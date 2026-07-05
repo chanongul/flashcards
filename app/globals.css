@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-950 text-neutral-100;
+}
+
+/* Rich text font-size steps — see lib/sanitize.ts's FONT_SIZE_VALUES. */
+[data-size="1"] { font-size: 0.7em; }
+[data-size="2"] { font-size: 0.85em; }
+[data-size="4"] { font-size: 1.25em; }
+[data-size="5"] { font-size: 1.6em; }
