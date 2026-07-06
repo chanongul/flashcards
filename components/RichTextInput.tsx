@@ -127,6 +127,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     document.execCommand('fontSize', false, String(level));
     ref.current?.focus();
 
+    const newSpans: HTMLElement[] = [];
     ref.current?.querySelectorAll('font[size]').forEach((fontEl) => {
       const parent = fontEl.parentNode;
       if (!parent) return;
@@ -134,7 +135,20 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
       span.setAttribute('data-size', String(level));
       while (fontEl.firstChild) span.appendChild(fontEl.firstChild);
       parent.replaceChild(span, fontEl);
+      newSpans.push(span);
     });
+
+    // The rewrite moves the font elements' children through a detached span,
+    // which collapses the live selection — rebuild it over the new spans so
+    // the text stays selected (the unwrap-to-normal path above already does
+    // the equivalent with its `moved` nodes).
+    if (newSpans.length > 0) {
+      const range = document.createRange();
+      range.setStartBefore(newSpans[0]);
+      range.setEndAfter(newSpans[newSpans.length - 1]);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
 
     handleInput();
   }
