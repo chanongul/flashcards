@@ -244,14 +244,14 @@ export default function ReviewPage() {
 
   if (userLoading || !user) {
     return (
-      <main className="mx-auto max-w-md p-6">
+      <main className="mx-auto mb-2 max-w-md p-6">
         <p className="text-sm text-neutral-500">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex h-dvh max-w-md flex-col p-6">
+    <main className="mx-auto flex h-[calc(100dvh-0.5rem)] max-w-md flex-col p-6">
       <div className="mb-4 flex shrink-0 items-center justify-between">
         <button
           onClick={() => router.push('/')}

@@ -58,14 +58,14 @@ export default function AllCardsPage() {
 
   if (userLoading || !user) {
     return (
-      <main className="mx-auto max-w-md p-6">
+      <main className="mx-auto mb-2 max-w-md p-6">
         <p className="text-sm text-neutral-500">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-md p-6">
+    <main className="mx-auto mb-2 max-w-md p-6">
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={() => router.push(`/review/${params.deckId}`)}

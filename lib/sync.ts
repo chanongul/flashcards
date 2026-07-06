@@ -46,13 +46,19 @@ export async function logEvent(
   return event;
 }
 
-/** Push any local events that haven't been synced yet. Safe to call often. */
+/** Push any local events that haven't been synced yet. Safe to call often.
+ * Inserted one at a time (not batched) so a single rejected row — bad data,
+ * a transient conflict, whatever — can't wedge every other event queued
+ * behind it forever; each row is retried independently on the next call. */
 export async function pushEvents() {
   const unsynced = await db.events.filter((e) => !e.synced).toArray();
   if (unsynced.length === 0) return { pushed: 0 };
 
-  const { error } = await supabase.from('events').insert(
-    unsynced.map((e) => ({
+  let pushed = 0;
+  let lastError: unknown;
+
+  for (const e of unsynced) {
+    const { error } = await supabase.from('events').insert({
       id: e.id,
       user_id: e.userId,
       entity_id: e.entityId,
@@ -60,16 +66,20 @@ export async function pushEvents() {
       payload: e.payload,
       client_id: e.clientId,
       timestamp: e.timestamp,
-    }))
-  );
+    });
 
-  if (error) {
-    console.error('pushEvents failed', error);
-    return { pushed: 0, error };
+    if (error) {
+      console.error('pushEvents: failed to push event', e.id, e.type, error);
+      lastError = error;
+      continue;
+    }
+
+    await db.events.update(e.id, { synced: true });
+    pushed++;
   }
 
-  await db.events.bulkPut(unsynced.map((e) => ({ ...e, synced: true })));
-  return { pushed: unsynced.length };
+  const failed = unsynced.length - pushed;
+  return failed > 0 ? { pushed, failed, error: lastError } : { pushed };
 }
 
 /** Pull any remote events we don't have locally yet, then replay them. */

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { SyncManager } from '@/components/SyncManager';
 
 export const metadata: Metadata = {
   title: 'Flashcards',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <SyncManager />
         {children}
         <script
           dangerouslySetInnerHTML={{

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   LogOut,
@@ -17,7 +17,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Deck, type NoteType, requestPersistentStorage } from '@/lib/db';
+import { db, type Deck, type NoteType } from '@/lib/db';
 import {
   createDeck,
   editDeck,
@@ -28,7 +28,6 @@ import {
   deleteNoteType,
   cloneNoteType,
 } from '@/lib/actions';
-import { sync } from '@/lib/sync';
 import { useUser } from '@/lib/useUser';
 import { createClient } from '@/utils/supabase/client';
 import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
@@ -112,12 +111,6 @@ export default function HomePage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    requestPersistentStorage();
-    sync(user.id).catch(console.error);
-  }, [user]);
 
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();
@@ -306,7 +299,7 @@ export default function HomePage() {
 
   if (loading || !user) {
     return (
-      <main className="mx-auto max-w-md p-6">
+      <main className="mx-auto mb-2 max-w-md p-6">
         <p className="text-sm text-neutral-500">Loading…</p>
       </main>
     );
@@ -315,7 +308,7 @@ export default function HomePage() {
   const deckRows = flattenDeckTree(decks ?? []);
 
   return (
-    <main className="mx-auto max-w-md p-6">
+    <main className="mx-auto mb-2 max-w-md p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Flashcards</h1>
         <button
