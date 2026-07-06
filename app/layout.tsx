@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Flashcards',
   },
+  icons: {
+    icon: '/favicon-32.png',
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
