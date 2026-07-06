@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, Search } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
 import { editCard, deleteCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
@@ -75,7 +76,13 @@ export default function AllCardsPage() {
           <ArrowLeft size={16} />
         </button>
         <h1 className="text-lg font-semibold">All cards</h1>
-        <div className="w-9" />
+        <Link
+          href={`/review/${params.deckId}/search`}
+          aria-label="Search this deck"
+          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+        >
+          <Search size={16} />
+        </Link>
       </div>
 
       <p className="mb-2 text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
