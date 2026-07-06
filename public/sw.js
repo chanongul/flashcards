@@ -1,7 +1,7 @@
 // Minimal service worker: caches the app shell so the PWA opens offline.
 // This is intentionally simple for v1 — no runtime caching strategy tuning yet.
 
-const CACHE_NAME = 'flashcard-app-v1';
+const CACHE_NAME = 'flashcard-app-v2';
 const APP_SHELL = ['/', '/manifest.json'];
 
 self.addEventListener('install', (event) => {

@@ -75,14 +75,14 @@ export default function BrowsePage() {
 
   if (userLoading || !user) {
     return (
-      <main className="mx-auto mb-2 max-w-md p-6 sm:mb-0">
+      <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
         <p className="text-sm text-neutral-500">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto mb-2 max-w-md p-6 sm:mb-0">
+    <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={() => router.push('/')}
