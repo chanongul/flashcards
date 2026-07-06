@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Pencil, Trash2, Star, Ban, Info, X, Bug } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
 import { stateLabel, ratingLabel, type StateLabel } from '@/lib/fsrs';
-import { clozeQuestion, clozeQuestionFor } from '@/lib/cloze';
+import { clozeQuestion, clozeQuestionFor, hasClozeDeletion } from '@/lib/cloze';
 import { getCardReviewHistory, type ReviewHistoryEntry } from '@/lib/stats';
 import { RichTextInput } from './RichTextInput';
 import { stripHtml } from '@/lib/sanitize';
@@ -39,6 +39,7 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
   const [back, setBack] = useState(card.back);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(card.fields);
   const [tagsInput, setTagsInput] = useState(card.tags.join(', '));
+  const [editError, setEditError] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [history, setHistory] = useState<ReviewHistoryEntry[] | null>(null);
 
@@ -57,6 +58,7 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
     setBack(card.back);
     setFieldValues(card.fields);
     setTagsInput(card.tags.join(', '));
+    setEditError('');
     setEditing(true);
   }
 
@@ -67,8 +69,27 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
     // cards, card.id is `${noteId}::${clozeIndex}`, which wouldn't match
     // anything during replay's note-content pass.
     if (card.cardType === 'custom') {
+      const fields = (noteType?.fields ?? []).map((f) => fieldValues[f] ?? '');
+      if (fields.every((v) => !stripHtml(v).trim())) {
+        setEditError('Fill in at least one field.');
+        return;
+      }
       await onSave(card.noteId, { fields: fieldValues, tags });
+    } else if (card.cardType === 'cloze') {
+      if (!front.trim()) {
+        setEditError('Enter the cloze text.');
+        return;
+      }
+      if (!hasClozeDeletion(front)) {
+        setEditError('Wrap at least one hidden word in {{c1::...}}.');
+        return;
+      }
+      await onSave(card.noteId, { front: front.trim(), back: back.trim(), tags });
     } else {
+      if (!stripHtml(front).trim() || !stripHtml(back).trim()) {
+        setEditError('Fill in both front and back.');
+        return;
+      }
       await onSave(card.noteId, { front: front.trim(), back: back.trim(), tags });
     }
     setEditing(false);
@@ -85,7 +106,10 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
                 <div className="mt-0.5">
                   <RichTextInput
                     value={fieldValues[fieldName] ?? ''}
-                    onChange={(html) => setFieldValues((f) => ({ ...f, [fieldName]: html }))}
+                    onChange={(html) => {
+                      setFieldValues((f) => ({ ...f, [fieldName]: html }));
+                      setEditError('');
+                    }}
                   />
                 </div>
               </label>
@@ -95,13 +119,28 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
             // conflict with the regex-based cloze parsing.
             <input
               value={front}
-              onChange={(e) => setFront(e.target.value)}
+              onChange={(e) => {
+                setFront(e.target.value);
+                setEditError('');
+              }}
               className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
             />
           ) : (
             <>
-              <RichTextInput value={front} onChange={setFront} />
-              <RichTextInput value={back} onChange={setBack} />
+              <RichTextInput
+                value={front}
+                onChange={(html) => {
+                  setFront(html);
+                  setEditError('');
+                }}
+              />
+              <RichTextInput
+                value={back}
+                onChange={(html) => {
+                  setBack(html);
+                  setEditError('');
+                }}
+              />
             </>
           )}
           <input
@@ -110,6 +149,7 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
             placeholder="Tags, comma-separated"
             className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs"
           />
+          {editError && <p className="text-xs text-red-400">{editError}</p>}
           <div className="flex gap-2">
             <button
               type="submit"
@@ -119,7 +159,10 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
             </button>
             <button
               type="button"
-              onClick={() => setEditing(false)}
+              onClick={() => {
+                setEditing(false);
+                setEditError('');
+              }}
               className="flex-1 rounded-md border border-neutral-700 py-1.5 text-xs text-neutral-300"
             >
               Cancel

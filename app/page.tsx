@@ -40,6 +40,7 @@ export default function HomePage() {
   const { user, loading } = useUser();
   const decks = useLiveQuery(() => db.decks.toArray(), []);
   const [newDeckName, setNewDeckName] = useState('');
+  const [createDeckError, setCreateDeckError] = useState('');
 
   const deckCounts = useLiveQuery(async () => {
     const [allDecks, cards] = await Promise.all([
@@ -88,7 +89,9 @@ export default function HomePage() {
   const [showCreateDeck, setShowCreateDeck] = useState(false);
   const [subdeckParent, setSubdeckParent] = useState<Deck | null>(null);
   const [subdeckName, setSubdeckName] = useState('');
+  const [subdeckError, setSubdeckError] = useState('');
   const [actionsDeck, setActionsDeck] = useState<Deck | null>(null);
+  const [renameDeckError, setRenameDeckError] = useState('');
 
   const [showNoteTypes, setShowNoteTypes] = useState(false);
   const [noteTypePage, setNoteTypePage] = useState<'list' | 'create'>('list');
@@ -98,6 +101,7 @@ export default function HomePage() {
   const [newQuestionFields, setNewQuestionFields] = useState<string[]>(['']);
   const [newAnswerFields, setNewAnswerFields] = useState<string[]>(['']);
   const [newTypeReversed, setNewTypeReversed] = useState(false);
+  const [noteTypeError, setNoteTypeError] = useState('');
   const noteTypes = useLiveQuery(
     () => db.noteTypes.filter((nt) => !nt.deleted).toArray(),
     []
@@ -117,10 +121,26 @@ export default function HomePage() {
 
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();
-    if (!newDeckName.trim() || !user) return;
-    await createDeck(user.id, newDeckName.trim());
+    if (!user) return;
+    const name = newDeckName.trim();
+    if (!name) {
+      setCreateDeckError('Enter a deck name.');
+      return;
+    }
+    if (decks?.some((d) => d.name === name)) {
+      setCreateDeckError(`A deck named "${name}" already exists.`);
+      return;
+    }
+    await createDeck(user.id, name);
     setNewDeckName('');
+    setCreateDeckError('');
     setShowCreateDeck(false);
+  }
+
+  function closeCreateDeck() {
+    setShowCreateDeck(false);
+    setNewDeckName('');
+    setCreateDeckError('');
   }
 
   async function handleSignOut() {
@@ -131,14 +151,22 @@ export default function HomePage() {
     setEditingDeckId(deck.id);
     setEditingDeckParent(deckParentName(deck.name));
     setEditDeckName(deckDisplayName(deck.name));
+    setRenameDeckError('');
   }
 
   async function handleSaveDeckName(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !editingDeckId || !editDeckName.trim()) return;
-    const fullName = editingDeckParent
-      ? `${editingDeckParent}::${editDeckName.trim()}`
-      : editDeckName.trim();
+    if (!user || !editingDeckId) return;
+    const name = editDeckName.trim();
+    if (!name) {
+      setRenameDeckError('Enter a deck name.');
+      return;
+    }
+    const fullName = editingDeckParent ? `${editingDeckParent}::${name}` : name;
+    if (decks?.some((d) => d.id !== editingDeckId && d.name === fullName)) {
+      setRenameDeckError(`A deck named "${name}" already exists.`);
+      return;
+    }
     await editDeck(user.id, editingDeckId, { name: fullName });
     setEditingDeckId(null);
   }
@@ -164,14 +192,30 @@ export default function HomePage() {
   function handleAddSubdeck(parent: Deck) {
     setSubdeckParent(parent);
     setSubdeckName('');
+    setSubdeckError('');
+  }
+
+  function closeSubdeckModal() {
+    setSubdeckParent(null);
+    setSubdeckName('');
+    setSubdeckError('');
   }
 
   async function handleCreateSubdeck(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !subdeckParent || !subdeckName.trim()) return;
-    await createDeck(user.id, `${subdeckParent.name}::${subdeckName.trim()}`);
-    setSubdeckParent(null);
-    setSubdeckName('');
+    if (!user || !subdeckParent) return;
+    const name = subdeckName.trim();
+    if (!name) {
+      setSubdeckError('Enter a subdeck name.');
+      return;
+    }
+    const fullName = `${subdeckParent.name}::${name}`;
+    if (decks?.some((d) => d.name === fullName)) {
+      setSubdeckError(`A subdeck named "${name}" already exists here.`);
+      return;
+    }
+    await createDeck(user.id, fullName);
+    closeSubdeckModal();
   }
 
   function closeNoteTypesModal() {
@@ -179,6 +223,7 @@ export default function HomePage() {
     setNoteTypePage('list');
     setEditingNoteTypeId(null);
     setNoteTypeActionsId(null);
+    setNoteTypeError('');
   }
 
   function openCreateNoteType() {
@@ -187,6 +232,7 @@ export default function HomePage() {
     setNewQuestionFields(['']);
     setNewAnswerFields(['']);
     setNewTypeReversed(false);
+    setNoteTypeError('');
     setNoteTypePage('create');
   }
 
@@ -196,37 +242,48 @@ export default function HomePage() {
     setNewQuestionFields(nt.questionFields.length ? nt.questionFields : ['']);
     setNewAnswerFields(nt.answerFields.length ? nt.answerFields : ['']);
     setNewTypeReversed(nt.reversed);
+    setNoteTypeError('');
     setNoteTypePage('create');
   }
 
   async function handleSubmitNoteType(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !newTypeName.trim()) return;
+    if (!user) return;
+    const name = newTypeName.trim();
+    if (!name) {
+      setNoteTypeError('Enter a name.');
+      return;
+    }
+    if (noteTypes?.some((nt) => nt.id !== editingNoteTypeId && nt.name === name)) {
+      setNoteTypeError(`A note type named "${name}" already exists.`);
+      return;
+    }
     const questionFields = newQuestionFields.map((f) => f.trim()).filter(Boolean);
     const answerFields = newAnswerFields.map((f) => f.trim()).filter(Boolean);
-    if (questionFields.length === 0) return;
+    if (questionFields.length === 0) {
+      setNoteTypeError('Add at least one question field.');
+      return;
+    }
+    if (answerFields.length === 0) {
+      setNoteTypeError('Add at least one answer field.');
+      return;
+    }
     // `fields` (the full set a note of this type holds) is just the union of
     // question/answer fields — no separate input for it, so there's no way
     // for it to drift out of sync with what's actually shown on each side.
     const fields = Array.from(new Set([...questionFields, ...answerFields]));
     if (editingNoteTypeId) {
       await editNoteType(user.id, editingNoteTypeId, {
-        name: newTypeName.trim(),
+        name,
         fields,
         questionFields,
         answerFields,
         reversed: newTypeReversed,
       });
     } else {
-      await createNoteType(
-        user.id,
-        newTypeName.trim(),
-        fields,
-        questionFields,
-        answerFields,
-        newTypeReversed
-      );
+      await createNoteType(user.id, name, fields, questionFields, answerFields, newTypeReversed);
     }
+    setNoteTypeError('');
     setNoteTypePage('list');
   }
 
@@ -299,12 +356,18 @@ export default function HomePage() {
           editingDeckId === deck.id ? (
             <li key={deck.id} style={{ marginLeft: depth * 16 }}>
               <form onSubmit={handleSaveDeckName} className="flex gap-2">
-                <input
-                  value={editDeckName}
-                  onChange={(e) => setEditDeckName(e.target.value)}
-                  autoFocus
-                  className="flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                />
+                <div className="flex-1">
+                  <input
+                    value={editDeckName}
+                    onChange={(e) => {
+                      setEditDeckName(e.target.value);
+                      setRenameDeckError('');
+                    }}
+                    autoFocus
+                    className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                  />
+                  {renameDeckError && <p className="mt-1 text-sm text-red-400">{renameDeckError}</p>}
+                </div>
                 <button
                   type="submit"
                   aria-label="Save"
@@ -314,7 +377,10 @@ export default function HomePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingDeckId(null)}
+                  onClick={() => {
+                    setEditingDeckId(null);
+                    setRenameDeckError('');
+                  }}
                   aria-label="Cancel"
                   className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
                 >
@@ -411,7 +477,11 @@ export default function HomePage() {
       </ul>
 
       <button
-        onClick={() => setShowCreateDeck(true)}
+        onClick={() => {
+          setNewDeckName('');
+          setCreateDeckError('');
+          setShowCreateDeck(true);
+        }}
         aria-label="Add deck"
         className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
       >
@@ -421,7 +491,7 @@ export default function HomePage() {
       {showCreateDeck && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowCreateDeck(false)}
+          onClick={closeCreateDeck}
         >
           <div
             className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
@@ -430,7 +500,7 @@ export default function HomePage() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium">New deck</p>
               <button
-                onClick={() => setShowCreateDeck(false)}
+                onClick={closeCreateDeck}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
               >
@@ -440,11 +510,15 @@ export default function HomePage() {
             <form onSubmit={handleCreateDeck} className="space-y-2">
               <input
                 value={newDeckName}
-                onChange={(e) => setNewDeckName(e.target.value)}
+                onChange={(e) => {
+                  setNewDeckName(e.target.value);
+                  setCreateDeckError('');
+                }}
                 placeholder="Deck name (or Parent::Child)"
                 autoFocus
                 className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
               />
+              {createDeckError && <p className="text-sm text-red-400">{createDeckError}</p>}
               <button
                 type="submit"
                 className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
@@ -459,7 +533,7 @@ export default function HomePage() {
       {subdeckParent && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setSubdeckParent(null)}
+          onClick={closeSubdeckModal}
         >
           <div
             className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
@@ -470,7 +544,7 @@ export default function HomePage() {
                 New subdeck of &ldquo;{deckDisplayName(subdeckParent.name)}&rdquo;
               </p>
               <button
-                onClick={() => setSubdeckParent(null)}
+                onClick={closeSubdeckModal}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
               >
@@ -480,11 +554,15 @@ export default function HomePage() {
             <form onSubmit={handleCreateSubdeck} className="space-y-2">
               <input
                 value={subdeckName}
-                onChange={(e) => setSubdeckName(e.target.value)}
+                onChange={(e) => {
+                  setSubdeckName(e.target.value);
+                  setSubdeckError('');
+                }}
                 placeholder="Subdeck name"
                 autoFocus
                 className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
               />
+              {subdeckError && <p className="text-sm text-red-400">{subdeckError}</p>}
               <button
                 type="submit"
                 className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
@@ -588,7 +666,10 @@ export default function HomePage() {
               <>
                 <div className="mb-3 flex items-center gap-2">
                   <button
-                    onClick={() => setNoteTypePage('list')}
+                    onClick={() => {
+                      setNoteTypeError('');
+                      setNoteTypePage('list');
+                    }}
                     aria-label="Back"
                     className="text-neutral-400 hover:text-neutral-200"
                   >
@@ -602,7 +683,10 @@ export default function HomePage() {
                 <form onSubmit={handleSubmitNoteType} className="space-y-2">
                   <input
                     value={newTypeName}
-                    onChange={(e) => setNewTypeName(e.target.value)}
+                    onChange={(e) => {
+                      setNewTypeName(e.target.value);
+                      setNoteTypeError('');
+                    }}
                     placeholder="Name (e.g. Vocabulary)"
                     autoFocus
                     className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
@@ -690,8 +774,10 @@ export default function HomePage() {
                       onChange={(e) => setNewTypeReversed(e.target.checked)}
                       className="accent-neutral-100"
                     />
-                    Also generate a reversed card (swap question/answer sides)
+                    Allow reversed cards (lets you opt in per note when creating a card)
                   </label>
+
+                  {noteTypeError && <p className="text-sm text-red-400">{noteTypeError}</p>}
 
                   <button
                     type="submit"

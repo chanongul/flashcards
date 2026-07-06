@@ -245,7 +245,9 @@ export async function replayAllEvents() {
       // Same pattern as basic notes: front/back stay as the type's own
       // question/answer rendering for both cards — questionText/answerText
       // do the actual display-time swap based on isReversed.
-      const variants = noteTypeDef.reversed ? [false, true] : [false];
+      // `noteTypeDef.reversed` only makes the option available; `note.reversed`
+      // is the per-note opt-in chosen when the note was created.
+      const variants = noteTypeDef.reversed && note.reversed ? [false, true] : [false];
       for (const isReversed of variants) {
         const id = isReversed ? `${note.id}::reversed` : note.id;
         cards.set(id, {

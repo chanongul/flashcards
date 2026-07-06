@@ -38,7 +38,7 @@ export interface NoteType {
   fields: string[]; // ordered, e.g. ["Word", "Reading", "Meaning", "Example"]
   questionFields: string[]; // subset/order of `fields` shown on the question
   answerFields: string[]; // subset/order of `fields` shown on the answer
-  reversed: boolean; // also generate an answer->question sibling card per note
+  reversed: boolean; // whether notes of this type may opt into an answer->question sibling card
   deleted: boolean;
   createdAt: number;
   updatedAt: number;
@@ -62,7 +62,7 @@ export interface Note {
   back: string;
   fields: Record<string, string>; // used when noteType references a custom NoteType
   tags: string[];
-  reversed: boolean; // basic notes only: also generate a back->front sibling card
+  reversed: boolean; // opt-in per note: also generate a back->front sibling card (basic notes, or custom types with reversed enabled)
   deleted: boolean;
   createdAt: number;
   updatedAt: number;

@@ -16,7 +16,7 @@ import {
 import { Rating, type Grade } from '@/lib/fsrs';
 import { db, type Card } from '@/lib/db';
 import { useUser } from '@/lib/useUser';
-import { clozeQuestionFor, clozeAnswerFor } from '@/lib/cloze';
+import { clozeQuestionFor, clozeAnswerFor, hasClozeDeletion } from '@/lib/cloze';
 import { RichTextInput } from '@/components/RichTextInput';
 import { RichText } from '@/components/RichText';
 import { stripHtml } from '@/lib/sanitize';
@@ -51,6 +51,7 @@ export default function ReviewPage() {
   const [newClozeText, setNewClozeText] = useState('');
   const [newFields, setNewFields] = useState<Record<string, string>>({});
   const [newTags, setNewTags] = useState('');
+  const [addCardError, setAddCardError] = useState('');
 
   const noteTypes = useLiveQuery(() => db.noteTypes.filter((nt) => !nt.deleted).toArray(), []);
   const selectedNoteType = noteTypes?.find((nt) => nt.id === newCardType);
@@ -63,6 +64,8 @@ export default function ReviewPage() {
   const [newCardsPerDay, setNewCardsPerDay] = useState(0);
   const [reviewsPerDay, setReviewsPerDay] = useState(0);
   const [studyAheadDays, setStudyAheadDays] = useState(1);
+  const [deckOptionsError, setDeckOptionsError] = useState('');
+  const [customStudyError, setCustomStudyError] = useState('');
 
   const [lastReview, setLastReview] = useState<{ card: Card; reviewEventId: string } | null>(
     null
@@ -133,6 +136,12 @@ export default function ReviewPage() {
     loadQueue();
   }
 
+  function selectCardType(type: string) {
+    setNewCardType(type);
+    setNewReversed(false);
+    setAddCardError('');
+  }
+
   function closeAddModal() {
     setShowAddModal(false);
     setNewCardType('basic');
@@ -142,6 +151,7 @@ export default function ReviewPage() {
     setNewClozeText('');
     setNewFields({});
     setNewTags('');
+    setAddCardError('');
   }
 
   async function handleAddCard(e: React.FormEvent) {
@@ -154,12 +164,35 @@ export default function ReviewPage() {
       .filter(Boolean);
 
     if (selectedNoteType) {
-      await createCard(user.id, params.deckId, selectedNoteType.id, '', '', tags, newFields);
+      if (selectedNoteType.fields.every((f) => !stripHtml(newFields[f] ?? '').trim())) {
+        setAddCardError('Fill in at least one field.');
+        return;
+      }
+      await createCard(
+        user.id,
+        params.deckId,
+        selectedNoteType.id,
+        '',
+        '',
+        tags,
+        newFields,
+        newReversed
+      );
     } else if (newCardType === 'cloze') {
-      if (!newClozeText.trim()) return;
+      if (!newClozeText.trim()) {
+        setAddCardError('Enter the cloze text.');
+        return;
+      }
+      if (!hasClozeDeletion(newClozeText)) {
+        setAddCardError('Wrap at least one hidden word in {{c1::...}}.');
+        return;
+      }
       await createCard(user.id, params.deckId, 'cloze', newClozeText.trim(), '', tags);
     } else {
-      if (!stripHtml(newFront).trim() || !stripHtml(newBack).trim()) return;
+      if (!stripHtml(newFront).trim() || !stripHtml(newBack).trim()) {
+        setAddCardError('Fill in both front and back.');
+        return;
+      }
       await createCard(user.id, params.deckId, newCardType, newFront, newBack, tags, undefined, newReversed);
     }
     closeAddModal();
@@ -171,14 +204,24 @@ export default function ReviewPage() {
     setDeckNameInput(deckDisplayName(deck.name));
     setNewCardsPerDay(deck.newCardsPerDay);
     setReviewsPerDay(deck.reviewsPerDay);
+    setDeckOptionsError('');
     setShowDeckOptions(true);
   }
 
   async function handleSaveDeckOptions(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !deck || !deckNameInput.trim()) return;
+    if (!user || !deck) return;
+    const name = deckNameInput.trim();
+    if (!name) {
+      setDeckOptionsError('Enter a deck name.');
+      return;
+    }
+    if (newCardsPerDay < 0 || reviewsPerDay < 0) {
+      setDeckOptionsError('New cards/day and reviews/day cannot be negative.');
+      return;
+    }
     const parent = deckParentName(deck.name);
-    const fullName = parent ? `${parent}::${deckNameInput.trim()}` : deckNameInput.trim();
+    const fullName = parent ? `${parent}::${name}` : name;
     await editDeck(user.id, params.deckId, {
       name: fullName,
       newCardsPerDay,
@@ -189,6 +232,10 @@ export default function ReviewPage() {
   }
 
   async function handleStartCustomStudy() {
+    if (studyAheadDays < 0) {
+      setCustomStudyError('Days ahead cannot be negative.');
+      return;
+    }
     const ahead = await getDueCardsAhead(params.deckId, studyAheadDays);
     setQueue(ahead);
     setRevealed(false);
@@ -231,7 +278,10 @@ export default function ReviewPage() {
             <List size={16} />
           </Link>
           <button
-            onClick={() => setShowCustomStudy(true)}
+            onClick={() => {
+              setCustomStudyError('');
+              setShowCustomStudy(true);
+            }}
             aria-label="Custom study"
             className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
@@ -367,7 +417,7 @@ export default function ReviewPage() {
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setNewCardType(type)}
+                    onClick={() => selectCardType(type)}
                     className={`rounded-md px-3 py-1.5 ${
                       newCardType === type
                         ? 'bg-neutral-100 text-neutral-900'
@@ -381,7 +431,7 @@ export default function ReviewPage() {
                   <button
                     key={nt.id}
                     type="button"
-                    onClick={() => setNewCardType(nt.id)}
+                    onClick={() => selectCardType(nt.id)}
                     className={`rounded-md px-3 py-1.5 ${
                       newCardType === nt.id
                         ? 'bg-neutral-100 text-neutral-900'
@@ -394,22 +444,41 @@ export default function ReviewPage() {
               </div>
 
               {selectedNoteType ? (
-                selectedNoteType.fields.map((fieldName) => (
-                  <label key={fieldName} className="block">
-                    <span className="text-xs text-neutral-500">{fieldName}</span>
-                    <div className="mt-0.5">
-                      <RichTextInput
-                        value={newFields[fieldName] ?? ''}
-                        onChange={(html) => setNewFields((f) => ({ ...f, [fieldName]: html }))}
+                <>
+                  {selectedNoteType.fields.map((fieldName) => (
+                    <label key={fieldName} className="block">
+                      <span className="text-xs text-neutral-500">{fieldName}</span>
+                      <div className="mt-0.5">
+                        <RichTextInput
+                          value={newFields[fieldName] ?? ''}
+                          onChange={(html) => {
+                            setNewFields((f) => ({ ...f, [fieldName]: html }));
+                            setAddCardError('');
+                          }}
+                        />
+                      </div>
+                    </label>
+                  ))}
+                  {selectedNoteType.reversed && (
+                    <label className="flex items-center gap-2 text-xs text-neutral-400">
+                      <input
+                        type="checkbox"
+                        checked={newReversed}
+                        onChange={(e) => setNewReversed(e.target.checked)}
+                        className="accent-neutral-100"
                       />
-                    </div>
-                  </label>
-                ))
+                      Also add the reverse card (answer → question)
+                    </label>
+                  )}
+                </>
               ) : newCardType === 'cloze' ? (
                 <>
                   <textarea
                     value={newClozeText}
-                    onChange={(e) => setNewClozeText(e.target.value)}
+                    onChange={(e) => {
+                      setNewClozeText(e.target.value);
+                      setAddCardError('');
+                    }}
                     placeholder="The capital of France is {{c1::Paris}}"
                     rows={3}
                     className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
@@ -420,8 +489,22 @@ export default function ReviewPage() {
                 </>
               ) : (
                 <>
-                  <RichTextInput value={newFront} onChange={setNewFront} placeholder="Front (e.g. 猫)" />
-                  <RichTextInput value={newBack} onChange={setNewBack} placeholder="Back (e.g. cat)" />
+                  <RichTextInput
+                    value={newFront}
+                    onChange={(html) => {
+                      setNewFront(html);
+                      setAddCardError('');
+                    }}
+                    placeholder="Front (e.g. 猫)"
+                  />
+                  <RichTextInput
+                    value={newBack}
+                    onChange={(html) => {
+                      setNewBack(html);
+                      setAddCardError('');
+                    }}
+                    placeholder="Back (e.g. cat)"
+                  />
                   <label className="flex items-center gap-2 text-xs text-neutral-400">
                     <input
                       type="checkbox"
@@ -441,6 +524,8 @@ export default function ReviewPage() {
                 className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs"
               />
 
+              {addCardError && <p className="text-sm text-red-400">{addCardError}</p>}
+
               <button
                 type="submit"
                 className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
@@ -455,7 +540,10 @@ export default function ReviewPage() {
       {showDeckOptions && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowDeckOptions(false)}
+          onClick={() => {
+            setShowDeckOptions(false);
+            setDeckOptionsError('');
+          }}
         >
           <div
             className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
@@ -466,7 +554,10 @@ export default function ReviewPage() {
                 {deck && deckParentName(deck.name) ? 'Subdeck options' : 'Deck options'}
               </p>
               <button
-                onClick={() => setShowDeckOptions(false)}
+                onClick={() => {
+                  setShowDeckOptions(false);
+                  setDeckOptionsError('');
+                }}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
               >
@@ -479,7 +570,10 @@ export default function ReviewPage() {
                 <span className="text-xs text-neutral-400">Name</span>
                 <input
                   value={deckNameInput}
-                  onChange={(e) => setDeckNameInput(e.target.value)}
+                  onChange={(e) => {
+                    setDeckNameInput(e.target.value);
+                    setDeckOptionsError('');
+                  }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
@@ -489,7 +583,10 @@ export default function ReviewPage() {
                   type="number"
                   min={0}
                   value={newCardsPerDay}
-                  onChange={(e) => setNewCardsPerDay(Number(e.target.value))}
+                  onChange={(e) => {
+                    setNewCardsPerDay(Number(e.target.value));
+                    setDeckOptionsError('');
+                  }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
@@ -499,10 +596,14 @@ export default function ReviewPage() {
                   type="number"
                   min={0}
                   value={reviewsPerDay}
-                  onChange={(e) => setReviewsPerDay(Number(e.target.value))}
+                  onChange={(e) => {
+                    setReviewsPerDay(Number(e.target.value));
+                    setDeckOptionsError('');
+                  }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
+              {deckOptionsError && <p className="text-sm text-red-400">{deckOptionsError}</p>}
               <button
                 type="submit"
                 className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
@@ -517,7 +618,10 @@ export default function ReviewPage() {
       {showCustomStudy && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowCustomStudy(false)}
+          onClick={() => {
+            setShowCustomStudy(false);
+            setCustomStudyError('');
+          }}
         >
           <div
             className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
@@ -526,7 +630,10 @@ export default function ReviewPage() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium">Custom study</p>
               <button
-                onClick={() => setShowCustomStudy(false)}
+                onClick={() => {
+                  setShowCustomStudy(false);
+                  setCustomStudyError('');
+                }}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
               >
@@ -539,22 +646,33 @@ export default function ReviewPage() {
               rescheduled from now, same as any other review.
             </p>
 
-            <label className="block">
-              <span className="text-xs text-neutral-400">Days ahead</span>
-              <input
-                type="number"
-                min={0}
-                value={studyAheadDays}
-                onChange={(e) => setStudyAheadDays(Number(e.target.value))}
-                className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-              />
-            </label>
-            <button
-              onClick={handleStartCustomStudy}
-              className="mt-3 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleStartCustomStudy();
+              }}
             >
-              Start
-            </button>
+              <label className="block">
+                <span className="text-xs text-neutral-400">Days ahead</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={studyAheadDays}
+                  onChange={(e) => {
+                    setStudyAheadDays(Number(e.target.value));
+                    setCustomStudyError('');
+                  }}
+                  className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                />
+              </label>
+              {customStudyError && <p className="mt-2 text-sm text-red-400">{customStudyError}</p>}
+              <button
+                type="submit"
+                className="mt-3 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+              >
+                Start
+              </button>
+            </form>
           </div>
         </div>
       )}

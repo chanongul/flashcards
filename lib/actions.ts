@@ -139,9 +139,10 @@ export async function cloneDeck(userId: string, deckId: string) {
 }
 
 /** cardType is 'basic' | 'cloze', or a NoteType id for a custom note type —
- * in the latter case, pass its field values via `fields`. `reversed` only
- * applies to 'basic': it also generates an independently-scheduled
- * back->front sibling card, matching Anki's "Basic (and reversed card)". */
+ * in the latter case, pass its field values via `fields`. `reversed` opts
+ * this note into an independently-scheduled back->front sibling card,
+ * matching Anki's "Basic (and reversed card)" — for custom types this only
+ * takes effect if the note type itself has `reversed` enabled. */
 export async function createCard(
   userId: string,
   deckId: string,
