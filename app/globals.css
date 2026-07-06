@@ -8,6 +8,12 @@ html, body {
    * without this the whole page can be dragged up/down past its own
    * content in the installed PWA. */
   overscroll-behavior: none;
+  /* The iOS input zoom-fix below inflates a control's layout width (then
+   * visually scales it back down with transform) — transforms don't affect
+   * scrollable-overflow calculations, so that invisible inflated width was
+   * making the whole page horizontally scrollable. Nothing here is ever
+   * meant to scroll sideways, so clip it. */
+  overflow-x: hidden;
 }
 
 body {

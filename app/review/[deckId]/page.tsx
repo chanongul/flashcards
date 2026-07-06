@@ -16,6 +16,7 @@ import {
 import { Rating, type Grade } from '@/lib/fsrs';
 import { db, type Card } from '@/lib/db';
 import { useUser } from '@/lib/useUser';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { clozeQuestionFor, clozeAnswerFor, hasClozeDeletion } from '@/lib/cloze';
 import { RichTextInput } from '@/components/RichTextInput';
 import { RichText } from '@/components/RichText';
@@ -59,6 +60,8 @@ export default function ReviewPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [showCustomStudy, setShowCustomStudy] = useState(false);
+
+  useBodyScrollLock(showAddModal || showDeckOptions || showCustomStudy);
 
   const [deckNameInput, setDeckNameInput] = useState('');
   const [newCardsPerDay, setNewCardsPerDay] = useState(0);

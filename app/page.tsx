@@ -29,6 +29,7 @@ import {
   cloneNoteType,
 } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { createClient } from '@/utils/supabase/client';
 import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
 import { deckDisplayName, deckParentName, ancestorNames, flattenDeckTree } from '@/lib/decks';
@@ -111,6 +112,8 @@ export default function HomePage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  useBodyScrollLock(showCreateDeck || !!subdeckParent || showNoteTypes);
 
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();

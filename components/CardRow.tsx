@@ -9,6 +9,7 @@ import { clozeQuestion, clozeQuestionFor, hasClozeDeletion } from '@/lib/cloze';
 import { getCardReviewHistory, type ReviewHistoryEntry } from '@/lib/stats';
 import { RichTextInput } from './RichTextInput';
 import { stripHtml } from '@/lib/sanitize';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 const STATE_COLORS: Record<StateLabel, string> = {
   New: 'bg-blue-900/50 text-blue-300',
@@ -42,6 +43,8 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
   const [editError, setEditError] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [history, setHistory] = useState<ReviewHistoryEntry[] | null>(null);
+
+  useBodyScrollLock(showInfo);
 
   const noteType = useLiveQuery(
     () => (card.noteTypeId ? db.noteTypes.get(card.noteTypeId) : undefined),
