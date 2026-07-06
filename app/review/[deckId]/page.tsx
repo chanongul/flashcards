@@ -259,7 +259,7 @@ export default function ReviewPage() {
         <button
           onClick={() => router.push('/')}
           aria-label="Back to decks"
-          className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >
           <ArrowLeft size={16} />
         </button>
@@ -268,7 +268,7 @@ export default function ReviewPage() {
             <button
               onClick={handleUndo}
               aria-label="Undo last review"
-              className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+              className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
             >
               <Undo2 size={16} />
             </button>
@@ -276,7 +276,7 @@ export default function ReviewPage() {
           <Link
             href={`/review/${params.deckId}/all`}
             aria-label="View all cards"
-            className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <List size={16} />
           </Link>
@@ -286,21 +286,21 @@ export default function ReviewPage() {
               setShowCustomStudy(true);
             }}
             aria-label="Custom study"
-            className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <CalendarClock size={16} />
           </button>
           <button
             onClick={openDeckOptions}
             aria-label="Deck options"
-            className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <Settings size={16} />
           </button>
           <button
             onClick={() => setShowAddModal(true)}
             aria-label="Add a card"
-            className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <Plus size={16} />
           </button>
