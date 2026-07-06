@@ -329,23 +329,31 @@ export default function ReviewPage() {
 
       {!loading && current && (
         <div className="flex flex-1 flex-col gap-4 overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 p-8 text-center">
-            <div className="flex flex-1 flex-col items-center justify-center">
-              {current.cardType === 'cloze' ? (
-                <p className="text-lg">{questionText(current)}</p>
-              ) : (
-                <RichText html={questionText(current)} className="text-lg" />
-              )}
+          <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 p-8 text-center">
+            {/* Each side is its own scroll region: the min-h-full inner
+                wrapper keeps content vertically centered when it fits, but
+                lets it grow past the container and scroll from the top when
+                it's too long (avoids flexbox centering clipping the top). */}
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex min-h-full flex-col items-center justify-center">
+                {current.cardType === 'cloze' ? (
+                  <p className="text-lg">{questionText(current)}</p>
+                ) : (
+                  <RichText html={questionText(current)} className="text-lg" />
+                )}
+              </div>
             </div>
             {revealed && (
               <>
                 <hr className="my-2 shrink-0 border-neutral-800" />
-                <div className="flex flex-1 flex-col items-center justify-center">
-                  {current.cardType === 'cloze' ? (
-                    <p className="text-lg text-neutral-300">{answerText(current)}</p>
-                  ) : (
-                    <RichText html={answerText(current)} className="text-lg text-neutral-300" />
-                  )}
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+                  <div className="flex min-h-full flex-col items-center justify-center">
+                    {current.cardType === 'cloze' ? (
+                      <p className="text-lg text-neutral-300">{answerText(current)}</p>
+                    ) : (
+                      <RichText html={answerText(current)} className="text-lg text-neutral-300" />
+                    )}
+                  </div>
                 </div>
               </>
             )}
