@@ -418,7 +418,7 @@ export default function ReviewPage() {
           onClick={closeAddModal}
         >
           <div
-            className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -596,7 +596,7 @@ export default function ReviewPage() {
           }}
         >
           <div
-            className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -674,7 +674,7 @@ export default function ReviewPage() {
           }}
         >
           <div
-            className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
