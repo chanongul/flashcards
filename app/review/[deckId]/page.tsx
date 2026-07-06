@@ -328,7 +328,7 @@ export default function ReviewPage() {
 
       {!loading && current && (
         <div className="flex flex-1 flex-col gap-4 overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-y-auto rounded-lg border border-neutral-800 p-8 text-center">
+          <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 p-8 text-center">
             <div className="flex flex-1 flex-col items-center justify-center">
               {current.cardType === 'cloze' ? (
                 <p className="text-lg">{questionText(current)}</p>

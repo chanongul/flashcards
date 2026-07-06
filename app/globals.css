@@ -8,11 +8,7 @@ html, body {
    * without this the whole page can be dragged up/down past its own
    * content in the installed PWA. */
   overscroll-behavior: none;
-  /* The iOS input zoom-fix below inflates a control's layout width (then
-   * visually scales it back down with transform) — transforms don't affect
-   * scrollable-overflow calculations, so that invisible inflated width was
-   * making the whole page horizontally scrollable. Nothing here is ever
-   * meant to scroll sideways, so clip it. */
+  /* Nothing in this app is ever meant to scroll sideways. */
   overflow-x: hidden;
 }
 
@@ -27,42 +23,29 @@ body {
 [data-size="5"] { font-size: 1.6em; }
 
 /* iOS Safari zooms the whole page in when a focused form control's
- * font-size is under 16px. Force 16px (so it won't) and then transform
- * the control back down to the size it's designed at. line-height and
- * vertical padding are switched to em (relative to the control's own
- * font-size) so they inflate to 16px alongside it and land back on their
- * original pixel values once scaled down — the box ends up the same
- * size as before, just no longer a zoom trigger.
+ * font-size is under 16px. Force 16px so it won't — this makes the text
+ * in small inputs render a couple px larger than their Tailwind class
+ * implies, but box dimensions (padding/line-height are fixed rem values,
+ * not relative to font-size) stay untouched in every layout context.
+ * An earlier version of this fix also transform-scaled the box back down
+ * to its original visual size, but that requires inflating the box's
+ * layout width to compensate, which breaks in flex/grid contexts (e.g.
+ * a field row with a remove button) where the browser's shrink/grow
+ * algorithm doesn't treat that inflated width the same as a plain block
+ * width — the input would end up too narrow, or independently
+ * horizontally scrollable inside any overflow-y:auto ancestor. Not worth
+ * the fragility for a ~2px cosmetic difference.
  * @supports (-webkit-touch-callout: none) is a standard iOS-only feature
  * detection hack — desktop Safari/Chrome/Firefox don't match it. */
 @supports (-webkit-touch-callout: none) {
   input.text-sm,
   textarea.text-sm,
   select.text-sm,
-  [contenteditable].text-sm {
-    font-size: 16px;
-    line-height: 1.428571; /* 20px / 14px */
-    padding-top: 0.571429em; /* 8px / 14px */
-    padding-bottom: 0.571429em;
-    transform: scale(0.875); /* 14px / 16px */
-    transform-origin: top left;
-    width: calc(100% / 0.875);
-  }
-
-  [contenteditable].text-sm {
-    min-height: calc(2.5rem / 0.875);
-  }
-
+  [contenteditable].text-sm,
   input.text-xs,
   textarea.text-xs,
   select.text-xs,
   [contenteditable].text-xs {
     font-size: 16px;
-    line-height: 1.333333; /* 16px / 12px */
-    padding-top: 0.666667em; /* 8px / 12px */
-    padding-bottom: 0.666667em;
-    transform: scale(0.75); /* 12px / 16px */
-    transform-origin: top left;
-    width: calc(100% / 0.75);
   }
 }

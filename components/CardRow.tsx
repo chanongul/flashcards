@@ -256,7 +256,7 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
           onClick={() => setShowInfo(false)}
         >
           <div
-            className="max-h-[80vh] w-full max-w-sm overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            className="max-h-[80vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">

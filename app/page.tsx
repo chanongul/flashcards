@@ -576,7 +576,7 @@ export default function HomePage() {
           onClick={closeNoteTypesModal}
         >
           <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             {noteTypePage === 'list' ? (
