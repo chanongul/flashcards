@@ -330,7 +330,7 @@ export default function ReviewPage() {
 
       {!loading && current && (
         <div className="flex flex-1 flex-col gap-4 overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 px-8 text-center">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 px-4 text-center">
             {/* Each side is its own scroll region (see ScrollFade). The
                 min-h-full inner wrapper keeps content vertically centered
                 when it fits, but lets it grow past the container and scroll
