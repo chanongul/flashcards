@@ -103,8 +103,11 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
       <li>
         <form onSubmit={handleSubmit} className="space-y-2 rounded-md border border-neutral-700 p-3">
           {card.cardType === 'custom' ? (
+            // div, not label: a label forwards clicks to its first labelable
+            // descendant — inside RichTextInput that's the Bold toolbar
+            // button, so clicking the field was toggling bold.
             (noteType?.fields ?? []).map((fieldName) => (
-              <label key={fieldName} className="block">
+              <div key={fieldName}>
                 <span className="text-xs text-neutral-500">{fieldName}</span>
                 <div className="mt-0.5">
                   <RichTextInput
@@ -115,7 +118,7 @@ export function CardRow({ card, deckName, onSave, onDelete, onToggleFlag, onTogg
                     }}
                   />
                 </div>
-              </label>
+              </div>
             ))
           ) : card.cardType === 'cloze' ? (
             // Cloze syntax ({{c1::...}}) is plain text — rich text markup would

@@ -143,14 +143,10 @@ export default function ReviewPage() {
   }
 
   function selectCardType(type: string) {
+    // Clear everything on type switch so values from one type never leak
+    // into another (e.g. basic front/back silently riding along after
+    // switching to a custom type).
     setNewCardType(type);
-    setNewReversed(false);
-    setAddCardError('');
-  }
-
-  function closeAddModal() {
-    setShowAddModal(false);
-    setNewCardType('basic');
     setNewFront('');
     setNewBack('');
     setNewReversed(false);
@@ -158,6 +154,11 @@ export default function ReviewPage() {
     setNewFields({});
     setNewTags([]);
     setAddCardError('');
+  }
+
+  function closeAddModal() {
+    setShowAddModal(false);
+    selectCardType('basic');
   }
 
   async function handleAddCard(e: React.FormEvent) {
@@ -465,9 +466,27 @@ export default function ReviewPage() {
 
               {selectedNoteType ? (
                 <>
+                  {/* div, not label: a label forwards clicks to its first
+                      labelable descendant, which inside RichTextInput is the
+                      Bold toolbar button — clicking the field was toggling
+                      bold. contentEditable isn't labelable, so nothing is
+                      lost by using a plain div. */}
                   {selectedNoteType.fields.map((fieldName) => (
-                    <label key={fieldName} className="block">
-                      <span className="text-xs text-neutral-500">{fieldName}</span>
+                    <div key={fieldName}>
+                      <span className="text-xs text-neutral-500">
+                        {fieldName}
+                        <span className="text-neutral-600">
+                          {' '}
+                          (
+                          {[
+                            selectedNoteType.questionFields.includes(fieldName) && 'question',
+                            selectedNoteType.answerFields.includes(fieldName) && 'answer',
+                          ]
+                            .filter(Boolean)
+                            .join(' + ')}
+                          )
+                        </span>
+                      </span>
                       <div className="mt-0.5">
                         <RichTextInput
                           value={newFields[fieldName] ?? ''}
@@ -477,10 +496,10 @@ export default function ReviewPage() {
                           }}
                         />
                       </div>
-                    </label>
+                    </div>
                   ))}
                   {selectedNoteType.reversed && (
-                    <label className="flex items-center gap-2 text-xs text-neutral-400">
+                    <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
                       <Checkbox checked={newReversed} onChange={setNewReversed} />
                       Also add the reverse card (answer → question)
                     </label>
@@ -507,7 +526,9 @@ export default function ReviewPage() {
                 </>
               ) : (
                 <>
-                  <label className="block">
+                  {/* divs, not labels — see the custom-fields comment above
+                      (label click-forwarding hits the Bold toolbar button). */}
+                  <div>
                     <span className="text-xs text-neutral-500">Front</span>
                     <div className="mt-0.5">
                       <RichTextInput
@@ -519,8 +540,8 @@ export default function ReviewPage() {
                         placeholder="e.g. 猫"
                       />
                     </div>
-                  </label>
-                  <label className="block">
+                  </div>
+                  <div>
                     <span className="text-xs text-neutral-500">Back</span>
                     <div className="mt-0.5">
                       <RichTextInput
@@ -532,15 +553,17 @@ export default function ReviewPage() {
                         placeholder="e.g. cat"
                       />
                     </div>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-neutral-400">
+                  </div>
+                  <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
                     <Checkbox checked={newReversed} onChange={setNewReversed} />
                     Also add the reverse card (back → front)
                   </label>
                 </>
               )}
 
-              <label className="block">
+              {/* div, not label: with chips present, a label's click-forward
+                  target would be the first chip's remove button. */}
+              <div>
                 <span className="text-xs text-neutral-500">Tags</span>
                 <div className="mt-0.5">
                   <TagsInput
@@ -549,7 +572,7 @@ export default function ReviewPage() {
                     placeholder="Type a tag, press Enter…"
                   />
                 </div>
-              </label>
+              </div>
 
               {addCardError && <p className="text-sm text-red-400">{addCardError}</p>}
 

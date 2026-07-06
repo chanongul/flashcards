@@ -797,7 +797,7 @@ export default function HomePage() {
                     </button>
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs text-neutral-400">
+                  <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
                     <Checkbox checked={newTypeReversed} onChange={setNewTypeReversed} />
                     Allow reversed cards (lets you opt in per note when creating a card)
                   </label>

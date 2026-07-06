@@ -52,13 +52,16 @@ export function TagsInput({ value, onChange, placeholder }: TagsInputProps) {
           </button>
         </span>
       ))}
+      {/* text-xs also opts this input into the iOS focus-zoom fix in
+          globals.css (which targets input.text-xs/.text-sm) — without it,
+          the inherited font-size is under 16px and iOS zooms on focus. */}
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={commitDraft}
         placeholder={value.length === 0 ? placeholder : ''}
-        className="min-w-[80px] flex-1 bg-transparent outline-none placeholder:text-neutral-500"
+        className="min-w-[80px] flex-1 bg-transparent text-xs outline-none placeholder:text-neutral-500"
       />
     </div>
   );
