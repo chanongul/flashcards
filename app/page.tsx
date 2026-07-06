@@ -302,7 +302,7 @@ export default function HomePage() {
 
   if (loading || !user) {
     return (
-      <main className="mx-auto mb-2 max-w-md p-6">
+      <main className="mx-auto mb-2 max-w-md p-6 sm:mb-0">
         <p className="text-sm text-neutral-500">Loading…</p>
       </main>
     );
@@ -311,7 +311,7 @@ export default function HomePage() {
   const deckRows = flattenDeckTree(decks ?? []);
 
   return (
-    <main className="mx-auto mb-2 max-w-md p-6">
+    <main className="mx-auto mb-2 max-w-md p-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Flashcards</h1>
         <button
