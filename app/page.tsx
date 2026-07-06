@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   LogOut,
@@ -48,6 +48,29 @@ function shouldDropUp(triggerRect: DOMRect): boolean {
 export default function HomePage() {
   const { user, loading } = useUser();
   const decks = useLiveQuery(() => db.decks.toArray(), []);
+  const [titleSkewed, setTitleSkewed] = useState(false);
+  const titleSkewTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTitleSkewTimeout = () => {
+    if (titleSkewTimeout.current) clearTimeout(titleSkewTimeout.current);
+    titleSkewTimeout.current = null;
+  };
+
+  const handleTitleHoverStart = () => {
+    clearTitleSkewTimeout();
+    setTitleSkewed(true);
+  };
+
+  const handleTitleHoverEnd = () => {
+    clearTitleSkewTimeout();
+    setTitleSkewed(false);
+  };
+
+  const handleTitleTouchStart = () => {
+    clearTitleSkewTimeout();
+    setTitleSkewed(true);
+    titleSkewTimeout.current = setTimeout(() => setTitleSkewed(false), 3000);
+  };
   const [newDeckName, setNewDeckName] = useState('');
   const [createDeckError, setCreateDeckError] = useState('');
 
@@ -331,7 +354,17 @@ export default function HomePage() {
   return (
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Flashcards</h1>
+        <h1
+          className={`relative inline-block text-2xl font-black transition-transform duration-300 ${titleSkewed ? '-skew-x-[15deg]' : ''}`}
+          onMouseEnter={handleTitleHoverStart}
+          onMouseLeave={handleTitleHoverEnd}
+          onTouchStart={handleTitleTouchStart}
+        >
+          Flashcards
+          <span
+            className={`absolute bottom-0 left-0 h-0.5 bg-current transition-[width] duration-700 ease-[cubic-bezier(0.1,1.1,0.025,1)] ${titleSkewed ? 'w-full' : 'w-0'}`}
+          />
+        </h1>
         <button
           onClick={handleSignOut}
           aria-label="Sign out"
