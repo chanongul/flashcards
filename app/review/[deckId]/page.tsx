@@ -21,6 +21,7 @@ import { clozeQuestionFor, clozeAnswerFor, hasClozeDeletion } from '@/lib/cloze'
 import { RichTextInput } from '@/components/RichTextInput';
 import { RichText } from '@/components/RichText';
 import { Checkbox } from '@/components/Checkbox';
+import { TagsInput } from '@/components/TagsInput';
 import { ScrollFade } from '@/components/ScrollFade';
 import { stripHtml } from '@/lib/sanitize';
 import { countCardsByState, DECK_COUNT_TOOLTIPS } from '@/lib/stats';
@@ -53,7 +54,7 @@ export default function ReviewPage() {
   const [newReversed, setNewReversed] = useState(false);
   const [newClozeText, setNewClozeText] = useState('');
   const [newFields, setNewFields] = useState<Record<string, string>>({});
-  const [newTags, setNewTags] = useState('');
+  const [newTags, setNewTags] = useState<string[]>([]);
   const [addCardError, setAddCardError] = useState('');
 
   const noteTypes = useLiveQuery(() => db.noteTypes.filter((nt) => !nt.deleted).toArray(), []);
@@ -155,7 +156,7 @@ export default function ReviewPage() {
     setNewReversed(false);
     setNewClozeText('');
     setNewFields({});
-    setNewTags('');
+    setNewTags([]);
     setAddCardError('');
   }
 
@@ -163,10 +164,7 @@ export default function ReviewPage() {
     e.preventDefault();
     if (!user) return;
 
-    const tags = newTags
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const tags = newTags;
 
     if (selectedNoteType) {
       if (selectedNoteType.fields.every((f) => !stripHtml(newFields[f] ?? '').trim())) {
@@ -490,38 +488,51 @@ export default function ReviewPage() {
                 </>
               ) : newCardType === 'cloze' ? (
                 <>
-                  <textarea
-                    value={newClozeText}
-                    onChange={(e) => {
-                      setNewClozeText(e.target.value);
-                      setAddCardError('');
-                    }}
-                    placeholder="The capital of France is {{c1::Paris}}"
-                    rows={3}
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                  />
+                  <label className="block">
+                    <span className="text-xs text-neutral-500">Text</span>
+                    <textarea
+                      value={newClozeText}
+                      onChange={(e) => {
+                        setNewClozeText(e.target.value);
+                        setAddCardError('');
+                      }}
+                      placeholder="The capital of France is {{c1::Paris}}"
+                      rows={3}
+                      className="mt-0.5 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                    />
+                  </label>
                   <p className="text-xs text-neutral-500">
                     Wrap hidden text in <code>{'{{c1::...}}'}</code>.
                   </p>
                 </>
               ) : (
                 <>
-                  <RichTextInput
-                    value={newFront}
-                    onChange={(html) => {
-                      setNewFront(html);
-                      setAddCardError('');
-                    }}
-                    placeholder="Front (e.g. 猫)"
-                  />
-                  <RichTextInput
-                    value={newBack}
-                    onChange={(html) => {
-                      setNewBack(html);
-                      setAddCardError('');
-                    }}
-                    placeholder="Back (e.g. cat)"
-                  />
+                  <label className="block">
+                    <span className="text-xs text-neutral-500">Front</span>
+                    <div className="mt-0.5">
+                      <RichTextInput
+                        value={newFront}
+                        onChange={(html) => {
+                          setNewFront(html);
+                          setAddCardError('');
+                        }}
+                        placeholder="e.g. 猫"
+                      />
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-neutral-500">Back</span>
+                    <div className="mt-0.5">
+                      <RichTextInput
+                        value={newBack}
+                        onChange={(html) => {
+                          setNewBack(html);
+                          setAddCardError('');
+                        }}
+                        placeholder="e.g. cat"
+                      />
+                    </div>
+                  </label>
                   <label className="flex items-center gap-2 text-xs text-neutral-400">
                     <Checkbox checked={newReversed} onChange={setNewReversed} />
                     Also add the reverse card (back → front)
@@ -529,12 +540,16 @@ export default function ReviewPage() {
                 </>
               )}
 
-              <input
-                value={newTags}
-                onChange={(e) => setNewTags(e.target.value)}
-                placeholder="Tags, comma-separated (e.g. verbs, chapter-3)"
-                className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs"
-              />
+              <label className="block">
+                <span className="text-xs text-neutral-500">Tags</span>
+                <div className="mt-0.5">
+                  <TagsInput
+                    value={newTags}
+                    onChange={setNewTags}
+                    placeholder="Type a tag, press Enter…"
+                  />
+                </div>
+              </label>
 
               {addCardError && <p className="text-sm text-red-400">{addCardError}</p>}
 
