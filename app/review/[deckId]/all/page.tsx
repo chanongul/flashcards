@@ -70,7 +70,7 @@ export default function AllCardsPage() {
         <button
           onClick={() => router.push(`/review/${params.deckId}`)}
           aria-label="Back to review"
-          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+          className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
         >
           <ArrowLeft size={16} />
         </button>

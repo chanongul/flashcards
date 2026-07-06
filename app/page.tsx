@@ -343,14 +343,14 @@ export default function HomePage() {
           <Link
             href="/browse"
             aria-label="Browse cards"
-            className="rounded-md border border-neutral-700 p-2 hover:text-neutral-200"
+            className="rounded-md p-2 hover:text-neutral-200"
           >
             <Search size={16} />
           </Link>
           <button
             onClick={() => setShowNoteTypes(true)}
             aria-label="Manage custom note/card types"
-            className="rounded-md border border-neutral-700 p-2 hover:text-neutral-200"
+            className="rounded-md p-2 hover:text-neutral-200"
           >
             <LayoutTemplate size={16} />
           </button>
@@ -377,7 +377,7 @@ export default function HomePage() {
                 <button
                   type="submit"
                   aria-label="Save"
-                  className="rounded-md border border-neutral-700 p-2 text-neutral-300 hover:text-neutral-100"
+                  className="rounded-md p-2 text-neutral-300 hover:text-neutral-100"
                 >
                   <Check size={16} />
                 </button>
@@ -388,7 +388,7 @@ export default function HomePage() {
                     setRenameDeckError('');
                   }}
                   aria-label="Cancel"
-                  className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+                  className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
                 >
                   <X size={16} />
                 </button>
@@ -424,7 +424,7 @@ export default function HomePage() {
                   if (opening) setActionsDeckDropUp(shouldDropUp(e.currentTarget.getBoundingClientRect()));
                 }}
                 aria-label="Deck actions"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
               >
                 <MoreVertical size={14} />
               </button>
@@ -497,7 +497,7 @@ export default function HomePage() {
           setShowCreateDeck(true);
         }}
         aria-label="Add deck"
-        className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+        className="mt-2 flex h-10 w-full items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
       >
         <Plus size={16} />
       </button>
@@ -623,7 +623,7 @@ export default function HomePage() {
                           if (opening) setNoteTypeActionsDropUp(shouldDropUp(e.currentTarget.getBoundingClientRect()));
                         }}
                         aria-label="Custom note/card type actions"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
                       >
                         <MoreVertical size={14} />
                       </button>
@@ -679,7 +679,7 @@ export default function HomePage() {
                 <button
                   onClick={openCreateNoteType}
                   aria-label="New custom note/card type"
-                  className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                  className="mt-2 flex h-10 w-full items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
                 >
                   <Plus size={16} />
                 </button>
@@ -745,7 +745,7 @@ export default function HomePage() {
                       type="button"
                       onClick={() => setNewQuestionFields((fs) => [...fs, ''])}
                       aria-label="Add question field"
-                      className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                      className="flex h-8 w-full items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
                     >
                       <Plus size={14} />
                     </button>
@@ -783,7 +783,7 @@ export default function HomePage() {
                       type="button"
                       onClick={() => setNewAnswerFields((fs) => [...fs, ''])}
                       aria-label="Add answer field"
-                      className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                      className="flex h-8 w-full items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
                     >
                       <Plus size={14} />
                     </button>
