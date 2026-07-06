@@ -374,13 +374,13 @@ export default function ReviewPage() {
               </button>
               <button
                 onClick={() => handleRate(Rating.Good)}
-                className="rounded-md bg-green-700 py-3 text-sm"
+                className="rounded-md bg-yellow-600 py-3 text-sm"
               >
                 Good
               </button>
               <button
                 onClick={() => handleRate(Rating.Easy)}
-                className="rounded-md bg-blue-700 py-3 text-sm"
+                className="rounded-md bg-green-600 py-3 text-sm"
               >
                 Easy
               </button>
