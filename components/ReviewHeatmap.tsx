@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getDailyReviewCounts, dateKey } from '@/lib/stats';
 
@@ -87,7 +89,7 @@ function buildGrid(counts: Map<string, number>, today: Date) {
         row: cellIndex % 7,
         blank: false,
         count: day.count,
-        title: `${day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}: ${day.count} review${day.count === 1 ? '' : 's'}`,
+        title: `${day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${day.count} review${day.count === 1 ? '' : 's'}`,
       });
     });
 
@@ -115,7 +117,44 @@ function buildGrid(counts: Map<string, number>, today: Date) {
   return { cells, monthLabels, totalColumns: colOffset };
 }
 
+interface TooltipState {
+  key: string;
+  text: string;
+  x: number;
+  y: number;
+}
+
 export function ReviewHeatmap() {
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tooltip) return;
+
+    // Only dismiss on a tap/click OUTSIDE the heatmap — a tap on a cell
+    // needs to reach that cell's own onClick (which toggles/switches the
+    // tooltip), not get pre-empted by this handler first.
+    const onPointerDown = (e: Event) => {
+      if (containerRef.current && e.target instanceof Node && !containerRef.current.contains(e.target)) {
+        setTooltip(null);
+      }
+    };
+    const dismiss = () => setTooltip(null);
+
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('mousedown', onPointerDown);
+    // capture:true so this still fires for scrolls inside the heatmap's own
+    // overflow-x-auto strip, which wouldn't otherwise bubble to window.
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [tooltip]);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfYear = new Date(today.getFullYear(), 0, 1);
@@ -130,46 +169,65 @@ export function ReviewHeatmap() {
   const rowTemplate = '12px repeat(7, 10px)';
 
   return (
-    <div>
-      <p className="mb-2 text-xs text-neutral-500">
-        {total} reviews in {today.getFullYear()}
-      </p>
-      <div className="flex gap-[3px]">
-        <div className="grid gap-[3px]" style={{ gridTemplateRows: rowTemplate }}>
-          <div />
-          {DAY_LABELS.map((label, i) => (
-            <div key={i} className="flex h-[10px] w-3 items-center text-[9px] leading-none text-neutral-500">
-              {label}
-            </div>
-          ))}
-        </div>
-        <div className="overflow-x-auto">
-          <div
-            className="grid gap-[3px]"
-            style={{ gridTemplateColumns: `repeat(${totalColumns}, 10px)`, gridTemplateRows: rowTemplate }}
-          >
-            {monthLabels.map((m) => (
-              <div
-                key={`month-${m.col}`}
-                style={{ gridColumn: m.col + 1, gridRow: 1 }}
-                className="whitespace-nowrap text-[9px] leading-none text-neutral-500"
-              >
-                {m.label}
+    <>
+      <div ref={containerRef}>
+        <p className="mb-2 text-xs text-neutral-500">
+          {total} reviews in {today.getFullYear()}
+        </p>
+        <div className="flex gap-[3px]">
+          <div className="grid gap-[3px]" style={{ gridTemplateRows: rowTemplate }}>
+            <div />
+            {DAY_LABELS.map((label, i) => (
+              <div key={i} className="flex h-[10px] w-3 items-center text-[9px] leading-none text-neutral-500">
+                {label}
               </div>
             ))}
-            {cells.map((cell) => (
-              <div
-                key={cell.key}
-                style={{ gridColumn: cell.col + 1, gridRow: cell.row + 2 }}
-                title={cell.title || undefined}
-                className={`h-[10px] w-[10px] rounded-sm ${
-                  cell.blank ? 'border border-neutral-900' : colorForCount(cell.count)
-                }`}
-              />
-            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <div
+              className="grid gap-[3px]"
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, 10px)`, gridTemplateRows: rowTemplate }}
+            >
+              {monthLabels.map((m) => (
+                <div
+                  key={`month-${m.col}`}
+                  style={{ gridColumn: m.col + 1, gridRow: 1 }}
+                  className="whitespace-nowrap text-[9px] leading-none text-neutral-500"
+                >
+                  {m.label}
+                </div>
+              ))}
+              {cells.map((cell) => (
+                <div
+                  key={cell.key}
+                  style={{ gridColumn: cell.col + 1, gridRow: cell.row + 2 }}
+                  onClick={(e) => {
+                    if (cell.blank) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setTooltip((prev) =>
+                      prev?.key === cell.key
+                        ? null
+                        : { key: cell.key, text: cell.title, x: rect.left + rect.width / 2, y: rect.top }
+                    );
+                  }}
+                  aria-label={cell.title || undefined}
+                  className={`h-[10px] w-[10px] rounded-sm ${cell.blank ? 'border border-neutral-900' : `${colorForCount(cell.count)} cursor-pointer`}`}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      {tooltip &&
+        createPortal(
+          <div
+            style={{ left: tooltip.x, top: tooltip.y, transform: 'translate(-50%, calc(-100% - 6px))' }}
+            className="pointer-events-none fixed z-[60] whitespace-nowrap rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-100 shadow-lg"
+          >
+            {tooltip.text}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
