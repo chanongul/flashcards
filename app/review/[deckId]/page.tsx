@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Plus, X, Undo2, List, Settings, CalendarClock } from 'lucide-react';
+import { ArrowLeft, Plus, X, Undo2, List, Settings, CalendarClock, Search } from 'lucide-react';
 import {
   getDueCards,
   getDueCardsAhead,
@@ -281,6 +281,13 @@ export default function ReviewPage() {
             className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <List size={16} />
+          </Link>
+          <Link
+            href={`/review/${params.deckId}/search`}
+            aria-label="Search this deck"
+            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+          >
+            <Search size={16} />
           </Link>
           <button
             onClick={() => {
