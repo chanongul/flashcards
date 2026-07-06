@@ -58,6 +58,13 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
   // a deliberate simplification for a 2-button stepper, not a full editor.
   function getCurrentLevel(range: Range): number {
     let node: Node | null = range.startContainer;
+    // Programmatic selections (select-all, our own post-apply restore) often
+    // start in an ELEMENT container with the sized span as the child at
+    // startOffset rather than inside it — descend one level so the ancestor
+    // walk below can see that span too.
+    if (node.nodeType === Node.ELEMENT_NODE && node.childNodes[range.startOffset]) {
+      node = node.childNodes[range.startOffset];
+    }
     while (node && node !== ref.current) {
       if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'SPAN') {
         const size = (node as HTMLElement).getAttribute('data-size');
@@ -143,9 +150,13 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     // the text stays selected (the unwrap-to-normal path above already does
     // the equivalent with its `moved` nodes).
     if (newSpans.length > 0) {
+      // Anchor INSIDE the spans (not before/after them) so getCurrentLevel's
+      // ancestor walk finds the size on the next step — anchoring outside
+      // made a second size step read "normal" and re-apply the same level.
       const range = document.createRange();
-      range.setStartBefore(newSpans[0]);
-      range.setEndAfter(newSpans[newSpans.length - 1]);
+      const last = newSpans[newSpans.length - 1];
+      range.setStart(newSpans[0], 0);
+      range.setEnd(last, last.childNodes.length);
       sel.removeAllRanges();
       sel.addRange(range);
     }
