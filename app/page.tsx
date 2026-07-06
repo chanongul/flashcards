@@ -29,10 +29,13 @@ import {
   editNoteType,
   deleteNoteType,
   cloneNoteType,
+  resetAllData,
 } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { createClient } from '@/utils/supabase/client';
+import { sync } from '@/lib/sync';
+import { syncPendingMedia } from '@/lib/mediaSync';
 import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
 import { deckDisplayName, deckParentName, ancestorNames, flattenDeckTree } from '@/lib/decks';
 import { ReviewHeatmap } from '@/components/ReviewHeatmap';
@@ -51,7 +54,7 @@ interface FieldRow {
 export default function HomePage() {
   const { user, loading } = useUser();
   const { withLoading } = useLoading();
-  const decks = useLiveQuery(() => db.decks.toArray(), []);
+  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
   const [titleSkewed, setTitleSkewed] = useState(false);
   const titleSkewTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Feature-detecting "real mouse vs touch" via matchMedia turned out
@@ -92,12 +95,29 @@ export default function HomePage() {
     setTitleSkewed(true);
     titleSkewTimeout.current = setTimeout(() => setTitleSkewed(false), 1000);
   };
+
+  // The title doubles as a manual sync trigger — same push-then-pull the
+  // background SyncManager already does on its own interval/focus ticks,
+  // just on demand for "I want this to happen right now" (e.g. right after
+  // making a change on another device). It's also the hidden unlock for the
+  // reset-all-data button below — plain component state, so it (and the
+  // button) resets on every refresh, same as the title-skew state above.
+  const [titleClickCount, setTitleClickCount] = useState(0);
+
+  async function handleTitleClick() {
+    setTitleClickCount((c) => c + 1);
+    if (!user) return;
+    await withLoading(async () => {
+      await sync(user.id);
+      await syncPendingMedia(user.id);
+    });
+  }
   const [newDeckName, setNewDeckName] = useState('');
   const [createDeckError, setCreateDeckError] = useState('');
 
   const deckCounts = useLiveQuery(async () => {
     const [allDecks, cards] = await Promise.all([
-      db.decks.toArray(),
+      db.decks.filter((d) => !d.deleted).toArray(),
       db.cards.filter((c) => !c.deleted && !c.suspended).toArray(),
     ]);
     const byDeck = new Map<string, typeof cards>();
@@ -168,7 +188,17 @@ export default function HomePage() {
     onConfirm: () => void;
   } | null>(null);
 
-  useBodyScrollLock(showCreateDeck || !!subdeckParent || showNoteTypes);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+
+  useBodyScrollLock(showCreateDeck || !!subdeckParent || showNoteTypes || showResetConfirm);
+
+  async function handleResetAllData() {
+    if (!user || resetConfirmText !== 'RESET') return;
+    await withLoading(() => resetAllData(user.id));
+    setShowResetConfirm(false);
+    setResetConfirmText('');
+  }
 
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();
@@ -387,10 +417,14 @@ export default function HomePage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
-          className={`relative inline-block text-2xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[20%] scale-[125%] -skew-x-[25deg] font-bold' : ''}`}
+          className={`relative inline-block cursor-pointer text-2xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[20%] scale-[125%] -skew-x-[25deg] font-bold' : ''}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
           onTouchStart={handleTitleTouchStart}
+          onClick={handleTitleClick}
+          role="button"
+          aria-label="Sync now"
+          title="Sync now"
         >
           Flashcards
           <span
@@ -578,6 +612,18 @@ export default function HomePage() {
       >
         <Plus size={16} />
       </button>
+
+      {titleClickCount >= 10 && (
+        <button
+          onClick={() => {
+            setResetConfirmText('');
+            setShowResetConfirm(true);
+          }}
+          className="mt-6 flex w-full justify-center text-xs text-neutral-600 hover:text-red-400"
+        >
+          Reset all data
+        </button>
+      )}
 
       {showCreateDeck && (
         <div
@@ -909,6 +955,60 @@ export default function HomePage() {
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}
       />
+
+      {showResetConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium text-red-400">Reset all data</p>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                aria-label="Close"
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mb-3 text-sm text-neutral-400">
+              This permanently deletes every deck, card, note type, and review event — on this
+              device and on the server. There is no undo.
+            </p>
+            <label className="block">
+              <span className="text-xs text-neutral-500">
+                Type <span className="font-mono font-semibold text-neutral-300">RESET</span> to
+                confirm
+              </span>
+              <input
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                autoFocus
+                className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={handleResetAllData}
+                disabled={resetConfirmText !== 'RESET'}
+                className="flex-1 rounded-md bg-red-900/50 py-2 text-sm font-medium text-red-200 disabled:opacity-40"
+              >
+                Delete everything
+              </button>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 rounded-md border border-neutral-700 py-2 text-sm text-neutral-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

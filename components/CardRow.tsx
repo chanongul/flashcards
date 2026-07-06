@@ -110,7 +110,7 @@ export function CardRow({
     [card.noteTypeId]
   );
 
-  const decks = useLiveQuery(() => db.decks.toArray(), []);
+  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
   const deckRows = flattenDeckTree(decks ?? []);
 
   useEffect(() => {

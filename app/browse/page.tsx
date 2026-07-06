@@ -24,7 +24,7 @@ export default function BrowsePage() {
     onConfirm: () => void;
   } | null>(null);
 
-  const decks = useLiveQuery(() => db.decks.toArray(), []);
+  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
   const allCards = useLiveQuery(() => db.cards.filter((c) => !c.deleted).toArray(), []);
 
   const deckNameById = new Map((decks ?? []).map((d) => [d.id, d.name]));

@@ -5,7 +5,7 @@ import {
   DEFAULT_REVIEWS_PER_DAY,
   type FieldTypeConfig,
 } from './db';
-import { logEvent, replayAllEvents, pushEvents } from './sync';
+import { logEvent, replayAllEvents, pushEvents, resetAllData as resetAllDataInSync } from './sync';
 import { stateLabel, sortQueue, type Grade } from './fsrs';
 import { getTodayCounts } from './stats';
 import { getDeckAndDescendantIds } from './decks';
@@ -17,7 +17,9 @@ import { getDeckAndDescendantIds } from './decks';
  * (Anki's own convention — decks have no separate parentId, just a delimited name). */
 export async function createDeck(userId: string, name: string) {
   const parts = name.split('::').filter(Boolean);
-  const existingNames = new Set((await db.decks.toArray()).map((d) => d.name));
+  const existingNames = new Set(
+    (await db.decks.filter((d) => !d.deleted).toArray()).map((d) => d.name)
+  );
 
   let path = '';
   for (const part of parts) {
@@ -30,7 +32,7 @@ export async function createDeck(userId: string, name: string) {
   await replayAllEvents();
   void pushEvents();
 
-  const leaf = (await db.decks.toArray()).find((d) => d.name === path);
+  const leaf = (await db.decks.filter((d) => !d.deleted).toArray()).find((d) => d.name === path);
   return leaf?.id ?? '';
 }
 
@@ -44,7 +46,11 @@ export async function editDeck(
     if (deck && deck.name !== changes.name) {
       // Renaming a parent must cascade to its descendants, or they'd detach
       // from the hierarchy (their name would no longer start with the new prefix).
-      const descendants = await db.decks.where('name').startsWith(`${deck.name}::`).toArray();
+      const descendants = await db.decks
+        .where('name')
+        .startsWith(`${deck.name}::`)
+        .filter((d) => !d.deleted)
+        .toArray();
       for (const child of descendants) {
         await logEvent(userId, child.id, 'deck_edit', {
           name: changes.name + child.name.slice(deck.name.length),
@@ -60,7 +66,7 @@ export async function editDeck(
 export async function deleteDeck(userId: string, deckId: string) {
   const deck = await db.decks.get(deckId);
   const descendants = deck
-    ? await db.decks.where('name').startsWith(`${deck.name}::`).toArray()
+    ? await db.decks.where('name').startsWith(`${deck.name}::`).filter((d) => !d.deleted).toArray()
     : [];
   const decksToDelete = deck ? [deck, ...descendants] : [];
 
@@ -87,10 +93,16 @@ export async function cloneDeck(userId: string, deckId: string) {
   const deck = await db.decks.get(deckId);
   if (!deck) return;
 
-  const descendants = await db.decks.where('name').startsWith(`${deck.name}::`).toArray();
+  const descendants = await db.decks
+    .where('name')
+    .startsWith(`${deck.name}::`)
+    .filter((d) => !d.deleted)
+    .toArray();
   const oldDecks = [deck, ...descendants];
 
-  const existingNames = new Set((await db.decks.toArray()).map((d) => d.name));
+  const existingNames = new Set(
+    (await db.decks.filter((d) => !d.deleted).toArray()).map((d) => d.name)
+  );
   let newRootName = `${deck.name} copy`;
   for (let i = 2; existingNames.has(newRootName); i++) {
     newRootName = `${deck.name} copy ${i}`;
@@ -351,4 +363,10 @@ export async function getDueCardsAhead(deckId: string, daysAhead: number) {
     .filter((c) => !c.deleted && !c.suspended && c.fsrs.due <= cutoff)
     .toArray();
   return sortQueue(cards);
+}
+
+/** Wipes every deck, card, note type, and review event for this user —
+ * locally and on the server. Irreversible; see resetAllData in lib/sync.ts. */
+export async function resetAllData(userId: string) {
+  await resetAllDataInSync(userId);
 }

@@ -82,6 +82,27 @@ export async function pushEvents() {
   return failed > 0 ? { pushed, failed, error: lastError } : { pushed };
 }
 
+/** Permanently wipes every deck, card, note type, and review event — both
+ * the local IndexedDB tables and this user's server-side event log. The
+ * server side has to go too, not just local: events are the durable source
+ * of truth, so leaving them in place would just have the next sync pull
+ * everything straight back. Irreversible — there's no soft-delete/undo
+ * path for this, unlike every other destructive action in the app. */
+export async function resetAllData(userId: string) {
+  const { error } = await supabase.from('events').delete().eq('user_id', userId);
+  if (error) throw error;
+
+  await db.transaction('rw', [db.decks, db.cards, db.events, db.noteTypes, db.pendingMedia], async () => {
+    await Promise.all([
+      db.decks.clear(),
+      db.cards.clear(),
+      db.events.clear(),
+      db.noteTypes.clear(),
+      db.pendingMedia.clear(),
+    ]);
+  });
+}
+
 /** Pull any remote events we don't have locally yet, then replay them. */
 export async function pullAndReplay(userId: string) {
   const localIds = new Set((await db.events.toArray()).map((e) => e.id));
@@ -165,13 +186,17 @@ export async function replayAllEvents() {
           name: (p.name as string) ?? existing?.name ?? 'Untitled deck',
           newCardsPerDay: (p.newCardsPerDay as number) ?? existing?.newCardsPerDay ?? DEFAULT_NEW_CARDS_PER_DAY,
           reviewsPerDay: (p.reviewsPerDay as number) ?? existing?.reviewsPerDay ?? DEFAULT_REVIEWS_PER_DAY,
+          // Never revived by an edit — only a dedicated deck_delete event (or
+          // its absence) determines this, same as notes/cards below.
+          deleted: existing?.deleted ?? false,
           createdAt: existing?.createdAt ?? e.timestamp,
           updatedAt: e.timestamp,
         });
         break;
       }
       case 'deck_delete': {
-        decks.delete(e.entityId);
+        const existing = decks.get(e.entityId);
+        if (existing) decks.set(e.entityId, { ...existing, deleted: true, updatedAt: e.timestamp });
         break;
       }
       case 'notetype_create':
@@ -186,14 +211,18 @@ export async function replayAllEvents() {
           answerFields: p.answerFields ?? existing?.answerFields ?? [],
           fieldTypes: p.fieldTypes ?? existing?.fieldTypes ?? {},
           reversed: p.reversed ?? existing?.reversed ?? false,
-          deleted: false,
+          // Was hardcoded `false` — meaning any edit event silently revived a
+          // deleted note type regardless of replay order. Preserve it like
+          // every other field instead.
+          deleted: existing?.deleted ?? false,
           createdAt: existing?.createdAt ?? e.timestamp,
           updatedAt: e.timestamp,
         });
         break;
       }
       case 'notetype_delete': {
-        noteTypes.delete(e.entityId);
+        const existing = noteTypes.get(e.entityId);
+        if (existing) noteTypes.set(e.entityId, { ...existing, deleted: true, updatedAt: e.timestamp });
         break;
       }
       case 'card_create': {
@@ -244,9 +273,12 @@ export async function replayAllEvents() {
 
   const cards = new Map<string, Card>();
   for (const note of notes.values()) {
+    // noteTypeDef stays in the map (soft-deleted) rather than disappearing —
+    // explicitly re-check .deleted here, not just presence, to keep the
+    // original behavior: a deleted type's notes stop generating cards.
     const noteTypeDef = noteTypes.get(note.noteType);
 
-    if (noteTypeDef) {
+    if (noteTypeDef && !noteTypeDef.deleted) {
       // Joined with <br>, not '\n' — this gets rendered as raw HTML (RichText's
       // dangerouslySetInnerHTML), and HTML collapses literal newlines into a
       // single space, which stacked multiple fields horizontally instead of

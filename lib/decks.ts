@@ -65,6 +65,10 @@ export function flattenDeckTree(decks: Deck[]): DeckTreeRow[] {
 export async function getDeckAndDescendantIds(deckId: string): Promise<string[]> {
   const deck = await db.decks.get(deckId);
   if (!deck) return [deckId];
-  const descendants = await db.decks.where('name').startsWith(`${deck.name}::`).toArray();
+  const descendants = await db.decks
+    .where('name')
+    .startsWith(`${deck.name}::`)
+    .filter((d) => !d.deleted)
+    .toArray();
   return [deckId, ...descendants.map((d) => d.id)];
 }

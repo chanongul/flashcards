@@ -26,7 +26,7 @@ export default function DeckBrowsePage() {
     onConfirm: () => void;
   } | null>(null);
 
-  const decks = useLiveQuery(() => db.decks.toArray(), []);
+  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
   const deckNameById = new Map((decks ?? []).map((d) => [d.id, d.name]));
 
   // Scope: this deck plus every subdeck (matches what reviewing the deck

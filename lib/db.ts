@@ -13,6 +13,7 @@ export interface Deck {
   name: string;
   newCardsPerDay: number;
   reviewsPerDay: number;
+  deleted: boolean;
   createdAt: number;
   updatedAt: number;
 }
