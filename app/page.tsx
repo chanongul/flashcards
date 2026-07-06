@@ -129,13 +129,20 @@ export default function HomePage() {
   async function handleCreateDeck(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-    const name = newDeckName.trim();
+    // Users type "Parent>Child" for subdecks; decks are stored with Anki's
+    // "::" delimiter internally (which all the hierarchy logic relies on),
+    // so translate the friendlier ">" separator to "::" before creating.
+    const name = newDeckName
+      .split('>')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('::');
     if (!name) {
       setCreateDeckError('Enter a deck name.');
       return;
     }
     if (decks?.some((d) => d.name === name)) {
-      setCreateDeckError(`A deck named "${name}" already exists.`);
+      setCreateDeckError(`A deck named "${name.replaceAll('::', '>')}" already exists.`);
       return;
     }
     await createDeck(user.id, name);
@@ -529,7 +536,7 @@ export default function HomePage() {
                   setNewDeckName(e.target.value);
                   setCreateDeckError('');
                 }}
-                placeholder="Deck name (or Parent::Child)"
+                placeholder="Deck name (or Parent>Child)"
                 autoFocus
                 className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
               />

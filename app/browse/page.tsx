@@ -28,7 +28,7 @@ export default function BrowsePage() {
   const deckNameById = new Map((decks ?? []).map((d) => [d.id, d.name]));
 
   const filtered = (allCards ?? []).filter((card) => {
-    if (!query.trim()) return true;
+    if (!query.trim()) return false;
     const q = query.trim().toLowerCase();
     const text =
       card.cardType === 'cloze'
@@ -105,9 +105,11 @@ export default function BrowsePage() {
         />
       </div>
 
-      <p className="mb-2 text-xs text-neutral-500">
-        {filtered.length} card{filtered.length === 1 ? '' : 's'}
-      </p>
+      {query.trim() && (
+        <p className="mb-2 text-xs text-neutral-500">
+          {filtered.length} card{filtered.length === 1 ? '' : 's'}
+        </p>
+      )}
 
       <ul className="space-y-2">
         {filtered.map((card) => (
@@ -121,8 +123,10 @@ export default function BrowsePage() {
             onToggleSuspend={handleToggleSuspend}
           />
         ))}
-        {filtered.length === 0 && (
-          <p className="text-sm text-neutral-500">No cards match.</p>
+        {query.trim() ? (
+          filtered.length === 0 && <p className="text-sm text-neutral-500">No cards match.</p>
+        ) : (
+          <p className="text-sm text-neutral-500">Type to search your cards.</p>
         )}
       </ul>
 
