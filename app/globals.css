@@ -3,7 +3,19 @@
 @tailwind utilities;
 
 html, body {
-  height: 100%;
+  /* min-height, NOT height — `height: 100%` combined with overflow-x:
+   * hidden below forces overflow-y to compute as `auto` too (CSS's
+   * overflow-x/y coupling rule: if one axis is non-visible, so is the
+   * other), and with an EXACT 100% height, body's own overflowing
+   * content got trapped and scrolled within body's own box instead of
+   * the actual viewport/html — breaking window.scrollTo/scrollY (and
+   * therefore every scroll-dependent fix) across the whole app. Verified
+   * via html.scrollHeight staying pinned to viewport height instead of
+   * tracking real content height. min-height still fills the viewport
+   * for the background color, but lets the box genuinely grow taller
+   * than 100% so the overflow surfaces at the html/viewport level like
+   * normal. */
+  min-height: 100%;
   /* Stop the iOS/Android rubber-band bounce and pull-to-refresh gesture —
    * without this the whole page can be dragged up/down past its own
    * content in the installed PWA. */
