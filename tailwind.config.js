@@ -12,6 +12,20 @@ module.exports = {
   },
   theme: {
     extend: {
+      fontFamily: {
+        // App-wide font stack. Font fallback is per-character: Latin renders
+        // in Geist Mono; Thai (absent from Geist Mono) falls through to
+        // Sukhumvit Set; anything else (e.g. CJK) hits the system fonts. Both
+        // variables are provided by next/font in app/layout.tsx.
+        sans: [
+          'var(--font-geist-mono)',
+          'var(--font-sukhumvit)',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'monospace',
+        ],
+      },
       colors: {
         // Olive green for the "due" status — not in Tailwind's default palette.
         // 300 = light olive for text on the near-black bg; 900 = dark olive
