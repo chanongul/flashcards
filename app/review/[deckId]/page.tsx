@@ -362,25 +362,25 @@ export default function ReviewPage() {
             <div className="grid shrink-0 grid-cols-4 gap-2">
               <button
                 onClick={() => handleRate(Rating.Again)}
-                className="rounded-md bg-red-900/50 py-3 text-sm"
+                className="rounded-md bg-red-700 py-3 text-sm"
               >
                 Again
               </button>
               <button
                 onClick={() => handleRate(Rating.Hard)}
-                className="rounded-md bg-orange-900/50 py-3 text-sm"
+                className="rounded-md bg-orange-700 py-3 text-sm"
               >
                 Hard
               </button>
               <button
                 onClick={() => handleRate(Rating.Good)}
-                className="rounded-md bg-green-900/50 py-3 text-sm"
+                className="rounded-md bg-green-700 py-3 text-sm"
               >
                 Good
               </button>
               <button
                 onClick={() => handleRate(Rating.Easy)}
-                className="rounded-md bg-blue-900/50 py-3 text-sm"
+                className="rounded-md bg-blue-700 py-3 text-sm"
               >
                 Easy
               </button>
