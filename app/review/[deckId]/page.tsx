@@ -283,8 +283,8 @@ export default function ReviewPage() {
             <List size={16} />
           </Link>
           <Link
-            href={`/review/${params.deckId}/search`}
-            aria-label="Search this deck"
+            href={`/review/${params.deckId}/browse`}
+            aria-label="Browse this deck"
             className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <Search size={16} />

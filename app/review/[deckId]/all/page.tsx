@@ -77,8 +77,8 @@ export default function AllCardsPage() {
         </button>
         <h1 className="text-lg font-semibold">All cards</h1>
         <Link
-          href={`/review/${params.deckId}/search`}
-          aria-label="Search this deck"
+          href={`/review/${params.deckId}/browse`}
+          aria-label="Browse this deck"
           className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >
           <Search size={16} />

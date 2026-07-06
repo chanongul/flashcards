@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft, Search, List } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
 import { editCard, deleteCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
@@ -13,7 +14,7 @@ import { clozeQuestion } from '@/lib/cloze';
 import { stripHtml } from '@/lib/sanitize';
 import { getDeckAndDescendantIds, deckDisplayName } from '@/lib/decks';
 
-export default function DeckSearchPage() {
+export default function DeckBrowsePage() {
   const params = useParams<{ deckId: string }>();
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
@@ -99,8 +100,14 @@ export default function DeckSearchPage() {
         >
           <ArrowLeft size={16} />
         </button>
-        <h1 className="text-lg font-semibold">Search deck</h1>
-        <div className="w-9" />
+        <h1 className="text-lg font-semibold">Browse deck</h1>
+        <Link
+          href={`/review/${params.deckId}/all`}
+          aria-label="View all cards"
+          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+        >
+          <List size={16} />
+        </Link>
       </div>
 
       <div className="relative mb-4">
