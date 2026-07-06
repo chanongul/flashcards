@@ -3,9 +3,10 @@ import {
   LEECH_THRESHOLD,
   DEFAULT_NEW_CARDS_PER_DAY,
   DEFAULT_REVIEWS_PER_DAY,
+  type FieldTypeConfig,
 } from './db';
 import { logEvent, replayAllEvents, pushEvents } from './sync';
-import { stateLabel, type Grade } from './fsrs';
+import { stateLabel, sortQueue, type Grade } from './fsrs';
 import { getTodayCounts } from './stats';
 import { getDeckAndDescendantIds } from './decks';
 
@@ -185,6 +186,7 @@ export async function createNoteType(
   fields: string[],
   questionFields: string[],
   answerFields: string[],
+  fieldTypes: Record<string, FieldTypeConfig> = {},
   reversed = false
 ) {
   const id = crypto.randomUUID();
@@ -193,6 +195,7 @@ export async function createNoteType(
     fields,
     questionFields,
     answerFields,
+    fieldTypes,
     reversed,
   });
   await replayAllEvents();
@@ -208,6 +211,7 @@ export async function editNoteType(
     fields: string[];
     questionFields: string[];
     answerFields: string[];
+    fieldTypes: Record<string, FieldTypeConfig>;
     reversed: boolean;
   }>
 ) {
@@ -238,13 +242,47 @@ export async function cloneNoteType(userId: string, noteTypeId: string) {
     name = `${nt.name} copy ${i}`;
   }
 
-  return createNoteType(userId, name, nt.fields, nt.questionFields, nt.answerFields, nt.reversed);
+  return createNoteType(
+    userId,
+    name,
+    nt.fields,
+    nt.questionFields,
+    nt.answerFields,
+    nt.fieldTypes,
+    nt.reversed
+  );
 }
 
 export async function deleteCard(userId: string, cardId: string) {
   await logEvent(userId, cardId, 'card_delete', {});
   await replayAllEvents();
   void pushEvents();
+}
+
+/** Clones a card's underlying note — including any sibling cards it shares
+ * (a reversed pair, or multiple cloze blanks) — into a brand-new note with
+ * fresh, unstarted FSRS state (not a copy of review history), placed in the
+ * given deck. Mirrors cloneDeck's per-note grouping for the same reason: a
+ * reversed pair or multi-cloze note should clone back into one note that
+ * (re-)generates its own full set of sibling cards, not one clone per
+ * already-derived card. */
+export async function cloneCard(userId: string, cardId: string, deckId: string) {
+  const card = await db.cards.get(cardId);
+  if (!card) return;
+  const siblings = await db.cards.filter((c) => !c.deleted && c.noteId === card.noteId).toArray();
+  const rep = siblings.find((c) => !c.isReversed) ?? card;
+  const reversed = siblings.some((c) => c.isReversed);
+  const cardType = rep.cardType === 'custom' ? rep.noteTypeId! : rep.cardType;
+  return createCard(
+    userId,
+    deckId,
+    cardType,
+    rep.front,
+    rep.back,
+    rep.tags,
+    rep.cardType === 'custom' ? rep.fields : undefined,
+    reversed
+  );
 }
 
 export async function reviewCard(userId: string, cardId: string, rating: Grade) {
@@ -293,8 +331,9 @@ export async function getDueCards(deckId: string) {
   const newRemaining = Math.max(0, newLimit - todayCounts.newDone);
   const reviewRemaining = Math.max(0, reviewLimit - todayCounts.reviewsDone);
 
-  const newCards = dueCards.filter((c) => stateLabel(c.fsrs.state) === 'New');
-  const reviewCards = dueCards.filter((c) => stateLabel(c.fsrs.state) !== 'New');
+  const sorted = sortQueue(dueCards);
+  const newCards = sorted.filter((c) => stateLabel(c.fsrs.state) === 'New');
+  const reviewCards = sorted.filter((c) => stateLabel(c.fsrs.state) !== 'New');
 
   return [...newCards.slice(0, newRemaining), ...reviewCards.slice(0, reviewRemaining)];
 }
@@ -306,9 +345,10 @@ export async function getDueCards(deckId: string) {
 export async function getDueCardsAhead(deckId: string, daysAhead: number) {
   const cutoff = Date.now() + daysAhead * 24 * 60 * 60 * 1000;
   const deckIds = await getDeckAndDescendantIds(deckId);
-  return db.cards
+  const cards = await db.cards
     .where('deckId')
     .anyOf(deckIds)
     .filter((c) => !c.deleted && !c.suspended && c.fsrs.due <= cutoff)
     .toArray();
+  return sortQueue(cards);
 }

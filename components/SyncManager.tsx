@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { requestPersistentStorage } from '@/lib/db';
 import { sync } from '@/lib/sync';
+import { syncPendingMedia } from '@/lib/mediaSync';
 import { useUser } from '@/lib/useUser';
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -21,8 +22,12 @@ export function SyncManager() {
 
     requestPersistentStorage();
     sync(user.id).catch(console.error);
+    syncPendingMedia(user.id).catch(console.error);
 
-    const runSync = () => sync(user.id).catch(console.error);
+    const runSync = () => {
+      sync(user.id).catch(console.error);
+      syncPendingMedia(user.id).catch(console.error);
+    };
 
     const interval = setInterval(runSync, SYNC_INTERVAL_MS);
     const onVisibilityChange = () => {
@@ -30,11 +35,15 @@ export function SyncManager() {
     };
 
     window.addEventListener('focus', runSync);
+    // Retry queued media uploads (and the regular sync) the moment
+    // connectivity comes back, rather than waiting up to SYNC_INTERVAL_MS.
+    window.addEventListener('online', runSync);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', runSync);
+      window.removeEventListener('online', runSync);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [user]);

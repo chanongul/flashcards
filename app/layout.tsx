@@ -3,6 +3,7 @@ import { Geist_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
 import './globals.css';
 import { SyncManager } from '@/components/SyncManager';
+import { LoadingProvider } from '@/components/GlobalLoading';
 
 // Self-hosted at build time by next/font — no runtime Google request, so it
 // still works offline in the installed PWA.
@@ -50,8 +51,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geistMono.variable} ${sukhumvit.variable}`}>
       <body>
-        <SyncManager />
-        {children}
+        <LoadingProvider>
+          <SyncManager />
+          {children}
+        </LoadingProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

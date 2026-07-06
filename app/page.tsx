@@ -17,7 +17,9 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Deck, type NoteType } from '@/lib/db';
+import { db, type Deck, type NoteType, type FieldTypeConfig } from '@/lib/db';
+import { FieldTypeConfigToggle } from '@/components/MediaFieldInput';
+import { useLoading, useLoadingWhen } from '@/components/GlobalLoading';
 import {
   createDeck,
   editDeck,
@@ -34,22 +36,33 @@ import { createClient } from '@/utils/supabase/client';
 import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
 import { deckDisplayName, deckParentName, ancestorNames, flattenDeckTree } from '@/lib/decks';
 import { ReviewHeatmap } from '@/components/ReviewHeatmap';
+import { TodayStatusSummary } from '@/components/TodayStatusSummary';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Checkbox } from '@/components/Checkbox';
+import { shouldDropUp } from '@/lib/dropdownMenu';
 
-// Both action dropdowns are a short single row of h-9 (36px) icon buttons
-// plus p-1 padding and a border — comfortably under 60px including margin.
-const DROPDOWN_MENU_HEIGHT = 60;
-
-function shouldDropUp(triggerRect: DOMRect): boolean {
-  return window.innerHeight - triggerRect.bottom < DROPDOWN_MENU_HEIGHT;
+// One row in the note-type editor's question/answer field lists — a name
+// plus its declared type (or 'dynamic', deferring the choice to each note).
+interface FieldRow {
+  name: string;
+  type: FieldTypeConfig;
 }
 
 export default function HomePage() {
   const { user, loading } = useUser();
+  const { withLoading } = useLoading();
   const decks = useLiveQuery(() => db.decks.toArray(), []);
   const [titleSkewed, setTitleSkewed] = useState(false);
   const titleSkewTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Feature-detecting "real mouse vs touch" via matchMedia turned out
+  // unreliable in both directions — (hover: hover) alone matched on some
+  // touch browsers, and adding "and (pointer: fine)" then wrongly excluded
+  // some real desktop trackpads/mice. Tracking the actual most-recent
+  // interaction instead sidesteps all of that: a touch always fires before
+  // any synthetic mouseenter/mouseleave a mobile browser adds for click
+  // compatibility, so this flag suppresses exactly those and only those.
+  const justTouchedRef = useRef(false);
+  const touchFlagTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTitleSkewTimeout = () => {
     if (titleSkewTimeout.current) clearTimeout(titleSkewTimeout.current);
@@ -57,19 +70,27 @@ export default function HomePage() {
   };
 
   const handleTitleHoverStart = () => {
+    if (justTouchedRef.current) return;
     clearTitleSkewTimeout();
     setTitleSkewed(true);
   };
 
   const handleTitleHoverEnd = () => {
+    if (justTouchedRef.current) return;
     clearTitleSkewTimeout();
     setTitleSkewed(false);
   };
 
   const handleTitleTouchStart = () => {
+    justTouchedRef.current = true;
+    if (touchFlagTimeout.current) clearTimeout(touchFlagTimeout.current);
+    touchFlagTimeout.current = setTimeout(() => {
+      justTouchedRef.current = false;
+    }, 500);
+
     clearTitleSkewTimeout();
     setTitleSkewed(true);
-    titleSkewTimeout.current = setTimeout(() => setTitleSkewed(false), 3000);
+    titleSkewTimeout.current = setTimeout(() => setTitleSkewed(false), 1000);
   };
   const [newDeckName, setNewDeckName] = useState('');
   const [createDeckError, setCreateDeckError] = useState('');
@@ -132,8 +153,8 @@ export default function HomePage() {
   const [noteTypeActionsId, setNoteTypeActionsId] = useState<string | null>(null);
   const [noteTypeActionsDropUp, setNoteTypeActionsDropUp] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
-  const [newQuestionFields, setNewQuestionFields] = useState<string[]>(['']);
-  const [newAnswerFields, setNewAnswerFields] = useState<string[]>(['']);
+  const [newQuestionFields, setNewQuestionFields] = useState<FieldRow[]>([{ name: '', type: 'richtext' }]);
+  const [newAnswerFields, setNewAnswerFields] = useState<FieldRow[]>([{ name: '', type: 'richtext' }]);
   const [newTypeReversed, setNewTypeReversed] = useState(false);
   const [noteTypeError, setNoteTypeError] = useState('');
   const noteTypes = useLiveQuery(
@@ -168,7 +189,7 @@ export default function HomePage() {
       setCreateDeckError(`A deck named "${name.replaceAll('::', '>')}" already exists.`);
       return;
     }
-    await createDeck(user.id, name);
+    await withLoading(() => createDeck(user.id, name));
     setNewDeckName('');
     setCreateDeckError('');
     setShowCreateDeck(false);
@@ -204,7 +225,7 @@ export default function HomePage() {
       setRenameDeckError(`A deck named "${name}" already exists.`);
       return;
     }
-    await editDeck(user.id, editingDeckId, { name: fullName });
+    await withLoading(() => editDeck(user.id, editingDeckId, { name: fullName }));
     setEditingDeckId(null);
   }
 
@@ -251,7 +272,7 @@ export default function HomePage() {
       setSubdeckError(`A subdeck named "${name}" already exists here.`);
       return;
     }
-    await createDeck(user.id, fullName);
+    await withLoading(() => createDeck(user.id, fullName));
     closeSubdeckModal();
   }
 
@@ -266,8 +287,8 @@ export default function HomePage() {
   function openCreateNoteType() {
     setEditingNoteTypeId(null);
     setNewTypeName('');
-    setNewQuestionFields(['']);
-    setNewAnswerFields(['']);
+    setNewQuestionFields([{ name: '', type: 'richtext' }]);
+    setNewAnswerFields([{ name: '', type: 'richtext' }]);
     setNewTypeReversed(false);
     setNoteTypeError('');
     setNoteTypePage('create');
@@ -276,8 +297,13 @@ export default function HomePage() {
   function openEditNoteType(nt: NoteType) {
     setEditingNoteTypeId(nt.id);
     setNewTypeName(nt.name);
-    setNewQuestionFields(nt.questionFields.length ? nt.questionFields : ['']);
-    setNewAnswerFields(nt.answerFields.length ? nt.answerFields : ['']);
+    const toRow = (name: string): FieldRow => ({ name, type: nt.fieldTypes?.[name] ?? 'richtext' });
+    setNewQuestionFields(
+      nt.questionFields.length ? nt.questionFields.map(toRow) : [{ name: '', type: 'richtext' }]
+    );
+    setNewAnswerFields(
+      nt.answerFields.length ? nt.answerFields.map(toRow) : [{ name: '', type: 'richtext' }]
+    );
     setNewTypeReversed(nt.reversed);
     setNoteTypeError('');
     setNoteTypePage('create');
@@ -295,30 +321,38 @@ export default function HomePage() {
       setNoteTypeError(`A note type named "${name}" already exists.`);
       return;
     }
-    const questionFields = newQuestionFields.map((f) => f.trim()).filter(Boolean);
-    const answerFields = newAnswerFields.map((f) => f.trim()).filter(Boolean);
-    if (questionFields.length === 0) {
+    const questionRows = newQuestionFields.map((f) => ({ ...f, name: f.name.trim() })).filter((f) => f.name);
+    const answerRows = newAnswerFields.map((f) => ({ ...f, name: f.name.trim() })).filter((f) => f.name);
+    if (questionRows.length === 0) {
       setNoteTypeError('Add at least one question field.');
       return;
     }
-    if (answerFields.length === 0) {
+    if (answerRows.length === 0) {
       setNoteTypeError('Add at least one answer field.');
       return;
     }
+    const questionFields = questionRows.map((f) => f.name);
+    const answerFields = answerRows.map((f) => f.name);
     // `fields` (the full set a note of this type holds) is just the union of
     // question/answer fields — no separate input for it, so there's no way
     // for it to drift out of sync with what's actually shown on each side.
     const fields = Array.from(new Set([...questionFields, ...answerFields]));
+    const fieldTypes = Object.fromEntries([...questionRows, ...answerRows].map((f) => [f.name, f.type]));
     if (editingNoteTypeId) {
-      await editNoteType(user.id, editingNoteTypeId, {
-        name,
-        fields,
-        questionFields,
-        answerFields,
-        reversed: newTypeReversed,
-      });
+      await withLoading(() =>
+        editNoteType(user.id, editingNoteTypeId, {
+          name,
+          fields,
+          questionFields,
+          answerFields,
+          fieldTypes,
+          reversed: newTypeReversed,
+        })
+      );
     } else {
-      await createNoteType(user.id, name, fields, questionFields, answerFields, newTypeReversed);
+      await withLoading(() =>
+        createNoteType(user.id, name, fields, questionFields, answerFields, fieldTypes, newTypeReversed)
+      );
     }
     setNoteTypeError('');
     setNoteTypePage('list');
@@ -341,12 +375,10 @@ export default function HomePage() {
     });
   }
 
+  useLoadingWhen(loading || !user);
+
   if (loading || !user) {
-    return (
-      <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </main>
-    );
+    return null;
   }
 
   const deckRows = flattenDeckTree(decks ?? []);
@@ -355,7 +387,7 @@ export default function HomePage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
-          className={`relative inline-block text-2xl font-black transition-transform duration-300 ${titleSkewed ? '-skew-x-[15deg]' : ''}`}
+          className={`relative inline-block text-2xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[20%] scale-[125%] -skew-x-[25deg] font-bold' : ''}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
           onTouchStart={handleTitleTouchStart}
@@ -372,6 +404,10 @@ export default function HomePage() {
         >
           <LogOut size={16} />
         </button>
+      </div>
+
+      <div className="mb-6">
+        <TodayStatusSummary />
       </div>
 
       <div className="mb-6">
@@ -757,34 +793,42 @@ export default function HomePage() {
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-neutral-400">Question fields</p>
                     {newQuestionFields.map((field, i) => (
-                      <div key={i} className="flex gap-2">
-                        <input
-                          value={field}
-                          onChange={(e) =>
-                            setNewQuestionFields((fs) =>
-                              fs.map((f, fi) => (fi === i ? e.target.value : f))
-                            )
-                          }
-                          placeholder="Field name (e.g. Word)"
-                          className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                        />
-                        {newQuestionFields.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setNewQuestionFields((fs) => fs.filter((_, fi) => fi !== i))
+                      <div key={i} className="space-y-1 rounded-md border border-neutral-800 p-2">
+                        <div className="flex gap-2">
+                          <input
+                            value={field.name}
+                            onChange={(e) =>
+                              setNewQuestionFields((fs) =>
+                                fs.map((f, fi) => (fi === i ? { ...f, name: e.target.value } : f))
+                              )
                             }
-                            aria-label="Remove field"
-                            className="shrink-0 text-neutral-500 hover:text-neutral-300"
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
+                            placeholder="Field name (e.g. Word)"
+                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                          />
+                          {newQuestionFields.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewQuestionFields((fs) => fs.filter((_, fi) => fi !== i))
+                              }
+                              aria-label="Remove field"
+                              className="shrink-0 text-neutral-500 hover:text-neutral-300"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <FieldTypeConfigToggle
+                          value={field.type}
+                          onChange={(type) =>
+                            setNewQuestionFields((fs) => fs.map((f, fi) => (fi === i ? { ...f, type } : f)))
+                          }
+                        />
                       </div>
                     ))}
                     <button
                       type="button"
-                      onClick={() => setNewQuestionFields((fs) => [...fs, ''])}
+                      onClick={() => setNewQuestionFields((fs) => [...fs, { name: '', type: 'richtext' }])}
                       aria-label="Add question field"
                       className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                     >
@@ -795,34 +839,42 @@ export default function HomePage() {
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-neutral-400">Answer fields</p>
                     {newAnswerFields.map((field, i) => (
-                      <div key={i} className="flex gap-2">
-                        <input
-                          value={field}
-                          onChange={(e) =>
-                            setNewAnswerFields((fs) =>
-                              fs.map((f, fi) => (fi === i ? e.target.value : f))
-                            )
-                          }
-                          placeholder="Field name (e.g. Meaning)"
-                          className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                        />
-                        {newAnswerFields.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setNewAnswerFields((fs) => fs.filter((_, fi) => fi !== i))
+                      <div key={i} className="space-y-1 rounded-md border border-neutral-800 p-2">
+                        <div className="flex gap-2">
+                          <input
+                            value={field.name}
+                            onChange={(e) =>
+                              setNewAnswerFields((fs) =>
+                                fs.map((f, fi) => (fi === i ? { ...f, name: e.target.value } : f))
+                              )
                             }
-                            aria-label="Remove field"
-                            className="shrink-0 text-neutral-500 hover:text-neutral-300"
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
+                            placeholder="Field name (e.g. Meaning)"
+                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                          />
+                          {newAnswerFields.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewAnswerFields((fs) => fs.filter((_, fi) => fi !== i))
+                              }
+                              aria-label="Remove field"
+                              className="shrink-0 text-neutral-500 hover:text-neutral-300"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <FieldTypeConfigToggle
+                          value={field.type}
+                          onChange={(type) =>
+                            setNewAnswerFields((fs) => fs.map((f, fi) => (fi === i ? { ...f, type } : f)))
+                          }
+                        />
                       </div>
                     ))}
                     <button
                       type="button"
-                      onClick={() => setNewAnswerFields((fs) => [...fs, ''])}
+                      onClick={() => setNewAnswerFields((fs) => [...fs, { name: '', type: 'richtext' }])}
                       aria-label="Add answer field"
                       className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                     >

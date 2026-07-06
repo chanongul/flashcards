@@ -7,7 +7,7 @@ import {
   type Card as FsrsCardInternal,
   type Grade,
 } from 'ts-fsrs';
-import type { FsrsState } from './db';
+import type { Card, FsrsState } from './db';
 
 // Default parameters. These work reasonably well out of the box;
 // ts-fsrs supports optimizing them from your own review history later
@@ -82,4 +82,22 @@ export type RatingLabel = (typeof RATING_LABELS)[number];
 
 export function ratingLabel(rating: number): RatingLabel {
   return RATING_LABELS[rating] ?? 'Manual';
+}
+
+/** Matches Anki's default display order: new cards in the order they were
+ * created (oldest first — a newly-added card queues up behind whatever new
+ * cards already existed, rather than appearing wherever IndexedDB happens
+ * to have stored it), then everything already introduced (Learning/Review/
+ * Relearning) by due date, soonest first. Without this, a plain Dexie query
+ * on the `deckId` index comes back ordered by primary key — a random UUID —
+ * which looks shuffled relative to when cards were actually added. Shared
+ * between the review queue and the "all cards" list so both present cards
+ * in the same order. */
+export function sortQueue(cards: Card[]): Card[] {
+  return [...cards].sort((a, b) => {
+    const aNew = stateLabel(a.fsrs.state) === 'New';
+    const bNew = stateLabel(b.fsrs.state) === 'New';
+    if (aNew !== bNew) return aNew ? -1 : 1;
+    return aNew ? a.createdAt - b.createdAt : a.fsrs.due - b.fsrs.due;
+  });
 }

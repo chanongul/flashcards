@@ -29,6 +29,17 @@ export interface FsrsState {
   last_review: number | null;
 }
 
+// The actual widget/content a single field holds: plain formatted text, or
+// exactly one image, or exactly one audio clip — never mixed in one field.
+export type FieldType = 'richtext' | 'image' | 'audio';
+
+// What gets declared per field on a custom NoteType. 'dynamic' means "let
+// each note choose its own FieldType for this field" (same toggle UI and
+// content-based inference as Basic's Front/Back, which have no persistent
+// per-type schema to fix a type to); a fixed FieldType means every note of
+// this type always shows that one widget for this field, no toggle.
+export type FieldTypeConfig = FieldType | 'dynamic';
+
 // A custom note type: an ordered field list plus which fields render on the
 // question vs answer. One note type produces exactly one card template (not
 // Anki's full multi-template-per-type system — that's out of scope for now).
@@ -38,6 +49,7 @@ export interface NoteType {
   fields: string[]; // ordered, e.g. ["Word", "Reading", "Meaning", "Example"]
   questionFields: string[]; // subset/order of `fields` shown on the question
   answerFields: string[]; // subset/order of `fields` shown on the answer
+  fieldTypes: Record<string, FieldTypeConfig>; // per-field type; missing entries default to 'richtext'
   reversed: boolean; // whether notes of this type may opt into an answer->question sibling card
   deleted: boolean;
   createdAt: number;
@@ -116,6 +128,29 @@ export interface ReviewEvent {
   synced: boolean; // has this been pushed to Supabase yet
 }
 
+// An image/audio file inserted into a field but not yet uploaded. Upload is
+// deferred to submit time (see lib/mediaSync.ts's resolvePendingMediaInHtml)
+// so an abandoned "add card" edit never leaves an orphaned file in R2 —
+// referenced from a field's HTML as data-media-id="pending:{id}" until
+// resolved to the real /api/media/{filename} id. Lives only on the device
+// that recorded/picked it — not synced like the event log.
+export interface PendingMedia {
+  id: string; // uuid
+  kind: 'image' | 'audio';
+  blob: Blob;
+  createdAt: number;
+  // Only set once a real, already-saved card has been found still
+  // referencing this item's pending:{id} (i.e. its submit-time upload
+  // attempt failed while offline/network-flaky). The background sync in
+  // SyncManager only ever retries committed items — an uncommitted item's
+  // media is still only referenced by an open, unsaved editor, and
+  // grabbing it in the background would race with that editor's own
+  // submit-time resolve: the file could get uploaded and this row deleted
+  // before the card is ever saved, leaving a "pending:" marker nothing will
+  // ever resolve.
+  committed: boolean;
+}
+
 // ---- Database ----
 
 class FlashcardDB extends Dexie {
@@ -123,6 +158,7 @@ class FlashcardDB extends Dexie {
   cards!: EntityTable<Card, 'id'>;
   events!: EntityTable<ReviewEvent, 'id'>;
   noteTypes!: EntityTable<NoteType, 'id'>;
+  pendingMedia!: EntityTable<PendingMedia, 'id'>;
 
   constructor() {
     super('FlashcardDB');
@@ -136,6 +172,13 @@ class FlashcardDB extends Dexie {
       cards: 'id, deckId, deleted, [deckId+deleted], updatedAt, fsrs.due',
       events: 'id, entityId, type, timestamp, synced',
       noteTypes: 'id, name, deleted',
+    });
+    this.version(3).stores({
+      decks: 'id, name, updatedAt',
+      cards: 'id, deckId, deleted, [deckId+deleted], updatedAt, fsrs.due',
+      events: 'id, entityId, type, timestamp, synced',
+      noteTypes: 'id, name, deleted',
+      pendingMedia: 'id, createdAt',
     });
   }
 }

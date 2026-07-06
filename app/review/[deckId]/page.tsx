@@ -14,51 +14,160 @@ import {
   editDeck,
 } from '@/lib/actions';
 import { Rating, type Grade } from '@/lib/fsrs';
-import { db, type Card } from '@/lib/db';
+import { db, type Card, type FieldType } from '@/lib/db';
 import { useUser } from '@/lib/useUser';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
-import { clozeQuestionFor, clozeAnswerFor, hasClozeDeletion } from '@/lib/cloze';
-import { RichTextInput } from '@/components/RichTextInput';
+import { clozeBlankLetters, buildClozeText, clozeSegments } from '@/lib/cloze';
 import { RichText } from '@/components/RichText';
+import { FieldTypeToggle, FieldValueInput, fieldHasContent, fieldNeedsLabel } from '@/components/MediaFieldInput';
+import { useLoading, useLoadingWhen } from '@/components/GlobalLoading';
 import { Checkbox } from '@/components/Checkbox';
 import { TagsInput } from '@/components/TagsInput';
 import { ScrollFade } from '@/components/ScrollFade';
-import { stripHtml } from '@/lib/sanitize';
+import { ClozeEditor } from '@/components/ClozeEditor';
+import { resolvePendingMediaInHtml } from '@/lib/mediaSync';
 import { countCardsByState, DECK_COUNT_TOOLTIPS } from '@/lib/stats';
 import { deckBreadcrumb, deckDisplayName, deckParentName, getDeckAndDescendantIds } from '@/lib/decks';
 
 function questionText(card: Card): string {
-  if (card.cardType === 'cloze') return clozeQuestionFor(card.front, card.clozeIndex ?? 1);
   if (card.isReversed) return card.back;
   return card.front;
 }
 
 function answerText(card: Card): string {
-  if (card.cardType === 'cloze') return clozeAnswerFor(card.front, card.clozeIndex ?? 1);
   if (card.isReversed) return card.front;
   return card.back;
+}
+
+// The cloze review UI (see below) lets the user type into the active blank
+// themselves rather than showing "[...]" — self-graded, so the typed value
+// is never checked, just a scratchpad for their own recall that gets shown
+// back to them (see ClozeRevealPart) once they hit "Show answer". Every
+// other cloze number already revealed stays plain text, matching Anki's
+// "other deletions shown as context" behavior.
+function ClozeFillIn({
+  text,
+  activeIndex,
+  values,
+  onChange,
+}: {
+  text: string;
+  activeIndex: number;
+  values: string[];
+  onChange: (index: number, value: string) => void;
+}) {
+  let blankCount = 0;
+  return (
+    <p className="text-lg">
+      {clozeSegments(text).map((seg, i) => {
+        if (seg.type === 'text') return <span key={i}>{seg.value}</span>;
+        if (seg.number !== activeIndex) return <span key={i}>{seg.answer}</span>;
+        const index = blankCount;
+        blankCount += 1;
+        return (
+          <input
+            key={i}
+            type="text"
+            value={values[index] ?? ''}
+            onChange={(e) => onChange(index, e.target.value)}
+            autoFocus={index === 0}
+            aria-label="Fill in the blank"
+            className="mx-1 w-32 rounded-none border-0 border-b-2 border-neutral-600 bg-transparent px-1 py-0.5 text-center text-lg text-neutral-100 focus:border-neutral-300 focus:outline-none"
+          />
+        );
+      })}
+    </p>
+  );
+}
+
+// One color per blank *occurrence* (not per section) — cycled by index, and
+// looked up with the same index in both the user-filled and answer parts —
+// so a sentence that repeats the same cloze number more than once still
+// lets the user tell which occurrence's typed answer lines up with which
+// occurrence's correct answer, rather than every blank looking identical.
+const CLOZE_COLORS = [
+  'bg-sky-900/60 text-sky-300',
+  'bg-green-900/60 text-green-300',
+  'bg-amber-900/60 text-amber-300',
+  'bg-purple-900/60 text-purple-300',
+  'bg-pink-900/60 text-pink-300',
+  'bg-teal-900/60 text-teal-300',
+  'bg-orange-900/60 text-orange-300',
+  'bg-indigo-900/60 text-indigo-300',
+];
+
+// The "Show answer" pair for a cloze card: the upper part freezes what the
+// user typed into each blank (dash if they left one empty), the lower part
+// shows the correct answer. Same sentence, same non-active-number context
+// text, rendered twice.
+function ClozeRevealPart({
+  text,
+  activeIndex,
+  mode,
+  userValues,
+}: {
+  text: string;
+  activeIndex: number;
+  mode: 'user' | 'answer';
+  userValues: string[];
+}) {
+  let blankCount = 0;
+  return (
+    <p className="text-lg">
+      {clozeSegments(text).map((seg, i) => {
+        if (seg.type === 'text') return <span key={i}>{seg.value}</span>;
+        if (seg.number !== activeIndex) return <span key={i}>{seg.answer}</span>;
+        const index = blankCount;
+        blankCount += 1;
+        const value = mode === 'user' ? userValues[index]?.trim() || '—' : seg.answer;
+        const color = CLOZE_COLORS[index % CLOZE_COLORS.length];
+        return (
+          <span key={i} className={`rounded px-1.5 ${color}`}>
+            {value}
+          </span>
+        );
+      })}
+    </p>
+  );
 }
 
 export default function ReviewPage() {
   const params = useParams<{ deckId: string }>();
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
+  const { withLoading } = useLoading();
   const [queue, setQueue] = useState<Card[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [clozeUserInputs, setClozeUserInputs] = useState<string[]>([]);
 
   // 'basic' | 'cloze', or a NoteType id for a custom type
   const [newCardType, setNewCardType] = useState<string>('basic');
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
+  // Basic has no persisted schema to fix a type to — chosen fresh each time,
+  // defaulting to rich text (matches the field's old, only behavior).
+  const [newFrontType, setNewFrontType] = useState<FieldType>('richtext');
+  const [newBackType, setNewBackType] = useState<FieldType>('richtext');
   const [newReversed, setNewReversed] = useState(false);
   const [newClozeText, setNewClozeText] = useState('');
+  const [newClozeAnswers, setNewClozeAnswers] = useState<Record<string, string>>({});
+  const [newClozeSeparateCards, setNewClozeSeparateCards] = useState(false);
   const [newFields, setNewFields] = useState<Record<string, string>>({});
+  // Only used for custom fields declared 'dynamic' in their note type —
+  // fixed-type fields never read from this.
+  const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>({});
   const [newTags, setNewTags] = useState<string[]>([]);
   const [addCardError, setAddCardError] = useState('');
 
   const noteTypes = useLiveQuery(() => db.noteTypes.filter((nt) => !nt.deleted).toArray(), []);
   const selectedNoteType = noteTypes?.find((nt) => nt.id === newCardType);
+
+  function resolvedNewFieldType(fieldName: string): FieldType {
+    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? 'richtext';
+    if (config === 'dynamic') return newFieldTypes[fieldName] ?? 'richtext';
+    return config;
+  }
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeckOptions, setShowDeckOptions] = useState(false);
@@ -103,6 +212,22 @@ export default function ReviewPage() {
   }, [user, loadQueue]);
 
   const current = queue[0];
+
+  // A fresh card (including moving to the next one after rating) starts
+  // with empty blanks — without this, stale input from the previous cloze
+  // card would otherwise carry over since clozeUserInputs is plain state,
+  // not per-card.
+  useEffect(() => {
+    setClozeUserInputs([]);
+  }, [current?.id]);
+
+  function handleClozeInputChange(index: number, value: string) {
+    setClozeUserInputs((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -149,9 +274,14 @@ export default function ReviewPage() {
     setNewCardType(type);
     setNewFront('');
     setNewBack('');
+    setNewFrontType('richtext');
+    setNewBackType('richtext');
     setNewReversed(false);
     setNewClozeText('');
+    setNewClozeAnswers({});
+    setNewClozeSeparateCards(false);
     setNewFields({});
+    setNewFieldTypes({});
     setNewTags([]);
     setAddCardError('');
   }
@@ -168,36 +298,86 @@ export default function ReviewPage() {
     const tags = newTags;
 
     if (selectedNoteType) {
-      if (selectedNoteType.fields.every((f) => !stripHtml(newFields[f] ?? '').trim())) {
-        setAddCardError('Fill in at least one field.');
+      const isFilled = (f: string) => fieldHasContent(newFields[f] ?? '', resolvedNewFieldType(f));
+      const missingLabelField = selectedNoteType.fields.find((f) =>
+        fieldNeedsLabel(newFields[f] ?? '', resolvedNewFieldType(f))
+      );
+      if (missingLabelField) {
+        setAddCardError(`Add a label for "${missingLabelField}" (used for search).`);
         return;
       }
-      await createCard(
-        user.id,
-        params.deckId,
-        selectedNoteType.id,
-        '',
-        '',
-        tags,
-        newFields,
-        newReversed
-      );
+      if (!selectedNoteType.questionFields.some(isFilled)) {
+        setAddCardError('Fill in at least one question field.');
+        return;
+      }
+      if (!selectedNoteType.answerFields.some(isFilled)) {
+        setAddCardError('Fill in at least one answer field.');
+        return;
+      }
+      // Any image/audio inserted while composing this card was only ever
+      // queued locally (see RichTextInput) — resolve it to a real upload
+      // now that the card is actually being saved, so an abandoned edit
+      // never leaves an orphaned file in R2.
+      await withLoading(async () => {
+        const resolvedFields = Object.fromEntries(
+          await Promise.all(
+            Object.entries(newFields).map(async ([key, val]) => [key, await resolvePendingMediaInHtml(val)])
+          )
+        );
+        await createCard(
+          user.id,
+          params.deckId,
+          selectedNoteType.id,
+          '',
+          '',
+          tags,
+          resolvedFields,
+          newReversed
+        );
+      });
     } else if (newCardType === 'cloze') {
       if (!newClozeText.trim()) {
         setAddCardError('Enter the cloze text.');
         return;
       }
-      if (!hasClozeDeletion(newClozeText)) {
-        setAddCardError('Wrap at least one hidden word in {{c1::...}}.');
+      const letters = clozeBlankLetters(newClozeText);
+      if (letters.length === 0) {
+        setAddCardError('Click + to mark at least one blank.');
         return;
       }
-      await createCard(user.id, params.deckId, 'cloze', newClozeText.trim(), '', tags);
+      if (letters.some((letter) => !newClozeAnswers[letter]?.trim())) {
+        setAddCardError('Fill in an answer for every blank.');
+        return;
+      }
+      const clozeText = buildClozeText(newClozeText, newClozeAnswers, newClozeSeparateCards);
+      await withLoading(() => createCard(user.id, params.deckId, 'cloze', clozeText.trim(), '', tags));
     } else {
-      if (!stripHtml(newFront).trim() || !stripHtml(newBack).trim()) {
+      if (fieldNeedsLabel(newFront, newFrontType)) {
+        setAddCardError('Add a label for the front (used for search).');
+        return;
+      }
+      if (fieldNeedsLabel(newBack, newBackType)) {
+        setAddCardError('Add a label for the back (used for search).');
+        return;
+      }
+      if (!fieldHasContent(newFront, newFrontType) || !fieldHasContent(newBack, newBackType)) {
         setAddCardError('Fill in both front and back.');
         return;
       }
-      await createCard(user.id, params.deckId, newCardType, newFront, newBack, tags, undefined, newReversed);
+      await withLoading(async () => {
+        const resolvedFront = await resolvePendingMediaInHtml(newFront);
+        const resolvedBack = await resolvePendingMediaInHtml(newBack);
+        await createCard(
+          user.id,
+          params.deckId,
+          newCardType,
+          resolvedFront,
+          resolvedBack,
+          tags,
+          undefined,
+          newReversed
+        );
+      });
     }
     closeAddModal();
     loadQueue();
@@ -246,12 +426,11 @@ export default function ReviewPage() {
     setShowCustomStudy(false);
   }
 
+  useLoadingWhen(userLoading || !user);
+  useLoadingWhen(loading);
+
   if (userLoading || !user) {
-    return (
-      <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </main>
-    );
+    return null;
   }
 
   return (
@@ -332,8 +511,6 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {loading && <p className="text-sm text-neutral-500">Loading…</p>}
-
       {!loading && current && (
         <div className="flex flex-1 flex-col gap-4 overflow-hidden">
           <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 px-4 text-center">
@@ -343,27 +520,61 @@ export default function ReviewPage() {
                 from the top when it's too long (avoids flexbox centering
                 clipping the top). No vertical padding so content can scroll
                 flush to the edges, where ScrollFade draws its hint gradients. */}
-            <ScrollFade>
-              <div className="flex min-h-full flex-col items-center justify-center">
-                {current.cardType === 'cloze' ? (
-                  <p className="text-lg">{questionText(current)}</p>
-                ) : (
-                  <RichText html={questionText(current)} className="text-lg" />
-                )}
-              </div>
-            </ScrollFade>
-            {revealed && (
+            {current.cardType === 'cloze' ? (
               <>
-                <hr className="shrink-0 border-neutral-800" />
                 <ScrollFade>
                   <div className="flex min-h-full flex-col items-center justify-center">
-                    {current.cardType === 'cloze' ? (
-                      <p className="text-lg text-neutral-300">{answerText(current)}</p>
+                    {revealed ? (
+                      <ClozeRevealPart
+                        text={current.front}
+                        activeIndex={current.clozeIndex ?? 1}
+                        mode="user"
+                        userValues={clozeUserInputs}
+                      />
                     ) : (
-                      <RichText html={answerText(current)} className="text-lg text-neutral-300" />
+                      <ClozeFillIn
+                        key={current.id}
+                        text={current.front}
+                        activeIndex={current.clozeIndex ?? 1}
+                        values={clozeUserInputs}
+                        onChange={handleClozeInputChange}
+                      />
                     )}
                   </div>
                 </ScrollFade>
+                {revealed && (
+                  <>
+                    <hr className="shrink-0 border-neutral-800" />
+                    <ScrollFade>
+                      <div className="flex min-h-full flex-col items-center justify-center">
+                        <ClozeRevealPart
+                          text={current.front}
+                          activeIndex={current.clozeIndex ?? 1}
+                          mode="answer"
+                          userValues={clozeUserInputs}
+                        />
+                      </div>
+                    </ScrollFade>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <ScrollFade>
+                  <div className="flex min-h-full flex-col items-center justify-center">
+                    <RichText html={questionText(current)} className="text-lg" />
+                  </div>
+                </ScrollFade>
+                {revealed && (
+                  <>
+                    <hr className="shrink-0 border-neutral-800" />
+                    <ScrollFade>
+                      <div className="flex min-h-full flex-col items-center justify-center">
+                        <RichText html={answerText(current)} className="text-lg text-neutral-300" />
+                      </div>
+                    </ScrollFade>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -471,33 +682,49 @@ export default function ReviewPage() {
                       Bold toolbar button — clicking the field was toggling
                       bold. contentEditable isn't labelable, so nothing is
                       lost by using a plain div. */}
-                  {selectedNoteType.fields.map((fieldName) => (
-                    <div key={fieldName}>
-                      <span className="text-xs text-neutral-500">
-                        {fieldName}
-                        <span className="text-neutral-600">
-                          {' '}
-                          (
-                          {[
-                            selectedNoteType.questionFields.includes(fieldName) && 'question',
-                            selectedNoteType.answerFields.includes(fieldName) && 'answer',
-                          ]
-                            .filter(Boolean)
-                            .join(' + ')}
-                          )
-                        </span>
-                      </span>
-                      <div className="mt-0.5">
-                        <RichTextInput
-                          value={newFields[fieldName] ?? ''}
-                          onChange={(html) => {
-                            setNewFields((f) => ({ ...f, [fieldName]: html }));
-                            setAddCardError('');
-                          }}
-                        />
+                  {selectedNoteType.fields.map((fieldName) => {
+                    const isDynamic = (selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
+                    const type = resolvedNewFieldType(fieldName);
+                    return (
+                      <div key={fieldName}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-neutral-500">
+                            {fieldName}
+                            <span className="text-neutral-600">
+                              {' '}
+                              (
+                              {[
+                                selectedNoteType.questionFields.includes(fieldName) && 'question',
+                                selectedNoteType.answerFields.includes(fieldName) && 'answer',
+                              ]
+                                .filter(Boolean)
+                                .join(' + ')}
+                              )
+                            </span>
+                          </span>
+                          {isDynamic && (
+                            <FieldTypeToggle
+                              value={type}
+                              onChange={(t) => {
+                                setNewFieldTypes((f) => ({ ...f, [fieldName]: t }));
+                                setNewFields((f) => ({ ...f, [fieldName]: '' }));
+                              }}
+                            />
+                          )}
+                        </div>
+                        <div className="mt-0.5">
+                          <FieldValueInput
+                            type={type}
+                            value={newFields[fieldName] ?? ''}
+                            onChange={(html) => {
+                              setNewFields((f) => ({ ...f, [fieldName]: html }));
+                              setAddCardError('');
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {selectedNoteType.reversed && (
                     <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
                       <Checkbox checked={newReversed} onChange={setNewReversed} />
@@ -506,32 +733,35 @@ export default function ReviewPage() {
                   )}
                 </>
               ) : newCardType === 'cloze' ? (
-                <>
-                  <label className="block">
-                    <span className="text-xs text-neutral-500">Text</span>
-                    <textarea
-                      value={newClozeText}
-                      onChange={(e) => {
-                        setNewClozeText(e.target.value);
-                        setAddCardError('');
-                      }}
-                      placeholder="The capital of France is {{c1::Paris}}"
-                      rows={3}
-                      className="mt-0.5 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <p className="text-xs text-neutral-500">
-                    Wrap hidden text in <code>{'{{c1::...}}'}</code>.
-                  </p>
-                </>
+                <ClozeEditor
+                  initialText=""
+                  initialAnswers={{}}
+                  initialSeparateCards={false}
+                  onChange={(text, answers, separateCards) => {
+                    setNewClozeText(text);
+                    setNewClozeAnswers(answers);
+                    setNewClozeSeparateCards(separateCards);
+                    setAddCardError('');
+                  }}
+                />
               ) : (
                 <>
                   {/* divs, not labels — see the custom-fields comment above
                       (label click-forwarding hits the Bold toolbar button). */}
                   <div>
-                    <span className="text-xs text-neutral-500">Front</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-neutral-500">Front</span>
+                      <FieldTypeToggle
+                        value={newFrontType}
+                        onChange={(t) => {
+                          setNewFrontType(t);
+                          setNewFront('');
+                        }}
+                      />
+                    </div>
                     <div className="mt-0.5">
-                      <RichTextInput
+                      <FieldValueInput
+                        type={newFrontType}
                         value={newFront}
                         onChange={(html) => {
                           setNewFront(html);
@@ -542,9 +772,19 @@ export default function ReviewPage() {
                     </div>
                   </div>
                   <div>
-                    <span className="text-xs text-neutral-500">Back</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-neutral-500">Back</span>
+                      <FieldTypeToggle
+                        value={newBackType}
+                        onChange={(t) => {
+                          setNewBackType(t);
+                          setNewBack('');
+                        }}
+                      />
+                    </div>
                     <div className="mt-0.5">
-                      <RichTextInput
+                      <FieldValueInput
+                        type={newBackType}
                         value={newBack}
                         onChange={(html) => {
                           setNewBack(html);

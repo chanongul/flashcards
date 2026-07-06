@@ -15,7 +15,18 @@ html, body {
    * for the background color, but lets the box genuinely grow taller
    * than 100% so the overflow surfaces at the html/viewport level like
    * normal. */
-  min-height: 100%;
+  /* 100dvh, not 100% — percentage height resolves against the initial
+   * containing block, which on mobile Safari can be the *largest* possible
+   * viewport (address bar collapsed) rather than the current one, leaving
+   * html/body measured shorter than what's actually on screen right now
+   * whenever a short page (e.g. a browse list with only a couple cards)
+   * doesn't otherwise force more height. Every `fixed inset-0` modal
+   * overlay in the app is still sized correctly against the true viewport,
+   * but on the affected iOS Safari versions a fixed element gets clipped to
+   * the shorter document height instead of the full screen when body is
+   * shorter than the viewport — matching this to the dynamic viewport unit
+   * keeps body's minimum height honest in the toolbar-shown state too. */
+  min-height: 100dvh;
   /* Nothing in this app is ever meant to scroll sideways. */
   overflow-x: hidden;
 }
@@ -24,11 +35,55 @@ body {
   @apply bg-neutral-950 text-neutral-100;
 }
 
+/* Without an explicit color-scheme, browsers assume a light UI and pick a
+ * placeholder color meant for a white background — on our dark inputs that
+ * reads as too light/washed out (or, in some browsers, an odd bluish
+ * tint). Pin it to the same neutral-500 used everywhere else placeholder
+ * color is set explicitly (e.g. TagsInput). */
+::placeholder {
+  color: theme('colors.neutral.500') !important; 
+  opacity: 1;
+}
+
+/* Indeterminate global loading bar — see components/GlobalLoading.tsx. */
+@keyframes loading-bar-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+
 /* Rich text font-size steps — see lib/sanitize.ts's FONT_SIZE_VALUES. */
 [data-size="1"] { font-size: 0.7em; }
 [data-size="2"] { font-size: 0.85em; }
 [data-size="4"] { font-size: 1.25em; }
 [data-size="5"] { font-size: 1.6em; }
+
+/* Scoped instead of allowlisting a free-form `style` attribute in
+ * lib/sanitize.ts, which would reopen a much bigger injection surface for
+ * one rule's benefit. */
+.rich-text-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+/* :has(), not a plain `.rich-text-content audio`: the wrapping
+ * .rich-text-content span is itself `display: inline` with a shrink-to-fit
+ * width, and the review page centers it via a flex `items-center` ancestor
+ * (rather than stretching it) — so an audio-only field's span never gets a
+ * definite width to be 100% of in the first place. That's a circular
+ * percentage (span's fit-content width depends on the audio's rendered
+ * width, which depends on the span's width), which browsers resolve by
+ * collapsing both to 0. Forcing the span itself to a real block box with a
+ * definite width (100% of ITS OWN parent, which does have one) breaks the
+ * cycle. Scoped to :has(> audio) rather than applied to every
+ * .rich-text-content, since plain text and image fields rely on staying
+ * shrink-to-fit for correct centering. */
+.rich-text-content:has(> audio) {
+  display: block;
+  width: 100%;
+}
+.rich-text-content audio {
+  width: 100%;
+}
 
 /* iOS Safari zooms the whole page in when a focused form control's
  * font-size is under 16px. Force 16px so it won't — this makes the text

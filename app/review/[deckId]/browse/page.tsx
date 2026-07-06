@@ -6,18 +6,19 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Search, List } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
-import { editCard, deleteCard } from '@/lib/actions';
+import { editCard, deleteCard, cloneCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { clozeQuestion } from '@/lib/cloze';
-import { stripHtml } from '@/lib/sanitize';
+import { cardSearchText } from '@/lib/search';
 import { getDeckAndDescendantIds, deckDisplayName } from '@/lib/decks';
+import { useLoadingWhen } from '@/components/GlobalLoading';
 
 export default function DeckBrowsePage() {
   const params = useParams<{ deckId: string }>();
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
+  useLoadingWhen(userLoading || !user);
   const [query, setQuery] = useState('');
   const [confirmState, setConfirmState] = useState<{
     title: string;
@@ -35,14 +36,11 @@ export default function DeckBrowsePage() {
     return db.cards.where('deckId').anyOf(deckIds).filter((c) => !c.deleted).toArray();
   }, [params.deckId]);
 
-  // Same matching algorithm as the global browse page.
+  // Same matching algorithm as the global browse page (both share cardSearchText).
   const filtered = (deckCards ?? []).filter((card) => {
     if (!query.trim()) return false;
     const q = query.trim().toLowerCase();
-    const text =
-      card.cardType === 'cloze'
-        ? clozeQuestion(card.front)
-        : `${stripHtml(card.front)} ${stripHtml(card.back)}`;
+    const text = cardSearchText(card);
     const deckName = deckNameById.get(card.deckId) ?? '';
     const tags = card.tags.join(' ');
     return (
@@ -82,12 +80,13 @@ export default function DeckBrowsePage() {
     await editCard(user.id, card.id, { suspended: !card.suspended });
   }
 
+  async function handleClone(cardId: string, deckId: string) {
+    if (!user) return;
+    await cloneCard(user.id, cardId, deckId);
+  }
+
   if (userLoading || !user) {
-    return (
-      <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </main>
-    );
+    return null;
   }
 
   return (
@@ -141,6 +140,7 @@ export default function DeckBrowsePage() {
             onDelete={handleDelete}
             onToggleFlag={handleToggleFlag}
             onToggleSuspend={handleToggleSuspend}
+            onClone={handleClone}
           />
         ))}
         {query.trim() ? (

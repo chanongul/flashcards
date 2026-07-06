@@ -3,19 +3,21 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft, Search, Star } from 'lucide-react';
 import { db } from '@/lib/db';
-import { editCard, deleteCard } from '@/lib/actions';
+import { editCard, deleteCard, cloneCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { clozeQuestion } from '@/lib/cloze';
-import { stripHtml } from '@/lib/sanitize';
+import { cardSearchText } from '@/lib/search';
+import { useLoadingWhen } from '@/components/GlobalLoading';
 
 export default function BrowsePage() {
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
+  useLoadingWhen(userLoading || !user);
   const [query, setQuery] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [confirmState, setConfirmState] = useState<{
     title: string;
     message: string;
@@ -28,12 +30,12 @@ export default function BrowsePage() {
   const deckNameById = new Map((decks ?? []).map((d) => [d.id, d.name]));
 
   const filtered = (allCards ?? []).filter((card) => {
-    if (!query.trim()) return false;
+    if (favoritesOnly && !card.flagged) return false;
     const q = query.trim().toLowerCase();
-    const text =
-      card.cardType === 'cloze'
-        ? clozeQuestion(card.front)
-        : `${stripHtml(card.front)} ${stripHtml(card.back)}`;
+    // With the favorites filter on, an empty query still shows every
+    // favorite — only plain search requires you to actually type something.
+    if (!q) return favoritesOnly;
+    const text = cardSearchText(card);
     const deckName = deckNameById.get(card.deckId) ?? '';
     const tags = card.tags.join(' ');
     return (
@@ -42,6 +44,7 @@ export default function BrowsePage() {
       tags.toLowerCase().includes(q)
     );
   });
+  const hasActiveFilter = query.trim() !== '' || favoritesOnly;
 
   async function handleSaveEdit(
     cardId: string,
@@ -73,12 +76,13 @@ export default function BrowsePage() {
     await editCard(user.id, card.id, { suspended: !card.suspended });
   }
 
+  async function handleClone(cardId: string, deckId: string) {
+    if (!user) return;
+    await cloneCard(user.id, cardId, deckId);
+  }
+
   if (userLoading || !user) {
-    return (
-      <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </main>
-    );
+    return null;
   }
 
   return (
@@ -92,7 +96,14 @@ export default function BrowsePage() {
           <ArrowLeft size={16} />
         </button>
         <h1 className="text-lg font-semibold">Browse</h1>
-        <div className="w-9" />
+        <button
+          onClick={() => setFavoritesOnly((v) => !v)}
+          aria-label={favoritesOnly ? 'Show all cards' : 'Show favorites only'}
+          aria-pressed={favoritesOnly}
+          className={`text-yellow-400 ${favoritesOnly ? '' : 'opacity-40 hover:opacity-70'}`}
+        >
+          <Star size={20} fill="currentColor" />
+        </button>
       </div>
 
       <div className="relative mb-4">
@@ -105,7 +116,7 @@ export default function BrowsePage() {
         />
       </div>
 
-      {query.trim() && (
+      {hasActiveFilter && (
         <p className="mb-2 text-xs text-neutral-500">
           {filtered.length} card{filtered.length === 1 ? '' : 's'}
         </p>
@@ -121,9 +132,10 @@ export default function BrowsePage() {
             onDelete={handleDelete}
             onToggleFlag={handleToggleFlag}
             onToggleSuspend={handleToggleSuspend}
+            onClone={handleClone}
           />
         ))}
-        {query.trim() ? (
+        {hasActiveFilter ? (
           filtered.length === 0 && <p className="text-sm text-neutral-500">No cards match.</p>
         ) : (
           <p className="text-sm text-neutral-500">Type to search your cards.</p>

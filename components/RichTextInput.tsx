@@ -251,7 +251,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         onInput={handleInput}
         onFocus={updateActiveStates}
         data-placeholder={placeholder}
-        className="min-h-[2.5rem] px-3 py-2 text-sm outline-none empty:before:text-neutral-500 empty:before:content-[attr(data-placeholder)]"
+        className="rich-text-content min-h-[2.5rem] px-3 py-2 text-sm outline-none empty:before:text-neutral-500 empty:before:content-[attr(data-placeholder)]"
       />
     </div>
   );

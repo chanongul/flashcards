@@ -184,6 +184,7 @@ export async function replayAllEvents() {
           fields: p.fields ?? existing?.fields ?? [],
           questionFields: p.questionFields ?? existing?.questionFields ?? [],
           answerFields: p.answerFields ?? existing?.answerFields ?? [],
+          fieldTypes: p.fieldTypes ?? existing?.fieldTypes ?? {},
           reversed: p.reversed ?? existing?.reversed ?? false,
           deleted: false,
           createdAt: existing?.createdAt ?? e.timestamp,

@@ -6,18 +6,27 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { ArrowLeft, Search } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
-import { editCard, deleteCard } from '@/lib/actions';
+import { editCard, deleteCard, cloneCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useLoadingWhen } from '@/components/GlobalLoading';
+import { sortQueue } from '@/lib/fsrs';
 
 export default function AllCardsPage() {
   const params = useParams<{ deckId: string }>();
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
+  useLoadingWhen(userLoading || !user);
 
   const allCards = useLiveQuery(
-    () => db.cards.where('deckId').equals(params.deckId).filter((c) => !c.deleted).toArray(),
+    () =>
+      db.cards
+        .where('deckId')
+        .equals(params.deckId)
+        .filter((c) => !c.deleted)
+        .toArray()
+        .then(sortQueue),
     [params.deckId]
   );
 
@@ -57,12 +66,13 @@ export default function AllCardsPage() {
     await editCard(user.id, card.id, { suspended: !card.suspended });
   }
 
+  async function handleClone(cardId: string, deckId: string) {
+    if (!user) return;
+    await cloneCard(user.id, cardId, deckId);
+  }
+
   if (userLoading || !user) {
-    return (
-      <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
-        <p className="text-sm text-neutral-500">Loading…</p>
-      </main>
-    );
+    return null;
   }
 
   return (
@@ -96,6 +106,7 @@ export default function AllCardsPage() {
             onDelete={handleDelete}
             onToggleFlag={handleToggleFlag}
             onToggleSuspend={handleToggleSuspend}
+            onClone={handleClone}
           />
         ))}
         {allCards && allCards.length === 0 && (
