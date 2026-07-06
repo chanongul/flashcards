@@ -11,7 +11,17 @@ module.exports = {
     hoverOnlyWhenSupported: true,
   },
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        // Olive green for the "due" status — not in Tailwind's default palette.
+        // 300 = light olive for text on the near-black bg; 900 = dark olive
+        // for the card-state badge background (used at /50 like the others).
+        olive: {
+          300: '#b7c46a',
+          900: '#3f471c',
+        },
+      },
+    },
   },
   plugins: [],
 };

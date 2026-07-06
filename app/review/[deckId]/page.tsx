@@ -312,13 +312,13 @@ export default function ReviewPage() {
         <div className="mb-4 flex shrink-0 items-center justify-between">
           <p className="text-sm text-neutral-500">{deckBreadcrumb(deck.name)}</p>
           <span className="flex gap-2 text-xs font-medium">
-            <span className="text-blue-400" title={DECK_COUNT_TOOLTIPS.new}>
+            <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
               {deckCounts?.newCount ?? 0}
             </span>
-            <span className="text-red-400" title={DECK_COUNT_TOOLTIPS.learning}>
+            <span className="text-orange-600" title={DECK_COUNT_TOOLTIPS.learning}>
               {deckCounts?.learningCount ?? 0}
             </span>
-            <span className="text-green-400" title={DECK_COUNT_TOOLTIPS.due}>
+            <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
               {deckCounts?.dueCount ?? 0}
             </span>
           </span>

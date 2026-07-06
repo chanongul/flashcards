@@ -12,9 +12,9 @@ import { stripHtml } from '@/lib/sanitize';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 const STATE_COLORS: Record<StateLabel, string> = {
-  New: 'bg-blue-900/50 text-blue-300',
+  New: 'bg-sky-900/50 text-sky-300',
   Learning: 'bg-orange-900/50 text-orange-300',
-  Review: 'bg-green-900/50 text-green-300',
+  Review: 'bg-olive-900/50 text-olive-300',
   Relearning: 'bg-red-900/50 text-red-300',
 };
 
