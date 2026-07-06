@@ -26,7 +26,7 @@ import { TagsInput } from '@/components/TagsInput';
 import { ScrollFade } from '@/components/ScrollFade';
 import { ClozeEditor } from '@/components/ClozeEditor';
 import { resolvePendingMediaInHtml } from '@/lib/mediaSync';
-import { countCardsByState, DECK_COUNT_TOOLTIPS } from '@/lib/stats';
+import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
 import { deckBreadcrumb, deckDisplayName, deckParentName, getDeckAndDescendantIds } from '@/lib/decks';
 
 function questionText(card: Card): string {
@@ -171,16 +171,16 @@ export default function ReviewPage() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeckOptions, setShowDeckOptions] = useState(false);
-  const [showCustomStudy, setShowCustomStudy] = useState(false);
+  const [showStudyAhead, setShowStudyAhead] = useState(false);
 
-  useBodyScrollLock(showAddModal || showDeckOptions || showCustomStudy);
+  useBodyScrollLock(showAddModal || showDeckOptions || showStudyAhead);
 
   const [deckNameInput, setDeckNameInput] = useState('');
   const [newCardsPerDay, setNewCardsPerDay] = useState(0);
   const [reviewsPerDay, setReviewsPerDay] = useState(0);
   const [studyAheadDays, setStudyAheadDays] = useState(1);
   const [deckOptionsError, setDeckOptionsError] = useState('');
-  const [customStudyError, setCustomStudyError] = useState('');
+  const [studyAheadError, setStudyAheadError] = useState('');
 
   const [lastReview, setLastReview] = useState<{ card: Card; reviewEventId: string } | null>(
     null
@@ -197,6 +197,10 @@ export default function ReviewPage() {
       .toArray();
     return countCardsByState(cards);
   }, [params.deckId]);
+  // Overrides deckCounts while a "study ahead" session is active — see
+  // handleStartStudyAhead. Plain state, not persisted, so a refresh drops
+  // back to the live "due right now" counts.
+  const [aheadCounts, setAheadCounts] = useState<DeckCounts | null>(null);
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
@@ -415,15 +419,23 @@ export default function ReviewPage() {
     loadQueue();
   }
 
-  async function handleStartCustomStudy() {
+  async function handleStartStudyAhead() {
     if (studyAheadDays < 0) {
-      setCustomStudyError('Days ahead cannot be negative.');
+      setStudyAheadError('Days ahead cannot be negative.');
       return;
     }
+    const cutoff = Date.now() + studyAheadDays * 24 * 60 * 60 * 1000;
     const ahead = await getDueCardsAhead(params.deckId, studyAheadDays);
     setQueue(ahead);
     setRevealed(false);
-    setShowCustomStudy(false);
+    setShowStudyAhead(false);
+    // Swap the New/Learning/Due badges to reflect this wider window instead
+    // of just what's due right now — otherwise reviewing cards that aren't
+    // actually due today would never move any visible number, since they
+    // were never counted as due in the first place. Goes back to the live
+    // "due right now" counts on refresh (this is plain component state, not
+    // persisted) — see aheadCounts below.
+    setAheadCounts(countCardsByState(ahead, cutoff));
   }
 
   useLoadingWhen(userLoading || !user);
@@ -469,10 +481,10 @@ export default function ReviewPage() {
           </Link>
           <button
             onClick={() => {
-              setCustomStudyError('');
-              setShowCustomStudy(true);
+              setStudyAheadError('');
+              setShowStudyAhead(true);
             }}
-            aria-label="Custom study"
+            aria-label="Study ahead"
             className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
             <CalendarClock size={16} />
@@ -499,13 +511,13 @@ export default function ReviewPage() {
           <p className="text-sm text-neutral-500">{deckBreadcrumb(deck.name)}</p>
           <span className="flex gap-2 text-xs font-medium">
             <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
-              {deckCounts?.newCount ?? 0}
+              {(aheadCounts ?? deckCounts)?.newCount ?? 0}
             </span>
             <span className="text-orange-600" title={DECK_COUNT_TOOLTIPS.learning}>
-              {deckCounts?.learningCount ?? 0}
+              {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
             </span>
             <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
-              {deckCounts?.dueCount ?? 0}
+              {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
             </span>
           </span>
         </div>
@@ -905,12 +917,12 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {showCustomStudy && (
+      {showStudyAhead && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={() => {
-            setShowCustomStudy(false);
-            setCustomStudyError('');
+            setShowStudyAhead(false);
+            setStudyAheadError('');
           }}
         >
           <div
@@ -918,11 +930,11 @@ export default function ReviewPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">Custom study</p>
+              <p className="text-sm font-medium">Study ahead</p>
               <button
                 onClick={() => {
-                  setShowCustomStudy(false);
-                  setCustomStudyError('');
+                  setShowStudyAhead(false);
+                  setStudyAheadError('');
                 }}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
@@ -933,13 +945,14 @@ export default function ReviewPage() {
 
             <p className="mb-3 text-xs text-neutral-500">
               Review cards ahead of schedule, bypassing today's limits. Cards you rate get
-              rescheduled from now, same as any other review.
+              rescheduled from now, same as any other review. This session isn't saved —
+              refreshing the page ends it and goes back to what's actually due today.
             </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleStartCustomStudy();
+                handleStartStudyAhead();
               }}
             >
               <label className="block">
@@ -950,12 +963,12 @@ export default function ReviewPage() {
                   value={studyAheadDays}
                   onChange={(e) => {
                     setStudyAheadDays(Number(e.target.value));
-                    setCustomStudyError('');
+                    setStudyAheadError('');
                   }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
-              {customStudyError && <p className="mt-2 text-sm text-red-400">{customStudyError}</p>}
+              {studyAheadError && <p className="mt-2 text-sm text-red-400">{studyAheadError}</p>}
               <button
                 type="submit"
                 className="mt-3 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
