@@ -36,6 +36,14 @@ import { deckDisplayName, deckParentName, ancestorNames, flattenDeckTree } from 
 import { ReviewHeatmap } from '@/components/ReviewHeatmap';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
+// Both action dropdowns are a short single row of h-9 (36px) icon buttons
+// plus p-1 padding and a border — comfortably under 60px including margin.
+const DROPDOWN_MENU_HEIGHT = 60;
+
+function shouldDropUp(triggerRect: DOMRect): boolean {
+  return window.innerHeight - triggerRect.bottom < DROPDOWN_MENU_HEIGHT;
+}
+
 export default function HomePage() {
   const { user, loading } = useUser();
   const decks = useLiveQuery(() => db.decks.toArray(), []);
@@ -91,12 +99,14 @@ export default function HomePage() {
   const [subdeckName, setSubdeckName] = useState('');
   const [subdeckError, setSubdeckError] = useState('');
   const [actionsDeck, setActionsDeck] = useState<Deck | null>(null);
+  const [actionsDeckDropUp, setActionsDeckDropUp] = useState(false);
   const [renameDeckError, setRenameDeckError] = useState('');
 
   const [showNoteTypes, setShowNoteTypes] = useState(false);
   const [noteTypePage, setNoteTypePage] = useState<'list' | 'create'>('list');
   const [editingNoteTypeId, setEditingNoteTypeId] = useState<string | null>(null);
   const [noteTypeActionsId, setNoteTypeActionsId] = useState<string | null>(null);
+  const [noteTypeActionsDropUp, setNoteTypeActionsDropUp] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newQuestionFields, setNewQuestionFields] = useState<string[]>(['']);
   const [newAnswerFields, setNewAnswerFields] = useState<string[]>(['']);
@@ -408,7 +418,11 @@ export default function HomePage() {
                 </span>
               </Link>
               <button
-                onClick={() => setActionsDeck(actionsDeck?.id === deck.id ? null : deck)}
+                onClick={(e) => {
+                  const opening = actionsDeck?.id !== deck.id;
+                  setActionsDeck(opening ? deck : null);
+                  if (opening) setActionsDeckDropUp(shouldDropUp(e.currentTarget.getBoundingClientRect()));
+                }}
                 aria-label="Deck actions"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
               >
@@ -418,7 +432,11 @@ export default function HomePage() {
               {actionsDeck?.id === deck.id && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setActionsDeck(null)} />
-                  <div className="absolute right-0 top-full z-50 mt-1 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg">
+                  <div
+                    className={`absolute right-0 z-50 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg ${
+                      actionsDeckDropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+                    }`}
+                  >
                     <button
                       onClick={() => {
                         handleAddSubdeck(deck);
@@ -599,7 +617,11 @@ export default function HomePage() {
                         <span className="truncate">{nt.name}</span>
                       </div>
                       <button
-                        onClick={() => setNoteTypeActionsId(noteTypeActionsId === nt.id ? null : nt.id)}
+                        onClick={(e) => {
+                          const opening = noteTypeActionsId !== nt.id;
+                          setNoteTypeActionsId(opening ? nt.id : null);
+                          if (opening) setNoteTypeActionsDropUp(shouldDropUp(e.currentTarget.getBoundingClientRect()));
+                        }}
                         aria-label="Custom note/card type actions"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                       >
@@ -609,7 +631,11 @@ export default function HomePage() {
                       {noteTypeActionsId === nt.id && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setNoteTypeActionsId(null)} />
-                          <div className="absolute right-0 top-full z-50 mt-1 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg">
+                          <div
+                            className={`absolute right-0 z-50 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg ${
+                              noteTypeActionsDropUp ? 'bottom-full mb-1' : 'top-full mt-1'
+                            }`}
+                          >
                             <button
                               onClick={() => {
                                 openEditNoteType(nt);
