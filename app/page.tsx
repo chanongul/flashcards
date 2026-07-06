@@ -434,7 +434,7 @@ export default function HomePage() {
         <button
           onClick={handleSignOut}
           aria-label="Sign out"
-          className="rounded-md p-2 text-neutral-400 hover:text-neutral-200"
+          className="rounded-md text-neutral-400 hover:text-neutral-200"
         >
           <LogOut size={16} />
         </button>
