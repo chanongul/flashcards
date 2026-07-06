@@ -35,6 +35,7 @@ import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/s
 import { deckDisplayName, deckParentName, ancestorNames, flattenDeckTree } from '@/lib/decks';
 import { ReviewHeatmap } from '@/components/ReviewHeatmap';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Checkbox } from '@/components/Checkbox';
 
 // Both action dropdowns are a short single row of h-9 (36px) icon buttons
 // plus p-1 padding and a border — comfortably under 60px including margin.
@@ -790,12 +791,7 @@ export default function HomePage() {
                   </div>
 
                   <label className="flex items-center gap-2 text-xs text-neutral-400">
-                    <input
-                      type="checkbox"
-                      checked={newTypeReversed}
-                      onChange={(e) => setNewTypeReversed(e.target.checked)}
-                      className="accent-neutral-100"
-                    />
+                    <Checkbox checked={newTypeReversed} onChange={setNewTypeReversed} />
                     Allow reversed cards (lets you opt in per note when creating a card)
                   </label>
 

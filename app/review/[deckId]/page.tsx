@@ -20,6 +20,7 @@ import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { clozeQuestionFor, clozeAnswerFor, hasClozeDeletion } from '@/lib/cloze';
 import { RichTextInput } from '@/components/RichTextInput';
 import { RichText } from '@/components/RichText';
+import { Checkbox } from '@/components/Checkbox';
 import { stripHtml } from '@/lib/sanitize';
 import { countCardsByState, DECK_COUNT_TOOLTIPS } from '@/lib/stats';
 import { deckBreadcrumb, deckDisplayName, deckParentName, getDeckAndDescendantIds } from '@/lib/decks';
@@ -464,12 +465,7 @@ export default function ReviewPage() {
                   ))}
                   {selectedNoteType.reversed && (
                     <label className="flex items-center gap-2 text-xs text-neutral-400">
-                      <input
-                        type="checkbox"
-                        checked={newReversed}
-                        onChange={(e) => setNewReversed(e.target.checked)}
-                        className="accent-neutral-100"
-                      />
+                      <Checkbox checked={newReversed} onChange={setNewReversed} />
                       Also add the reverse card (answer → question)
                     </label>
                   )}
@@ -509,12 +505,7 @@ export default function ReviewPage() {
                     placeholder="Back (e.g. cat)"
                   />
                   <label className="flex items-center gap-2 text-xs text-neutral-400">
-                    <input
-                      type="checkbox"
-                      checked={newReversed}
-                      onChange={(e) => setNewReversed(e.target.checked)}
-                      className="accent-neutral-100"
-                    />
+                    <Checkbox checked={newReversed} onChange={setNewReversed} />
                     Also add the reverse card (back → front)
                   </label>
                 </>
