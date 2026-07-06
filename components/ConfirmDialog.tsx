@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -19,15 +20,35 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const touchStartY = useRef<number | null>(null);
+
   if (!open) return null;
+
+  // Unlike the bigger modals, this dialog doesn't lock body scroll — but a
+  // fixed full-viewport backdrop still sits on top of the page and normally
+  // eats touch-drags before they can reach it, so scrolling wouldn't work
+  // either way without this: forward drags on the backdrop into a real
+  // page scroll by hand.
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0]?.clientY ?? null;
+  }
+  function handleTouchMove(e: React.TouchEvent) {
+    if (touchStartY.current === null) return;
+    const y = e.touches[0]?.clientY;
+    if (y === undefined) return;
+    window.scrollBy(0, touchStartY.current - y);
+    touchStartY.current = y;
+  }
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={onCancel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
     >
       <div
-        className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+        className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">

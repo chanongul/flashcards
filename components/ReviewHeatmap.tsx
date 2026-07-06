@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getDailyReviewCounts, dateKey } from '@/lib/stats';
@@ -120,13 +120,39 @@ function buildGrid(counts: Map<string, number>, today: Date) {
 interface TooltipState {
   key: string;
   text: string;
-  x: number;
-  y: number;
+  cellLeft: number;
+  cellTop: number;
+  cellRight: number;
+  cellBottom: number;
 }
+
+const TOOLTIP_MARGIN = 8;
+const TOOLTIP_GAP = 6;
 
 export function ReviewHeatmap() {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ left: number; top: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Position after the tooltip has rendered (and we know its real size), so
+  // it can be clamped to stay fully on-screen instead of running off the
+  // left/right/top edge near the grid's boundaries.
+  useLayoutEffect(() => {
+    if (!tooltip || !tooltipRef.current) {
+      setTooltipPos(null);
+      return;
+    }
+    const rect = tooltipRef.current.getBoundingClientRect();
+    let left = tooltip.cellLeft + (tooltip.cellRight - tooltip.cellLeft) / 2 - rect.width / 2;
+    left = Math.min(Math.max(left, TOOLTIP_MARGIN), window.innerWidth - rect.width - TOOLTIP_MARGIN);
+
+    let top = tooltip.cellTop - rect.height - TOOLTIP_GAP;
+    if (top < TOOLTIP_MARGIN) {
+      top = tooltip.cellBottom + TOOLTIP_GAP; // not enough room above — flip below
+    }
+    setTooltipPos({ left, top });
+  }, [tooltip]);
 
   useEffect(() => {
     if (!tooltip) return;
@@ -155,12 +181,24 @@ export function ReviewHeatmap() {
     };
   }, [tooltip]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hasAutoScrolledRef = useRef(false);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startOfYear = new Date(today.getFullYear(), 0, 1);
   const daysSoFar = Math.round((today.getTime() - startOfYear.getTime()) / MS_PER_DAY) + 1;
 
   const counts = useLiveQuery(() => getDailyReviewCounts(daysSoFar), [daysSoFar]);
+
+  // Once, on first real render (not on every later live-query update, which
+  // would otherwise yank a manually-scrolled-left view back to today),
+  // scroll to the far right so the most recent days are what's visible.
+  useLayoutEffect(() => {
+    if (hasAutoScrolledRef.current || !counts || !scrollRef.current) return;
+    scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    hasAutoScrolledRef.current = true;
+  }, [counts]);
 
   if (!counts) return null;
 
@@ -183,7 +221,7 @@ export function ReviewHeatmap() {
               </div>
             ))}
           </div>
-          <div className="overflow-x-auto">
+          <div ref={scrollRef} className="overflow-x-auto">
             <div
               className="grid gap-[3px]"
               style={{ gridTemplateColumns: `repeat(${totalColumns}, 10px)`, gridTemplateRows: rowTemplate }}
@@ -207,7 +245,14 @@ export function ReviewHeatmap() {
                     setTooltip((prev) =>
                       prev?.key === cell.key
                         ? null
-                        : { key: cell.key, text: cell.title, x: rect.left + rect.width / 2, y: rect.top }
+                        : {
+                            key: cell.key,
+                            text: cell.title,
+                            cellLeft: rect.left,
+                            cellTop: rect.top,
+                            cellRight: rect.right,
+                            cellBottom: rect.bottom,
+                          }
                     );
                   }}
                   aria-label={cell.title || undefined}
@@ -221,8 +266,13 @@ export function ReviewHeatmap() {
       {tooltip &&
         createPortal(
           <div
-            style={{ left: tooltip.x, top: tooltip.y, transform: 'translate(-50%, calc(-100% - 6px))' }}
-            className="pointer-events-none fixed z-[60] whitespace-nowrap rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-100 shadow-lg"
+            ref={tooltipRef}
+            style={{
+              left: tooltipPos?.left ?? tooltip.cellLeft,
+              top: tooltipPos?.top ?? tooltip.cellTop,
+              visibility: tooltipPos ? 'visible' : 'hidden',
+            }}
+            className="pointer-events-none fixed z-[60] max-w-[calc(100vw-16px)] whitespace-nowrap rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-100 shadow-lg"
           >
             {tooltip.text}
           </div>,
