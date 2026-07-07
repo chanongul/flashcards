@@ -96,13 +96,13 @@ export default function HomePage() {
   };
 
   // Two hidden gestures layered on the same press, mutually exclusive by
-  // duration: held 3–10s then released → reload the page. Held past 10s
+  // duration: held 1.5–10s then released → reload the page. Held past 10s
   // → toggle the reset-all-data button below (fires automatically while
   // still held, not on release) and does NOT also reload — that would
   // instantly wipe out the very state it just revealed. A plain elapsed-
   // time check at release time (rather than two independent timers/flags)
   // is what makes those mutually exclusive without extra bookkeeping.
-  const REFRESH_HOLD_MS = 3_000;
+  const REFRESH_HOLD_MS = 1_500;
   const RESET_HOLD_MS = 10_000;
   const [showResetButton, setShowResetButton] = useState(false);
   const resetHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -448,7 +448,7 @@ export default function HomePage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
-          className={`relative inline-block cursor-pointer text-3xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[12%] scale-[115%] -skew-x-[15deg]' : ''}`}
+          className={`relative inline-block cursor-pointer text-3xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[12%] scale-[115%] -skew-x-[15deg]' : ''} ${showResetButton ? 'text-orange-600' : ''}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
           onMouseDown={startPressHoldTimers}
