@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Search, Star } from 'lucide-react';
 import { db } from '@/lib/db';
@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { cardSearchText } from '@/lib/search';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { useSmartBack } from '@/lib/useSmartBack';
+import { sync } from '@/lib/sync';
 
 export default function BrowsePage() {
   const goBack = useSmartBack('/');
@@ -81,6 +82,37 @@ export default function BrowsePage() {
     await cloneCard(user.id, cardId, deckId);
   }
 
+  // Title gesture timers
+  const REFRESH_HOLD_MS = 1_000;
+  const pressStartRef = useRef<number | null>(null);
+
+  function startPressHoldTimers() {
+    pressStartRef.current = Date.now();
+  }
+  
+  function cancelPressHoldTimers() {
+    pressStartRef.current = null;
+  }
+  
+  function endPressHoldTimers() {
+    const start = pressStartRef.current;
+    cancelPressHoldTimers();
+    if (start === null) return;
+    const heldMs = Date.now() - start;
+    if (heldMs >= REFRESH_HOLD_MS) {
+      window.location.reload();
+    }
+  }
+
+  async function handleTitleClick() {
+    if (!user) return;
+    try {
+      await sync(user.id);
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+    }
+  }
+
   if (userLoading || !user) {
     return null;
   }
@@ -95,7 +127,20 @@ export default function BrowsePage() {
         >
           <ArrowLeft size={16} />
         </button>
-        <h1 className="text-lg font-semibold">Browse</h1>
+        <h1
+          className="cursor-pointer text-lg font-semibold select-none"
+          onMouseDown={startPressHoldTimers}
+          onMouseUp={endPressHoldTimers}
+          onTouchStart={startPressHoldTimers}
+          onTouchEnd={endPressHoldTimers}
+          onTouchCancel={cancelPressHoldTimers}
+          onClick={handleTitleClick}
+          role="button"
+          aria-label="Sync now"
+          title="Sync now"
+        >
+          Browse
+        </h1>
         <button
           onClick={() => setFavoritesOnly((v) => !v)}
           aria-label={favoritesOnly ? 'Show all cards' : 'Show favorites only'}

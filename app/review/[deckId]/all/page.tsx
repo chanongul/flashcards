@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
@@ -13,6 +13,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { sortQueue } from '@/lib/fsrs';
 import { useSmartBack } from '@/lib/useSmartBack';
+import { sync } from '@/lib/sync';
 
 export default function AllCardsPage() {
   const params = useParams<{ deckId: string }>();
@@ -72,6 +73,37 @@ export default function AllCardsPage() {
     await cloneCard(user.id, cardId, deckId);
   }
 
+  // Title gesture timers
+  const REFRESH_HOLD_MS = 1_000;
+  const pressStartRef = useRef<number | null>(null);
+
+  function startPressHoldTimers() {
+    pressStartRef.current = Date.now();
+  }
+  
+  function cancelPressHoldTimers() {
+    pressStartRef.current = null;
+  }
+  
+  function endPressHoldTimers() {
+    const start = pressStartRef.current;
+    cancelPressHoldTimers();
+    if (start === null) return;
+    const heldMs = Date.now() - start;
+    if (heldMs >= REFRESH_HOLD_MS) {
+      window.location.reload();
+    }
+  }
+
+  async function handleTitleClick() {
+    if (!user) return;
+    try {
+      await sync(user.id);
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+    }
+  }
+
   if (userLoading || !user) {
     return null;
   }
@@ -86,7 +118,20 @@ export default function AllCardsPage() {
         >
           <ArrowLeft size={16} />
         </button>
-        <h1 className="text-lg font-semibold">All cards</h1>
+        <h1
+          className="cursor-pointer text-lg font-semibold select-none"
+          onMouseDown={startPressHoldTimers}
+          onMouseUp={endPressHoldTimers}
+          onTouchStart={startPressHoldTimers}
+          onTouchEnd={endPressHoldTimers}
+          onTouchCancel={cancelPressHoldTimers}
+          onClick={handleTitleClick}
+          role="button"
+          aria-label="Sync now"
+          title="Sync now"
+        >
+          All cards
+        </h1>
         <Link
           href={`/review/${params.deckId}/browse`}
           aria-label="Browse this deck"

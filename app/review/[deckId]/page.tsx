@@ -23,6 +23,7 @@ import {
   createCard,
   editDeck,
 } from "@/lib/actions";
+import { sync } from "@/lib/sync";
 import { Rating, type Grade } from "@/lib/fsrs";
 import { db, type Card, type FieldType } from "@/lib/db";
 import { useUser } from "@/lib/useUser";
@@ -169,6 +170,37 @@ export default function ReviewPage() {
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [clozeUserInputs, setClozeUserInputs] = useState<string[]>([]);
+
+  // Title gesture timers
+  const REFRESH_HOLD_MS = 1_000;
+  const pressStartRef = useRef<number | null>(null);
+
+  function startPressHoldTimers() {
+    pressStartRef.current = Date.now();
+  }
+  
+  function cancelPressHoldTimers() {
+    pressStartRef.current = null;
+  }
+  
+  function endPressHoldTimers() {
+    const start = pressStartRef.current;
+    cancelPressHoldTimers();
+    if (start === null) return;
+    const heldMs = Date.now() - start;
+    if (heldMs >= REFRESH_HOLD_MS) {
+      window.location.reload();
+    }
+  }
+
+  async function handleTitleClick() {
+    if (!user) return;
+    try {
+      await sync(user.id);
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+    }
+  }
 
   // 'basic' | 'cloze', or a NoteType id for a custom type
   const [newCardType, setNewCardType] = useState<string>("basic");
@@ -632,7 +664,18 @@ export default function ReviewPage() {
 
       {deck && (
         <div className="mb-4 flex shrink-0 items-center justify-between">
-          <p className="text-sm text-neutral-500">
+          <p
+            className="cursor-pointer text-sm text-neutral-500 select-none"
+            onMouseDown={startPressHoldTimers}
+            onMouseUp={endPressHoldTimers}
+            onTouchStart={startPressHoldTimers}
+            onTouchEnd={endPressHoldTimers}
+            onTouchCancel={cancelPressHoldTimers}
+            onClick={handleTitleClick}
+            role="button"
+            aria-label="Sync now"
+            title="Sync now"
+          >
             {deckBreadcrumb(deck.name)}
           </p>
           <div className="flex items-center gap-4">
