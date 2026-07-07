@@ -96,7 +96,7 @@ export default function HomePage() {
   };
 
   // Two hidden gestures layered on the same press, mutually exclusive by
-  // duration: held 1.5–5s then released → reload the page. Held past 5s
+  // duration: held 1–5s then released → reload the page. Held past 5s
   // → toggle the reset-all-data button below (fires automatically while
   // still held, not on release) and does NOT also reload — that would
   // instantly wipe out the very state it just revealed. A plain elapsed-
