@@ -298,9 +298,15 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     // A pending span is only ever closed explicitly by this button — always
     // treat the next click as "close it" rather than re-checking whether the
     // caret is still literally inside it (see exitDimSpan's comment).
+    // No re-focus() calls in this collapsed-caret branch (unlike exec()
+    // below, which needs one so execCommand has a focused editing context
+    // to act on) — the field is already focused here (the button's
+    // onMouseDown preventDefault keeps it that way), and redundantly calling
+    // .focus() on an already-focused contentEditable has been observed to
+    // reset the caret to the end of the content on some engines, silently
+    // destroying the exact selection/caret position just set below.
     if (pendingDimSpanRef.current) {
       finalizePendingDim();
-      ref.current?.focus();
       handleInput();
       updateActiveStates();
       return;
@@ -325,7 +331,6 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         sel.removeAllRanges();
         sel.addRange(newRange);
       }
-      ref.current?.focus();
       handleInput();
       updateActiveStates();
       return;
@@ -347,7 +352,6 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     if (wasDimmed) {
       sel.removeAllRanges();
       sel.addRange(rangeToWrap);
-      ref.current?.focus();
       handleInput();
       updateActiveStates();
       return;
@@ -362,7 +366,6 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     newRange.selectNodeContents(span);
     sel.removeAllRanges();
     sel.addRange(newRange);
-    ref.current?.focus();
 
     handleInput();
     updateActiveStates();
