@@ -175,35 +175,34 @@ export default function ReviewPage() {
   // Vertical position of the jot panel's *content* (below the handle), in
   // px from the top of the card box — 0 means the content sits flush with
   // the card's own top edge, with the handle itself allowed to poke up
-  // above it by JOT_HANDLE_HEIGHT. jotAreaRef (the card box) is also the
-  // only thing the panel is clamped against, which is what keeps it from
-  // ever being dragged down over the Show answer/rating buttons below the
-  // card, or (via the clamp's lower bound) up past the card's own top.
+  // above it by JOT_HANDLE_HEIGHT. cardBox (the card's own rect, measured
+  // relative to <main>) is also the only thing the panel is clamped
+  // against, which is what keeps it from ever being dragged down over the
+  // Show answer/rating buttons below the card, or up past the card's own
+  // top.
   //
-  // The panel itself is a sibling of the card box, not a child of it — the
-  // card box has its own overflow-hidden (needed to clip ScrollFade's fade
-  // gradients to its rounded corners), which was clipping the jot panel's
-  // handle and its wider-than-the-card width right along with it. Siblings
-  // within the outer wrapper (which has overflow-hidden removed, since the
-  // card box's own overflow-hidden already does the clipping either of
-  // them actually needs) aren't affected by the card box's clipping.
+  // The panel is rendered as a direct child of <main> (a sibling of the
+  // header/card/buttons, not nested in any of them) and positioned with
+  // raw pixel offsets from cardBox, rather than as a normal child of the
+  // card box or its wrapper. Both of those have their own overflow-hidden
+  // — the wrapper needs it to actually respect <main>'s fixed height
+  // instead of growing to fit its content (the classic flexbox
+  // min-height:auto issue), and the card box needs it to clip ScrollFade's
+  // fade gradients to its rounded corners — and either one clips the jot
+  // panel's handle and its wider-than-the-card width right along with it
+  // if the panel is a descendant of it. <main> itself has no such
+  // clipping, so a child of it isn't affected by either.
   const JOT_HANDLE_HEIGHT = 24;
   const JOT_CONTENT_RATIO = 0.5;
   const [jotOffset, setJotOffset] = useState(0);
-  // The panel's height can't be a plain CSS percentage — being a sibling of
-  // the card box rather than a child of it (see above), its containing
-  // block is the wider outer wrapper, which also includes the buttons
-  // below the card. Tracked in px instead, off the card box's own
-  // clientHeight specifically.
-  const [cardHeight, setCardHeight] = useState(0);
+  const [cardBox, setCardBox] = useState({ top: 0, left: 0, width: 0, height: 0 });
+  const mainRef = useRef<HTMLElement>(null);
   const jotAreaRef = useRef<HTMLDivElement>(null);
   const jotDragRef = useRef<{ startY: number; startOffset: number } | null>(null);
 
   function clampJotOffset(offset: number): number {
-    const area = jotAreaRef.current;
-    if (!area) return Math.max(0, offset);
-    const contentHeight = area.clientHeight * JOT_CONTENT_RATIO;
-    const max = Math.max(0, area.clientHeight - contentHeight);
+    const contentHeight = cardBox.height * JOT_CONTENT_RATIO;
+    const max = Math.max(0, cardBox.height - contentHeight);
     return Math.min(Math.max(0, offset), max);
   }
 
@@ -271,10 +270,22 @@ export default function ReviewPage() {
 
   useEffect(() => {
     const el = jotAreaRef.current;
-    if (!el) return;
-    setCardHeight(el.clientHeight);
-    const ro = new ResizeObserver(() => setCardHeight(el.clientHeight));
+    const mainEl = mainRef.current;
+    if (!el || !mainEl) return;
+    const update = () => {
+      const cardRect = el.getBoundingClientRect();
+      const mainRect = mainEl.getBoundingClientRect();
+      setCardBox({
+        top: cardRect.top - mainRect.top,
+        left: cardRect.left - mainRect.left,
+        width: cardRect.width,
+        height: cardRect.height,
+      });
+    };
+    update();
+    const ro = new ResizeObserver(update);
     ro.observe(el);
+    ro.observe(mainEl);
     return () => ro.disconnect();
   }, [current?.id, revealed]);
 
@@ -507,7 +518,10 @@ export default function ReviewPage() {
   }
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-1rem)] max-w-md flex-col p-6 sm:h-dvh">
+    <main
+      ref={mainRef}
+      className="relative mx-auto flex h-[calc(100dvh-1rem)] max-w-md flex-col p-6 sm:h-dvh"
+    >
       <div className="mb-4 flex shrink-0 items-center justify-between">
         <button
           onClick={goBack}
@@ -595,10 +609,10 @@ export default function ReviewPage() {
       )}
 
       {!loading && current && (
-        <div className="relative flex flex-1 flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-4 overflow-hidden">
           <div
             ref={jotAreaRef}
-            className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900/70 px-4 text-center"
+            className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-center"
           >
             {/* Each side is its own scroll region (see ScrollFade). The
                 min-h-full inner wrapper keeps content vertically centered
@@ -665,38 +679,6 @@ export default function ReviewPage() {
             )}
           </div>
 
-          {/* Always mounted (never conditional on showJot) so its own text/
-              drawing content survives toggling it closed and reopening —
-              only a full page refresh clears it, same as everything else
-              about this being a plain in-memory scratchpad. showJot just
-              toggles visibility. A sibling of the card box, not a child of
-              it (see jotAreaRef's doc comment for why), positioned within
-              this shared outer wrapper — left/right slightly negative
-              widens it past the card, and since the card box is this
-              wrapper's first child with no leading gap, top 0 here already
-              lines up with the card's own top edge. */}
-          <div
-            style={{
-              top: jotOffset - JOT_HANDLE_HEIGHT,
-              height: cardHeight * JOT_CONTENT_RATIO + JOT_HANDLE_HEIGHT,
-            }}
-            className={`absolute left-[-5%] right-[-5%] z-20 flex flex-col ${showJot ? '' : 'invisible pointer-events-none'}`}
-          >
-            <div
-              onPointerDown={handleJotHandlePointerDown}
-              onPointerMove={handleJotHandlePointerMove}
-              onPointerUp={handleJotHandlePointerUp}
-              onPointerCancel={handleJotHandlePointerUp}
-              aria-label="Drag to move the jot sheet"
-              className="flex h-6 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
-            >
-              <div className="h-1 w-10 rounded-full bg-neutral-500" />
-            </div>
-            <div className="min-h-0 flex-1">
-              <JotPad />
-            </div>
-          </div>
-
           {!revealed ? (
             <button
               onClick={() => setRevealed(true)}
@@ -732,6 +714,39 @@ export default function ReviewPage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Always mounted (never conditional on showJot) so its own text/
+          drawing content survives toggling it closed and reopening — only a
+          full page refresh clears it, same as everything else about this
+          being a plain in-memory scratchpad. showJot just toggles
+          visibility. A direct child of <main>, positioned from cardBox —
+          see that state's doc comment for why it's not a normal descendant
+          of the card box or its wrapper. */}
+      {current && (
+        <div
+          style={{
+            top: cardBox.top + jotOffset - JOT_HANDLE_HEIGHT,
+            left: cardBox.left - cardBox.width * 0.05,
+            width: cardBox.width * 1.1,
+            height: cardBox.height * JOT_CONTENT_RATIO + JOT_HANDLE_HEIGHT,
+          }}
+          className={`absolute z-20 flex flex-col ${showJot ? '' : 'invisible pointer-events-none'}`}
+        >
+          <div
+            onPointerDown={handleJotHandlePointerDown}
+            onPointerMove={handleJotHandlePointerMove}
+            onPointerUp={handleJotHandlePointerUp}
+            onPointerCancel={handleJotHandlePointerUp}
+            aria-label="Drag to move the jot sheet"
+            className="flex h-6 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
+          >
+            <div className="h-1 w-10 rounded-full bg-neutral-500" />
+          </div>
+          <div className="min-h-0 flex-1">
+            <JotPad />
+          </div>
         </div>
       )}
 
