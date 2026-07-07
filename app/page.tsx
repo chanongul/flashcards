@@ -74,6 +74,7 @@ export default function HomePage() {
   const handleTitleHoverEnd = () => {
     if (justTouchedRef.current) return;
     setTitleSkewed(false);
+    cancelPressHoldTimers();
   };
 
   // Skewed for exactly as long as the finger is down — no timer, just
@@ -86,22 +87,56 @@ export default function HomePage() {
       justTouchedRef.current = false;
     }, 500);
     setTitleSkewed(true);
+    startPressHoldTimers();
   };
 
   const handleTitleTouchEnd = () => {
     setTitleSkewed(false);
+    endPressHoldTimers();
   };
+
+  // Two hidden gestures layered on the same press, mutually exclusive by
+  // duration: held 3–10s then released → reload the page. Held past 10s
+  // → toggle the reset-all-data button below (fires automatically while
+  // still held, not on release) and does NOT also reload — that would
+  // instantly wipe out the very state it just revealed. A plain elapsed-
+  // time check at release time (rather than two independent timers/flags)
+  // is what makes those mutually exclusive without extra bookkeeping.
+  const REFRESH_HOLD_MS = 3_000;
+  const RESET_HOLD_MS = 10_000;
+  const [showResetButton, setShowResetButton] = useState(false);
+  const resetHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStartRef = useRef<number | null>(null);
+
+  function startPressHoldTimers() {
+    pressStartRef.current = Date.now();
+    if (resetHoldTimeout.current) clearTimeout(resetHoldTimeout.current);
+    resetHoldTimeout.current = setTimeout(() => {
+      setShowResetButton((v) => !v);
+    }, RESET_HOLD_MS);
+  }
+
+  function cancelPressHoldTimers() {
+    if (resetHoldTimeout.current) clearTimeout(resetHoldTimeout.current);
+    resetHoldTimeout.current = null;
+    pressStartRef.current = null;
+  }
+
+  function endPressHoldTimers() {
+    const start = pressStartRef.current;
+    cancelPressHoldTimers();
+    if (start === null) return;
+    const heldMs = Date.now() - start;
+    if (heldMs >= REFRESH_HOLD_MS && heldMs < RESET_HOLD_MS) {
+      window.location.reload();
+    }
+  }
 
   // The title doubles as a manual sync trigger — same push-then-pull the
   // background SyncManager already does on its own interval/focus ticks,
   // just on demand for "I want this to happen right now" (e.g. right after
-  // making a change on another device). It's also the hidden unlock for the
-  // reset-all-data button below — plain component state, so it (and the
-  // button) resets on every refresh, same as the title-skew state above.
-  const [titleClickCount, setTitleClickCount] = useState(0);
-
+  // making a change on another device).
   async function handleTitleClick() {
-    setTitleClickCount((c) => c + 1);
     if (!user) return;
     await withLoading(async () => {
       await sync(user.id);
@@ -416,6 +451,8 @@ export default function HomePage() {
           className={`relative inline-block cursor-pointer text-3xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[12%] scale-[115%] -skew-x-[15deg]' : ''}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
+          onMouseDown={startPressHoldTimers}
+          onMouseUp={endPressHoldTimers}
           onTouchStart={handleTitleTouchStart}
           onTouchEnd={handleTitleTouchEnd}
           onTouchCancel={handleTitleTouchEnd}
@@ -611,7 +648,7 @@ export default function HomePage() {
         <Plus size={16} />
       </button>
 
-      {titleClickCount >= 10 && (
+      {showResetButton && (
         <button
           onClick={() => {
             setResetConfirmText('');
