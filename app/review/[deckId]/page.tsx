@@ -254,7 +254,7 @@ export default function ReviewPage() {
   // card box's own overflow-hidden already does the clipping either of
   // them actually needs) aren't affected by the card box's clipping.
   const JOT_HANDLE_HEIGHT = 16;
-  const SIZE_OPTIONS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+  const SIZE_OPTIONS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
   const [jotSizeIndex, setJotSizeIndex] = useState(
     SIZE_OPTIONS.indexOf(0.5) // default 50%
   );

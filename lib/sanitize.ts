@@ -56,16 +56,20 @@ function sanitizeNode(node: Node) {
       continue;
     }
     if (el.tagName === 'SPAN') {
-      // A span only exists here to carry a size — one without a valid size is
-      // meaningless (e.g. pasted from elsewhere), so unwrap it like any other
-      // disallowed content instead of leaving an empty wrapper.
+      // A span only exists here to carry a size and/or a dim flag — one with
+      // neither is meaningless (e.g. pasted from elsewhere), so unwrap it
+      // like any other disallowed content instead of leaving an empty
+      // wrapper.
       const size = el.getAttribute('data-size');
-      if (!size || !ALLOWED_SIZES.has(size)) {
+      const validSize = size && ALLOWED_SIZES.has(size) ? size : null;
+      const dim = el.hasAttribute('data-dim');
+      if (!validSize && !dim) {
         unwrap(node, el);
         continue;
       }
       for (const attr of Array.from(el.attributes)) el.removeAttribute(attr.name);
-      el.setAttribute('data-size', size);
+      if (validSize) el.setAttribute('data-size', validSize);
+      if (dim) el.setAttribute('data-dim', '');
       sanitizeNode(el);
       continue;
     }

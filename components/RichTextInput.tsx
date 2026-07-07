@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline } from 'lucide-react';
+import { Bold, Italic, Underline, EyeClosed } from 'lucide-react';
 import { sanitizeRichText } from '@/lib/sanitize';
 
 interface RichTextInputProps {
@@ -16,7 +16,7 @@ const NORMAL_SIZE = 3;
 
 export function RichTextInput({ value, onChange, placeholder }: RichTextInputProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState({ bold: false, italic: false, underline: false });
+  const [active, setActive] = useState({ bold: false, italic: false, underline: false, dim: false });
 
   // Sync external value changes (e.g. switching which card is open) — but
   // never while this field has focus. Echoing the value back through the DOM
@@ -33,10 +33,12 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
 
   function updateActiveStates() {
     if (document.activeElement !== ref.current) return;
+    const sel = window.getSelection();
     setActive({
       bold: document.queryCommandState('bold'),
       italic: document.queryCommandState('italic'),
       underline: document.queryCommandState('underline'),
+      dim: sel && sel.rangeCount > 0 ? isDimmed(sel.getRangeAt(0)) : false,
     });
   }
 
@@ -178,6 +180,98 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     onChange(sanitizeRichText(ref.current.innerHTML));
   }
 
+  // Same ancestor-walk shape as getCurrentLevel above, but for a boolean
+  // instead of a size level.
+  function isDimmed(range: Range): boolean {
+    let node: Node | null = range.startContainer;
+    if (node.nodeType === Node.ELEMENT_NODE && node.childNodes[range.startOffset]) {
+      node = node.childNodes[range.startOffset];
+    }
+    while (node && node !== ref.current) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).hasAttribute('data-dim')) {
+        return true;
+      }
+      node = node.parentNode;
+    }
+    return false;
+  }
+
+  // Same shape as unwrapOverlappingSizes above, but for [data-dim] spans.
+  function unwrapOverlappingDim(range: Range): ChildNode[] {
+    if (!ref.current) return [];
+    const moved: ChildNode[] = [];
+    ref.current.querySelectorAll('span[data-dim]').forEach((span) => {
+      if (!range.intersectsNode(span)) return;
+      const parent = span.parentNode;
+      if (!parent) return;
+      const children = Array.from(span.childNodes);
+      while (span.firstChild) parent.insertBefore(span.firstChild, span);
+      parent.removeChild(span);
+      moved.push(...children);
+    });
+    return moved;
+  }
+
+  // execCommand('fontSize', ..., DIM_SENTINEL_SIZE) is used purely as a
+  // selection-aware wrapping mechanism (same trick applyFontSize uses above)
+  // — the resulting <font size="7"> is immediately rewritten into our own
+  // <span data-dim>, never stored. 7 is outside the 1-5 range the visible
+  // size stepper uses, so it can't collide with a real size level.
+  const DIM_SENTINEL_SIZE = 7;
+
+  function toggleDim() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const originalRange = sel.getRangeAt(0).cloneRange();
+    const wasDimmed = isDimmed(originalRange);
+
+    const moved = unwrapOverlappingDim(originalRange);
+
+    const newRange = document.createRange();
+    if (moved.length > 0) {
+      newRange.setStartBefore(moved[0]);
+      newRange.setEndAfter(moved[moved.length - 1]);
+    } else {
+      newRange.setStart(originalRange.startContainer, originalRange.startOffset);
+      newRange.setEnd(originalRange.endContainer, originalRange.endOffset);
+    }
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    if (wasDimmed) {
+      ref.current?.focus();
+      handleInput();
+      updateActiveStates();
+      return;
+    }
+
+    document.execCommand('fontSize', false, String(DIM_SENTINEL_SIZE));
+    ref.current?.focus();
+
+    const newSpans: HTMLElement[] = [];
+    ref.current?.querySelectorAll(`font[size="${DIM_SENTINEL_SIZE}"]`).forEach((fontEl) => {
+      const parent = fontEl.parentNode;
+      if (!parent) return;
+      const span = document.createElement('span');
+      span.setAttribute('data-dim', '');
+      while (fontEl.firstChild) span.appendChild(fontEl.firstChild);
+      parent.replaceChild(span, fontEl);
+      newSpans.push(span);
+    });
+
+    if (newSpans.length > 0) {
+      const range = document.createRange();
+      const last = newSpans[newSpans.length - 1];
+      range.setStart(newSpans[0], 0);
+      range.setEnd(last, last.childNodes.length);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    handleInput();
+    updateActiveStates();
+  }
+
   return (
     <div className="rounded-md border border-neutral-700 bg-neutral-900">
       <div className="flex gap-1 border-b border-neutral-700 p-1">
@@ -222,6 +316,20 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
           }`}
         >
           <Underline size={14} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={toggleDim}
+          aria-label="Dim text"
+          aria-pressed={active.dim}
+          className={`rounded p-1 ${
+            active.dim
+              ? 'bg-neutral-700 text-neutral-100'
+              : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+          }`}
+        >
+          <EyeClosed size={14} />
         </button>
         <div className="mx-1 w-px bg-neutral-700" />
         <button

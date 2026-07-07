@@ -87,6 +87,7 @@ body {
 [data-size="2"] { font-size: 0.85em; }
 [data-size="4"] { font-size: 1.25em; }
 [data-size="5"] { font-size: 1.6em; }
+[data-dim] { opacity: 0.5; }
 
 /* Scoped instead of allowlisting a free-form `style` attribute in
  * lib/sanitize.ts, which would reopen a much bigger injection surface for
