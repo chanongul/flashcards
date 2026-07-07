@@ -7,6 +7,16 @@ import { Type, PenTool, Eraser, Undo2 } from 'lucide-react';
 // stack (one full-canvas ImageData per entry) can't grow unbounded.
 const MAX_UNDO_STEPS = 20;
 
+// Graph-paper grid, drawn as a CSS background (not baked into the canvas's
+// own pixels) so it never shows up in undo/clear/getImageData — it's purely
+// decorative and unaffected by drawing, resizing, or DPR.
+const GRID_SIZE = 20; // px
+const GRID_STYLE: React.CSSProperties = {
+  backgroundImage:
+    'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
+  backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+};
+
 const STROKE_COLOR = '#e5e5e5'; // neutral-200, readable on the neutral-950 canvas bg
 
 /** A scratchpad for working through a card before revealing the answer —
@@ -186,6 +196,7 @@ export function JotPad() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
+          style={GRID_STYLE}
           className={`absolute inset-0 h-full w-full touch-none rounded-md border border-neutral-700 bg-neutral-950/5 ${
             mode === 'draw' ? '' : 'invisible'
           }`}
