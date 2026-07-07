@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Plus, X, Undo2, List, Settings, CalendarClock, Search } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
 import { Rating, type Grade } from '@/lib/fsrs';
 import { db, type Card, type FieldType } from '@/lib/db';
 import { useUser } from '@/lib/useUser';
+import { useSmartBack } from '@/lib/useSmartBack';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { clozeBlankLetters, buildClozeText, clozeSegments } from '@/lib/cloze';
 import { RichText } from '@/components/RichText';
@@ -133,7 +134,7 @@ function ClozeRevealPart({
 
 export default function ReviewPage() {
   const params = useParams<{ deckId: string }>();
-  const router = useRouter();
+  const goBack = useSmartBack('/');
   const { user, loading: userLoading } = useUser();
   const { withLoading } = useLoading();
   const [queue, setQueue] = useState<Card[]>([]);
@@ -449,7 +450,7 @@ export default function ReviewPage() {
     <main className="mx-auto flex h-[calc(100dvh-1rem)] max-w-md flex-col p-6 sm:h-dvh">
       <div className="mb-4 flex shrink-0 items-center justify-between">
         <button
-          onClick={() => router.push('/')}
+          onClick={goBack}
           aria-label="Back to decks"
           className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { ArrowLeft, Search } from 'lucide-react';
@@ -12,10 +12,11 @@ import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { sortQueue } from '@/lib/fsrs';
+import { useSmartBack } from '@/lib/useSmartBack';
 
 export default function AllCardsPage() {
   const params = useParams<{ deckId: string }>();
-  const router = useRouter();
+  const goBack = useSmartBack(`/review/${params.deckId}`);
   const { user, loading: userLoading } = useUser();
   useLoadingWhen(userLoading || !user);
 
@@ -79,7 +80,7 @@ export default function AllCardsPage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
-          onClick={() => router.push(`/review/${params.deckId}`)}
+          onClick={goBack}
           aria-label="Back to review"
           className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >

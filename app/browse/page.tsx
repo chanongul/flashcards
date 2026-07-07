@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Search, Star } from 'lucide-react';
 import { db } from '@/lib/db';
@@ -11,9 +10,10 @@ import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { cardSearchText } from '@/lib/search';
 import { useLoadingWhen } from '@/components/GlobalLoading';
+import { useSmartBack } from '@/lib/useSmartBack';
 
 export default function BrowsePage() {
-  const router = useRouter();
+  const goBack = useSmartBack('/');
   const { user, loading: userLoading } = useUser();
   useLoadingWhen(userLoading || !user);
   const [query, setQuery] = useState('');
@@ -89,7 +89,7 @@ export default function BrowsePage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
-          onClick={() => router.push('/')}
+          onClick={goBack}
           aria-label="Back to decks"
           className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Search, List } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
@@ -13,10 +13,11 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { cardSearchText } from '@/lib/search';
 import { getDeckAndDescendantIds, deckDisplayName } from '@/lib/decks';
 import { useLoadingWhen } from '@/components/GlobalLoading';
+import { useSmartBack } from '@/lib/useSmartBack';
 
 export default function DeckBrowsePage() {
   const params = useParams<{ deckId: string }>();
-  const router = useRouter();
+  const goBack = useSmartBack(`/review/${params.deckId}`);
   const { user, loading: userLoading } = useUser();
   useLoadingWhen(userLoading || !user);
   const [query, setQuery] = useState('');
@@ -93,7 +94,7 @@ export default function DeckBrowsePage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
-          onClick={() => router.push(`/review/${params.deckId}`)}
+          onClick={goBack}
           aria-label="Back to review"
           className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >
