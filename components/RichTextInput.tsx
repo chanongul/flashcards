@@ -212,61 +212,50 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     return moved;
   }
 
-  // execCommand('fontSize', ..., DIM_SENTINEL_SIZE) is used purely as a
-  // selection-aware wrapping mechanism (same trick applyFontSize uses above)
-  // — the resulting <font size="7"> is immediately rewritten into our own
-  // <span data-dim>, never stored. 7 is outside the 1-5 range the visible
-  // size stepper uses, so it can't collide with a real size level.
-  const DIM_SENTINEL_SIZE = 7;
-
+  // Wraps directly via Range.extractContents()/insertNode() rather than the
+  // execCommand('fontSize')-as-wrapping trick applyFontSize uses above —
+  // that trick briefly applies a real (huge, size-7) <font> tag to the
+  // selection before this code gets a chance to rewrite it, and at least on
+  // some engines that flash was visible/sticking around instead of being
+  // swapped out synchronously. Opacity has no execCommand equivalent worth
+  // routing through anyway, so a plain Range wrap sidesteps the whole issue.
   function toggleDim() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const originalRange = sel.getRangeAt(0).cloneRange();
+    if (originalRange.collapsed) return;
     const wasDimmed = isDimmed(originalRange);
 
     const moved = unwrapOverlappingDim(originalRange);
 
-    const newRange = document.createRange();
+    const rangeToWrap = document.createRange();
     if (moved.length > 0) {
-      newRange.setStartBefore(moved[0]);
-      newRange.setEndAfter(moved[moved.length - 1]);
+      rangeToWrap.setStartBefore(moved[0]);
+      rangeToWrap.setEndAfter(moved[moved.length - 1]);
     } else {
-      newRange.setStart(originalRange.startContainer, originalRange.startOffset);
-      newRange.setEnd(originalRange.endContainer, originalRange.endOffset);
+      rangeToWrap.setStart(originalRange.startContainer, originalRange.startOffset);
+      rangeToWrap.setEnd(originalRange.endContainer, originalRange.endOffset);
     }
-    sel.removeAllRanges();
-    sel.addRange(newRange);
 
     if (wasDimmed) {
+      sel.removeAllRanges();
+      sel.addRange(rangeToWrap);
       ref.current?.focus();
       handleInput();
       updateActiveStates();
       return;
     }
 
-    document.execCommand('fontSize', false, String(DIM_SENTINEL_SIZE));
+    const span = document.createElement('span');
+    span.setAttribute('data-dim', '');
+    span.appendChild(rangeToWrap.extractContents());
+    rangeToWrap.insertNode(span);
+
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
     ref.current?.focus();
-
-    const newSpans: HTMLElement[] = [];
-    ref.current?.querySelectorAll(`font[size="${DIM_SENTINEL_SIZE}"]`).forEach((fontEl) => {
-      const parent = fontEl.parentNode;
-      if (!parent) return;
-      const span = document.createElement('span');
-      span.setAttribute('data-dim', '');
-      while (fontEl.firstChild) span.appendChild(fontEl.firstChild);
-      parent.replaceChild(span, fontEl);
-      newSpans.push(span);
-    });
-
-    if (newSpans.length > 0) {
-      const range = document.createRange();
-      const last = newSpans[newSpans.length - 1];
-      range.setStart(newSpans[0], 0);
-      range.setEnd(last, last.childNodes.length);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
 
     handleInput();
     updateActiveStates();
