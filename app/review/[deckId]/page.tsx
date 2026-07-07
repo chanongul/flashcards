@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -172,6 +172,38 @@ export default function ReviewPage() {
   }
 
   const [showJot, setShowJot] = useState(false);
+  // Vertical position of the floating jot panel, in px from the top of
+  // jotAreaRef — that wrapper starts right below the deck-name/stats row
+  // and is the only thing the panel is positioned/clamped within, which is
+  // what keeps it from ever being dragged up over the header buttons above
+  // it: 0 already means "as high as it can go."
+  const [jotOffset, setJotOffset] = useState(0);
+  const jotAreaRef = useRef<HTMLDivElement>(null);
+  const jotPanelRef = useRef<HTMLDivElement>(null);
+  const jotDragRef = useRef<{ startY: number; startOffset: number } | null>(null);
+
+  function clampJotOffset(offset: number): number {
+    const area = jotAreaRef.current;
+    const panel = jotPanelRef.current;
+    if (!area || !panel) return Math.max(0, offset);
+    const max = Math.max(0, area.clientHeight - panel.clientHeight);
+    return Math.min(Math.max(0, offset), max);
+  }
+
+  function handleJotHandlePointerDown(e: React.PointerEvent) {
+    jotDragRef.current = { startY: e.clientY, startOffset: jotOffset };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleJotHandlePointerMove(e: React.PointerEvent) {
+    const drag = jotDragRef.current;
+    if (!drag) return;
+    setJotOffset(clampJotOffset(drag.startOffset + (e.clientY - drag.startY)));
+  }
+
+  function handleJotHandlePointerUp() {
+    jotDragRef.current = null;
+  }
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [showStudyAhead, setShowStudyAhead] = useState(false);
@@ -512,7 +544,7 @@ export default function ReviewPage() {
       {deck && (
         <div className="mb-4 flex shrink-0 items-center justify-between">
           <p className="text-sm text-neutral-500">{deckBreadcrumb(deck.name)}</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <span className="flex gap-2 text-xs font-medium">
               <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
                 {(aheadCounts ?? deckCounts)?.newCount ?? 0}
@@ -536,14 +568,8 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {showJot && current && (
-        <div className="mb-4 shrink-0" key={current.id}>
-          <JotPad />
-        </div>
-      )}
-
       {!loading && current && (
-        <div className="flex flex-1 flex-col gap-4 overflow-hidden">
+        <div ref={jotAreaRef} className="relative flex flex-1 flex-col gap-4 overflow-hidden">
           <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 px-4 text-center">
             {/* Each side is its own scroll region (see ScrollFade). The
                 min-h-full inner wrapper keeps content vertically centered
@@ -643,6 +669,28 @@ export default function ReviewPage() {
               >
                 Easy
               </button>
+            </div>
+          )}
+
+          {showJot && (
+            <div
+              ref={jotPanelRef}
+              style={{ top: jotOffset, height: '50%' }}
+              className="absolute inset-x-0 z-10 flex flex-col"
+            >
+              <div
+                onPointerDown={handleJotHandlePointerDown}
+                onPointerMove={handleJotHandlePointerMove}
+                onPointerUp={handleJotHandlePointerUp}
+                onPointerCancel={handleJotHandlePointerUp}
+                aria-label="Drag to move the jot sheet"
+                className="flex shrink-0 touch-none justify-center py-1 cursor-grab active:cursor-grabbing"
+              >
+                <div className="h-1 w-10 rounded-full bg-neutral-500" />
+              </div>
+              <div className="min-h-0 flex-1" key={current.id}>
+                <JotPad />
+              </div>
             </div>
           )}
         </div>

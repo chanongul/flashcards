@@ -91,8 +91,8 @@ export function JotPad() {
   }
 
   return (
-    <div className="rounded-md border border-neutral-800 bg-neutral-900/50 p-2">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="flex h-full flex-col rounded-md border border-neutral-800 bg-neutral-900/70 p-2 backdrop-blur-sm">
+      <div className="mb-2 flex shrink-0 items-center justify-between">
         <div className="flex gap-1">
           <button
             type="button"
@@ -125,12 +125,12 @@ export function JotPad() {
         </button>
       </div>
 
-      <div ref={containerRef} className="relative h-32 w-full">
+      <div ref={containerRef} className="relative w-full flex-1">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Jot something…"
-          className={`absolute inset-0 h-full w-full resize-none rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none ${
+          className={`absolute inset-0 h-full w-full resize-none rounded-md border border-neutral-700 bg-neutral-950/40 px-3 py-2 text-sm outline-none ${
             mode === 'type' ? '' : 'invisible'
           }`}
         />
@@ -140,7 +140,7 @@ export function JotPad() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          className={`absolute inset-0 h-full w-full touch-none rounded-md border border-neutral-700 bg-neutral-950 ${
+          className={`absolute inset-0 h-full w-full touch-none rounded-md border border-neutral-700 bg-neutral-950/40 ${
             mode === 'draw' ? '' : 'invisible'
           }`}
         />
