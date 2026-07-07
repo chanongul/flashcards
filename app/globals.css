@@ -33,6 +33,7 @@ html, body {
 
 body {
   @apply bg-neutral-950 text-neutral-100;
+  user-select: none;
 }
 
 /* Without an explicit color-scheme, browsers assume a light UI and pick a

@@ -56,7 +56,6 @@ export default function HomePage() {
   const { withLoading } = useLoading();
   const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
   const [titleSkewed, setTitleSkewed] = useState(false);
-  const titleSkewTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Feature-detecting "real mouse vs touch" via matchMedia turned out
   // unreliable in both directions — (hover: hover) alone matched on some
   // touch browsers, and adding "and (pointer: fine)" then wrongly excluded
@@ -67,33 +66,30 @@ export default function HomePage() {
   const justTouchedRef = useRef(false);
   const touchFlagTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTitleSkewTimeout = () => {
-    if (titleSkewTimeout.current) clearTimeout(titleSkewTimeout.current);
-    titleSkewTimeout.current = null;
-  };
-
   const handleTitleHoverStart = () => {
     if (justTouchedRef.current) return;
-    clearTitleSkewTimeout();
     setTitleSkewed(true);
   };
 
   const handleTitleHoverEnd = () => {
     if (justTouchedRef.current) return;
-    clearTitleSkewTimeout();
     setTitleSkewed(false);
   };
 
+  // Skewed for exactly as long as the finger is down — no timer, just
+  // start on touchstart and end on touchend/touchcancel (a call coming in
+  // mid-touch, etc., still counts as "no longer touching").
   const handleTitleTouchStart = () => {
     justTouchedRef.current = true;
     if (touchFlagTimeout.current) clearTimeout(touchFlagTimeout.current);
     touchFlagTimeout.current = setTimeout(() => {
       justTouchedRef.current = false;
     }, 500);
-
-    clearTitleSkewTimeout();
     setTitleSkewed(true);
-    titleSkewTimeout.current = setTimeout(() => setTitleSkewed(false), 1000);
+  };
+
+  const handleTitleTouchEnd = () => {
+    setTitleSkewed(false);
   };
 
   // The title doubles as a manual sync trigger — same push-then-pull the
@@ -417,10 +413,12 @@ export default function HomePage() {
     <main className="mx-auto mb-4 max-w-md p-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
-          className={`relative inline-block cursor-pointer text-2xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[20%] scale-[125%] -skew-x-[25deg] font-bold' : ''}`}
+          className={`relative inline-block cursor-pointer text-3xl font-black transition-transform duration-200 ${titleSkewed ? 'translate-x-[12%] scale-[115%] -skew-x-[15deg]' : ''}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
           onTouchStart={handleTitleTouchStart}
+          onTouchEnd={handleTitleTouchEnd}
+          onTouchCancel={handleTitleTouchEnd}
           onClick={handleTitleClick}
           role="button"
           aria-label="Sync now"
