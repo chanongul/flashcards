@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, EyeClosed } from 'lucide-react';
+import { Bold, Italic, Underline, EyeDashed } from 'lucide-react';
 import { sanitizeRichText } from '@/lib/sanitize';
 
 interface RichTextInputProps {
@@ -451,7 +451,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
               : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
           }`}
         >
-          <EyeClosed size={14} />
+          <EyeDashed size={14} />
         </button>
         <div className="mx-1 w-px bg-neutral-700" />
         <button
