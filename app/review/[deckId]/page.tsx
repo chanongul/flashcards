@@ -1,10 +1,20 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Plus, X, Undo2, List, Settings, CalendarClock, Search, NotebookPen } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useLiveQuery } from "dexie-react-hooks";
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  Undo2,
+  List,
+  Settings,
+  CalendarClock,
+  Search,
+  NotebookPen,
+} from "lucide-react";
 import {
   getDueCards,
   getDueCardsAhead,
@@ -12,24 +22,38 @@ import {
   undoReview,
   createCard,
   editDeck,
-} from '@/lib/actions';
-import { Rating, type Grade } from '@/lib/fsrs';
-import { db, type Card, type FieldType } from '@/lib/db';
-import { useUser } from '@/lib/useUser';
-import { useSmartBack } from '@/lib/useSmartBack';
-import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
-import { clozeBlankLetters, buildClozeText, clozeSegments } from '@/lib/cloze';
-import { RichText } from '@/components/RichText';
-import { FieldTypeToggle, FieldValueInput, fieldHasContent, fieldNeedsLabel } from '@/components/MediaFieldInput';
-import { useLoading, useLoadingWhen } from '@/components/GlobalLoading';
-import { Checkbox } from '@/components/Checkbox';
-import { TagsInput } from '@/components/TagsInput';
-import { ScrollFade } from '@/components/ScrollFade';
-import { ClozeEditor } from '@/components/ClozeEditor';
-import { JotPad } from '@/components/JotPad';
-import { resolvePendingMediaInHtml } from '@/lib/mediaSync';
-import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
-import { deckBreadcrumb, deckDisplayName, deckParentName, getDeckAndDescendantIds } from '@/lib/decks';
+} from "@/lib/actions";
+import { Rating, type Grade } from "@/lib/fsrs";
+import { db, type Card, type FieldType } from "@/lib/db";
+import { useUser } from "@/lib/useUser";
+import { useSmartBack } from "@/lib/useSmartBack";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { clozeBlankLetters, buildClozeText, clozeSegments } from "@/lib/cloze";
+import { RichText } from "@/components/RichText";
+import {
+  FieldTypeToggle,
+  FieldValueInput,
+  fieldHasContent,
+  fieldNeedsLabel,
+} from "@/components/MediaFieldInput";
+import { useLoading, useLoadingWhen } from "@/components/GlobalLoading";
+import { Checkbox } from "@/components/Checkbox";
+import { TagsInput } from "@/components/TagsInput";
+import { ScrollFade } from "@/components/ScrollFade";
+import { ClozeEditor } from "@/components/ClozeEditor";
+import { JotPad } from "@/components/JotPad";
+import { resolvePendingMediaInHtml } from "@/lib/mediaSync";
+import {
+  countCardsByState,
+  DECK_COUNT_TOOLTIPS,
+  type DeckCounts,
+} from "@/lib/stats";
+import {
+  deckBreadcrumb,
+  deckDisplayName,
+  deckParentName,
+  getDeckAndDescendantIds,
+} from "@/lib/decks";
 
 function questionText(card: Card): string {
   if (card.isReversed) return card.back;
@@ -62,15 +86,16 @@ function ClozeFillIn({
   return (
     <p className="text-lg">
       {clozeSegments(text).map((seg, i) => {
-        if (seg.type === 'text') return <span key={i}>{seg.value}</span>;
-        if (seg.number !== activeIndex) return <span key={i}>{seg.answer}</span>;
+        if (seg.type === "text") return <span key={i}>{seg.value}</span>;
+        if (seg.number !== activeIndex)
+          return <span key={i}>{seg.answer}</span>;
         const index = blankCount;
         blankCount += 1;
         return (
           <input
             key={i}
             type="text"
-            value={values[index] ?? ''}
+            value={values[index] ?? ""}
             onChange={(e) => onChange(index, e.target.value)}
             autoFocus={index === 0}
             aria-label="Fill in the blank"
@@ -88,14 +113,14 @@ function ClozeFillIn({
 // lets the user tell which occurrence's typed answer lines up with which
 // occurrence's correct answer, rather than every blank looking identical.
 const CLOZE_COLORS = [
-  'bg-sky-900/60 text-sky-300',
-  'bg-green-900/60 text-green-300',
-  'bg-amber-900/60 text-amber-300',
-  'bg-purple-900/60 text-purple-300',
-  'bg-pink-900/60 text-pink-300',
-  'bg-teal-900/60 text-teal-300',
-  'bg-orange-900/60 text-orange-300',
-  'bg-indigo-900/60 text-indigo-300',
+  "bg-sky-900/60 text-sky-300",
+  "bg-green-900/60 text-green-300",
+  "bg-amber-900/60 text-amber-300",
+  "bg-purple-900/60 text-purple-300",
+  "bg-pink-900/60 text-pink-300",
+  "bg-teal-900/60 text-teal-300",
+  "bg-orange-900/60 text-orange-300",
+  "bg-indigo-900/60 text-indigo-300",
 ];
 
 // The "Show answer" pair for a cloze card: the upper part freezes what the
@@ -110,18 +135,20 @@ function ClozeRevealPart({
 }: {
   text: string;
   activeIndex: number;
-  mode: 'user' | 'answer';
+  mode: "user" | "answer";
   userValues: string[];
 }) {
   let blankCount = 0;
   return (
     <p className="text-lg">
       {clozeSegments(text).map((seg, i) => {
-        if (seg.type === 'text') return <span key={i}>{seg.value}</span>;
-        if (seg.number !== activeIndex) return <span key={i}>{seg.answer}</span>;
+        if (seg.type === "text") return <span key={i}>{seg.value}</span>;
+        if (seg.number !== activeIndex)
+          return <span key={i}>{seg.answer}</span>;
         const index = blankCount;
         blankCount += 1;
-        const value = mode === 'user' ? userValues[index]?.trim() || '—' : seg.answer;
+        const value =
+          mode === "user" ? userValues[index]?.trim() || "—" : seg.answer;
         const color = CLOZE_COLORS[index % CLOZE_COLORS.length];
         return (
           <span key={i} className={`rounded px-1.5 ${color}`}>
@@ -135,7 +162,7 @@ function ClozeRevealPart({
 
 export default function ReviewPage() {
   const params = useParams<{ deckId: string }>();
-  const goBack = useSmartBack('/');
+  const goBack = useSmartBack("/");
   const { user, loading: userLoading } = useUser();
   const { withLoading } = useLoading();
   const [queue, setQueue] = useState<Card[]>([]);
@@ -144,30 +171,37 @@ export default function ReviewPage() {
   const [clozeUserInputs, setClozeUserInputs] = useState<string[]>([]);
 
   // 'basic' | 'cloze', or a NoteType id for a custom type
-  const [newCardType, setNewCardType] = useState<string>('basic');
-  const [newFront, setNewFront] = useState('');
-  const [newBack, setNewBack] = useState('');
+  const [newCardType, setNewCardType] = useState<string>("basic");
+  const [newFront, setNewFront] = useState("");
+  const [newBack, setNewBack] = useState("");
   // Basic has no persisted schema to fix a type to — chosen fresh each time,
   // defaulting to rich text (matches the field's old, only behavior).
-  const [newFrontType, setNewFrontType] = useState<FieldType>('richtext');
-  const [newBackType, setNewBackType] = useState<FieldType>('richtext');
+  const [newFrontType, setNewFrontType] = useState<FieldType>("richtext");
+  const [newBackType, setNewBackType] = useState<FieldType>("richtext");
   const [newReversed, setNewReversed] = useState(false);
-  const [newClozeText, setNewClozeText] = useState('');
-  const [newClozeAnswers, setNewClozeAnswers] = useState<Record<string, string>>({});
+  const [newClozeText, setNewClozeText] = useState("");
+  const [newClozeAnswers, setNewClozeAnswers] = useState<
+    Record<string, string>
+  >({});
   const [newClozeSeparateCards, setNewClozeSeparateCards] = useState(false);
   const [newFields, setNewFields] = useState<Record<string, string>>({});
   // Only used for custom fields declared 'dynamic' in their note type —
   // fixed-type fields never read from this.
-  const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>({});
+  const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>(
+    {},
+  );
   const [newTags, setNewTags] = useState<string[]>([]);
-  const [addCardError, setAddCardError] = useState('');
+  const [addCardError, setAddCardError] = useState("");
 
-  const noteTypes = useLiveQuery(() => db.noteTypes.filter((nt) => !nt.deleted).toArray(), []);
+  const noteTypes = useLiveQuery(
+    () => db.noteTypes.filter((nt) => !nt.deleted).toArray(),
+    [],
+  );
   const selectedNoteType = noteTypes?.find((nt) => nt.id === newCardType);
 
   function resolvedNewFieldType(fieldName: string): FieldType {
-    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? 'richtext';
-    if (config === 'dynamic') return newFieldTypes[fieldName] ?? 'richtext';
+    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? "richtext";
+    if (config === "dynamic") return newFieldTypes[fieldName] ?? "richtext";
     return config;
   }
 
@@ -187,8 +221,8 @@ export default function ReviewPage() {
   // within the outer wrapper (which has overflow-hidden removed, since the
   // card box's own overflow-hidden already does the clipping either of
   // them actually needs) aren't affected by the card box's clipping.
-  const JOT_HANDLE_HEIGHT = 24;
-  const JOT_CONTENT_RATIO = 0.5;
+  const JOT_HANDLE_HEIGHT = 12;
+  const JOT_CONTENT_RATIO = 0.6;
   const [jotOffset, setJotOffset] = useState(0);
   // The panel's height can't be a plain CSS percentage — being a sibling of
   // the card box rather than a child of it (see above), its containing
@@ -197,7 +231,9 @@ export default function ReviewPage() {
   // clientHeight specifically.
   const [cardHeight, setCardHeight] = useState(0);
   const jotAreaRef = useRef<HTMLDivElement>(null);
-  const jotDragRef = useRef<{ startY: number; startOffset: number } | null>(null);
+  const jotDragRef = useRef<{ startY: number; startOffset: number } | null>(
+    null,
+  );
 
   function clampJotOffset(offset: number): number {
     const area = jotAreaRef.current;
@@ -227,23 +263,24 @@ export default function ReviewPage() {
 
   useBodyScrollLock(showAddModal || showDeckOptions || showStudyAhead);
 
-  const [deckNameInput, setDeckNameInput] = useState('');
+  const [deckNameInput, setDeckNameInput] = useState("");
   const [newCardsPerDay, setNewCardsPerDay] = useState(0);
   const [reviewsPerDay, setReviewsPerDay] = useState(0);
   const [studyAheadDays, setStudyAheadDays] = useState(1);
-  const [deckOptionsError, setDeckOptionsError] = useState('');
-  const [studyAheadError, setStudyAheadError] = useState('');
+  const [deckOptionsError, setDeckOptionsError] = useState("");
+  const [studyAheadError, setStudyAheadError] = useState("");
 
-  const [lastReview, setLastReview] = useState<{ card: Card; reviewEventId: string } | null>(
-    null
-  );
+  const [lastReview, setLastReview] = useState<{
+    card: Card;
+    reviewEventId: string;
+  } | null>(null);
 
   const deck = useLiveQuery(() => db.decks.get(params.deckId), [params.deckId]);
 
   const deckCounts = useLiveQuery(async () => {
     const deckIds = await getDeckAndDescendantIds(params.deckId);
     const cards = await db.cards
-      .where('deckId')
+      .where("deckId")
       .anyOf(deckIds)
       .filter((c) => !c.deleted && !c.suspended)
       .toArray();
@@ -273,7 +310,7 @@ export default function ReviewPage() {
     const el = jotAreaRef.current;
     if (!el) return;
     setCardHeight(el.clientHeight);
-    const ro = new ResizeObserver(() => setCardHeight(el.clientHeight));
+    const ro = new ResizeObserver(() => setCardHeight(el.clientHeight + 4));
     ro.observe(el);
     return () => ro.disconnect();
   }, [current?.id, revealed, jotAreaRef.current]);
@@ -297,24 +334,24 @@ export default function ReviewPage() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
       if (showAddModal || !current) return;
 
-      if (e.code === 'Space') {
+      if (e.code === "Space") {
         e.preventDefault();
         if (!revealed) setRevealed(true);
         return;
       }
 
       if (!revealed) return;
-      if (e.key === '1') handleRate(Rating.Again);
-      else if (e.key === '2') handleRate(Rating.Hard);
-      else if (e.key === '3') handleRate(Rating.Good);
-      else if (e.key === '4') handleRate(Rating.Easy);
+      if (e.key === "1") handleRate(Rating.Again);
+      else if (e.key === "2") handleRate(Rating.Hard);
+      else if (e.key === "3") handleRate(Rating.Good);
+      else if (e.key === "4") handleRate(Rating.Easy);
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [current, revealed, showAddModal]);
 
   async function handleRate(rating: Grade) {
@@ -337,23 +374,23 @@ export default function ReviewPage() {
     // into another (e.g. basic front/back silently riding along after
     // switching to a custom type).
     setNewCardType(type);
-    setNewFront('');
-    setNewBack('');
-    setNewFrontType('richtext');
-    setNewBackType('richtext');
+    setNewFront("");
+    setNewBack("");
+    setNewFrontType("richtext");
+    setNewBackType("richtext");
     setNewReversed(false);
-    setNewClozeText('');
+    setNewClozeText("");
     setNewClozeAnswers({});
     setNewClozeSeparateCards(false);
     setNewFields({});
     setNewFieldTypes({});
     setNewTags([]);
-    setAddCardError('');
+    setAddCardError("");
   }
 
   function closeAddModal() {
     setShowAddModal(false);
-    selectCardType('basic');
+    selectCardType("basic");
   }
 
   async function handleAddCard(e: React.FormEvent) {
@@ -363,20 +400,23 @@ export default function ReviewPage() {
     const tags = newTags;
 
     if (selectedNoteType) {
-      const isFilled = (f: string) => fieldHasContent(newFields[f] ?? '', resolvedNewFieldType(f));
+      const isFilled = (f: string) =>
+        fieldHasContent(newFields[f] ?? "", resolvedNewFieldType(f));
       const missingLabelField = selectedNoteType.fields.find((f) =>
-        fieldNeedsLabel(newFields[f] ?? '', resolvedNewFieldType(f))
+        fieldNeedsLabel(newFields[f] ?? "", resolvedNewFieldType(f)),
       );
       if (missingLabelField) {
-        setAddCardError(`Add a label for "${missingLabelField}" (used for search).`);
+        setAddCardError(
+          `Add a label for "${missingLabelField}" (used for search).`,
+        );
         return;
       }
       if (!selectedNoteType.questionFields.some(isFilled)) {
-        setAddCardError('Fill in at least one question field.');
+        setAddCardError("Fill in at least one question field.");
         return;
       }
       if (!selectedNoteType.answerFields.some(isFilled)) {
-        setAddCardError('Fill in at least one answer field.');
+        setAddCardError("Fill in at least one answer field.");
         return;
       }
       // Any image/audio inserted while composing this card was only ever
@@ -386,47 +426,59 @@ export default function ReviewPage() {
       await withLoading(async () => {
         const resolvedFields = Object.fromEntries(
           await Promise.all(
-            Object.entries(newFields).map(async ([key, val]) => [key, await resolvePendingMediaInHtml(val)])
-          )
+            Object.entries(newFields).map(async ([key, val]) => [
+              key,
+              await resolvePendingMediaInHtml(val),
+            ]),
+          ),
         );
         await createCard(
           user.id,
           params.deckId,
           selectedNoteType.id,
-          '',
-          '',
+          "",
+          "",
           tags,
           resolvedFields,
-          newReversed
+          newReversed,
         );
       });
-    } else if (newCardType === 'cloze') {
+    } else if (newCardType === "cloze") {
       if (!newClozeText.trim()) {
-        setAddCardError('Enter the cloze text.');
+        setAddCardError("Enter the cloze text.");
         return;
       }
       const letters = clozeBlankLetters(newClozeText);
       if (letters.length === 0) {
-        setAddCardError('Click + to mark at least one blank.');
+        setAddCardError("Click + to mark at least one blank.");
         return;
       }
       if (letters.some((letter) => !newClozeAnswers[letter]?.trim())) {
-        setAddCardError('Fill in an answer for every blank.');
+        setAddCardError("Fill in an answer for every blank.");
         return;
       }
-      const clozeText = buildClozeText(newClozeText, newClozeAnswers, newClozeSeparateCards);
-      await withLoading(() => createCard(user.id, params.deckId, 'cloze', clozeText.trim(), '', tags));
+      const clozeText = buildClozeText(
+        newClozeText,
+        newClozeAnswers,
+        newClozeSeparateCards,
+      );
+      await withLoading(() =>
+        createCard(user.id, params.deckId, "cloze", clozeText.trim(), "", tags),
+      );
     } else {
       if (fieldNeedsLabel(newFront, newFrontType)) {
-        setAddCardError('Add a label for the front (used for search).');
+        setAddCardError("Add a label for the front (used for search).");
         return;
       }
       if (fieldNeedsLabel(newBack, newBackType)) {
-        setAddCardError('Add a label for the back (used for search).');
+        setAddCardError("Add a label for the back (used for search).");
         return;
       }
-      if (!fieldHasContent(newFront, newFrontType) || !fieldHasContent(newBack, newBackType)) {
-        setAddCardError('Fill in both front and back.');
+      if (
+        !fieldHasContent(newFront, newFrontType) ||
+        !fieldHasContent(newBack, newBackType)
+      ) {
+        setAddCardError("Fill in both front and back.");
         return;
       }
       await withLoading(async () => {
@@ -440,7 +492,7 @@ export default function ReviewPage() {
           resolvedBack,
           tags,
           undefined,
-          newReversed
+          newReversed,
         );
       });
     }
@@ -453,7 +505,7 @@ export default function ReviewPage() {
     setDeckNameInput(deckDisplayName(deck.name));
     setNewCardsPerDay(deck.newCardsPerDay);
     setReviewsPerDay(deck.reviewsPerDay);
-    setDeckOptionsError('');
+    setDeckOptionsError("");
     setShowDeckOptions(true);
   }
 
@@ -462,11 +514,11 @@ export default function ReviewPage() {
     if (!user || !deck) return;
     const name = deckNameInput.trim();
     if (!name) {
-      setDeckOptionsError('Enter a deck name.');
+      setDeckOptionsError("Enter a deck name.");
       return;
     }
     if (newCardsPerDay < 0 || reviewsPerDay < 0) {
-      setDeckOptionsError('New cards/day and reviews/day cannot be negative.');
+      setDeckOptionsError("New cards/day and reviews/day cannot be negative.");
       return;
     }
     const parent = deckParentName(deck.name);
@@ -482,7 +534,7 @@ export default function ReviewPage() {
 
   async function handleStartStudyAhead() {
     if (studyAheadDays < 0) {
-      setStudyAheadError('Days ahead cannot be negative.');
+      setStudyAheadError("Days ahead cannot be negative.");
       return;
     }
     const cutoff = Date.now() + studyAheadDays * 24 * 60 * 60 * 1000;
@@ -542,7 +594,7 @@ export default function ReviewPage() {
           </Link>
           <button
             onClick={() => {
-              setStudyAheadError('');
+              setStudyAheadError("");
               setShowStudyAhead(true);
             }}
             aria-label="Study ahead"
@@ -569,13 +621,18 @@ export default function ReviewPage() {
 
       {deck && (
         <div className="mb-4 flex shrink-0 items-center justify-between">
-          <p className="text-sm text-neutral-500">{deckBreadcrumb(deck.name)}</p>
+          <p className="text-sm text-neutral-500">
+            {deckBreadcrumb(deck.name)}
+          </p>
           <div className="flex items-center gap-4">
             <span className="flex gap-2 text-xs font-medium">
               <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
                 {(aheadCounts ?? deckCounts)?.newCount ?? 0}
               </span>
-              <span className="text-orange-600" title={DECK_COUNT_TOOLTIPS.learning}>
+              <span
+                className="text-orange-600"
+                title={DECK_COUNT_TOOLTIPS.learning}
+              >
                 {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
               </span>
               <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
@@ -584,9 +641,13 @@ export default function ReviewPage() {
             </span>
             <button
               onClick={() => setShowJot((v) => !v)}
-              aria-label={showJot ? 'Hide jot sheet' : 'Show jot sheet'}
+              aria-label={showJot ? "Hide jot sheet" : "Show jot sheet"}
               aria-pressed={showJot}
-              className={showJot ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-300'}
+              className={
+                showJot
+                  ? "text-neutral-100"
+                  : "text-neutral-500 hover:text-neutral-300"
+              }
             >
               <NotebookPen size={16} />
             </button>
@@ -606,7 +667,7 @@ export default function ReviewPage() {
                 from the top when it's too long (avoids flexbox centering
                 clipping the top). No vertical padding so content can scroll
                 flush to the edges, where ScrollFade draws its hint gradients. */}
-            {current.cardType === 'cloze' ? (
+            {current.cardType === "cloze" ? (
               <>
                 <ScrollFade>
                   <div className="flex min-h-full flex-col items-center justify-center">
@@ -648,7 +709,10 @@ export default function ReviewPage() {
               <>
                 <ScrollFade>
                   <div className="flex min-h-full flex-col items-center justify-center">
-                    <RichText html={questionText(current)} className="text-lg" />
+                    <RichText
+                      html={questionText(current)}
+                      className="text-lg"
+                    />
                   </div>
                 </ScrollFade>
                 {revealed && (
@@ -656,7 +720,10 @@ export default function ReviewPage() {
                     <hr className="shrink-0 border-neutral-800" />
                     <ScrollFade>
                       <div className="flex min-h-full flex-col items-center justify-center">
-                        <RichText html={answerText(current)} className="text-lg text-neutral-300" />
+                        <RichText
+                          html={answerText(current)}
+                          className="text-lg text-neutral-300"
+                        />
                       </div>
                     </ScrollFade>
                   </>
@@ -678,9 +745,9 @@ export default function ReviewPage() {
           <div
             style={{
               top: jotOffset - JOT_HANDLE_HEIGHT,
-              height: cardHeight * JOT_CONTENT_RATIO + JOT_HANDLE_HEIGHT,
+              height: cardHeight * JOT_CONTENT_RATIO + JOT_HANDLE_HEIGHT
             }}
-            className={`absolute left-[-5%] right-[-5%] z-20 flex flex-col ${showJot ? '' : 'invisible pointer-events-none'}`}
+            className={`absolute left-[-5%] right-[-5%] z-20 flex flex-col ${showJot ? "" : "invisible pointer-events-none"}`}
           >
             <div
               onPointerDown={handleJotHandlePointerDown}
@@ -688,9 +755,9 @@ export default function ReviewPage() {
               onPointerUp={handleJotHandlePointerUp}
               onPointerCancel={handleJotHandlePointerUp}
               aria-label="Drag to move the jot sheet"
-              className="flex h-6 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
+              className="flex h-3 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
             >
-              <div className="h-1 w-10 rounded-full bg-neutral-500" />
+              <div className="h-1 w-12 rounded-full bg-neutral-500" />
             </div>
             <div className="min-h-0 flex-1">
               <JotPad />
@@ -763,18 +830,18 @@ export default function ReviewPage() {
 
             <form onSubmit={handleAddCard} className="space-y-2">
               <div className="flex flex-wrap gap-1 text-xs">
-                {(['basic', 'cloze'] as const).map((type) => (
+                {(["basic", "cloze"] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => selectCardType(type)}
                     className={`rounded-md px-3 py-1.5 ${
                       newCardType === type
-                        ? 'bg-neutral-100 text-neutral-900'
-                        : 'border border-neutral-700 text-neutral-400'
+                        ? "bg-neutral-100 text-neutral-900"
+                        : "border border-neutral-700 text-neutral-400"
                     }`}
                   >
-                    {type === 'basic' ? 'Basic' : 'Cloze'}
+                    {type === "basic" ? "Basic" : "Cloze"}
                   </button>
                 ))}
                 {noteTypes?.map((nt) => (
@@ -784,8 +851,8 @@ export default function ReviewPage() {
                     onClick={() => selectCardType(nt.id)}
                     className={`rounded-md px-3 py-1.5 ${
                       newCardType === nt.id
-                        ? 'bg-neutral-100 text-neutral-900'
-                        : 'border border-neutral-700 text-neutral-400'
+                        ? "bg-neutral-100 text-neutral-900"
+                        : "border border-neutral-700 text-neutral-400"
                     }`}
                   >
                     {nt.name}
@@ -801,7 +868,9 @@ export default function ReviewPage() {
                       bold. contentEditable isn't labelable, so nothing is
                       lost by using a plain div. */}
                   {selectedNoteType.fields.map((fieldName) => {
-                    const isDynamic = (selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
+                    const isDynamic =
+                      (selectedNoteType.fieldTypes?.[fieldName] ??
+                        "richtext") === "dynamic";
                     const type = resolvedNewFieldType(fieldName);
                     return (
                       <div key={fieldName}>
@@ -809,14 +878,18 @@ export default function ReviewPage() {
                           <span className="text-xs text-neutral-500">
                             {fieldName}
                             <span className="text-neutral-600">
-                              {' '}
+                              {" "}
                               (
                               {[
-                                selectedNoteType.questionFields.includes(fieldName) && 'question',
-                                selectedNoteType.answerFields.includes(fieldName) && 'answer',
+                                selectedNoteType.questionFields.includes(
+                                  fieldName,
+                                ) && "question",
+                                selectedNoteType.answerFields.includes(
+                                  fieldName,
+                                ) && "answer",
                               ]
                                 .filter(Boolean)
-                                .join(' + ')}
+                                .join(" + ")}
                               )
                             </span>
                           </span>
@@ -824,8 +897,14 @@ export default function ReviewPage() {
                             <FieldTypeToggle
                               value={type}
                               onChange={(t) => {
-                                setNewFieldTypes((f) => ({ ...f, [fieldName]: t }));
-                                setNewFields((f) => ({ ...f, [fieldName]: '' }));
+                                setNewFieldTypes((f) => ({
+                                  ...f,
+                                  [fieldName]: t,
+                                }));
+                                setNewFields((f) => ({
+                                  ...f,
+                                  [fieldName]: "",
+                                }));
                               }}
                             />
                           )}
@@ -833,10 +912,13 @@ export default function ReviewPage() {
                         <div className="mt-0.5">
                           <FieldValueInput
                             type={type}
-                            value={newFields[fieldName] ?? ''}
+                            value={newFields[fieldName] ?? ""}
                             onChange={(html) => {
-                              setNewFields((f) => ({ ...f, [fieldName]: html }));
-                              setAddCardError('');
+                              setNewFields((f) => ({
+                                ...f,
+                                [fieldName]: html,
+                              }));
+                              setAddCardError("");
                             }}
                           />
                         </div>
@@ -845,12 +927,15 @@ export default function ReviewPage() {
                   })}
                   {selectedNoteType.reversed && (
                     <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
-                      <Checkbox checked={newReversed} onChange={setNewReversed} />
+                      <Checkbox
+                        checked={newReversed}
+                        onChange={setNewReversed}
+                      />
                       Also add the reverse card (answer → question)
                     </label>
                   )}
                 </>
-              ) : newCardType === 'cloze' ? (
+              ) : newCardType === "cloze" ? (
                 <ClozeEditor
                   initialText=""
                   initialAnswers={{}}
@@ -859,7 +944,7 @@ export default function ReviewPage() {
                     setNewClozeText(text);
                     setNewClozeAnswers(answers);
                     setNewClozeSeparateCards(separateCards);
-                    setAddCardError('');
+                    setAddCardError("");
                   }}
                 />
               ) : (
@@ -873,7 +958,7 @@ export default function ReviewPage() {
                         value={newFrontType}
                         onChange={(t) => {
                           setNewFrontType(t);
-                          setNewFront('');
+                          setNewFront("");
                         }}
                       />
                     </div>
@@ -883,7 +968,7 @@ export default function ReviewPage() {
                         value={newFront}
                         onChange={(html) => {
                           setNewFront(html);
-                          setAddCardError('');
+                          setAddCardError("");
                         }}
                         placeholder="e.g. 猫"
                       />
@@ -896,7 +981,7 @@ export default function ReviewPage() {
                         value={newBackType}
                         onChange={(t) => {
                           setNewBackType(t);
-                          setNewBack('');
+                          setNewBack("");
                         }}
                       />
                     </div>
@@ -906,7 +991,7 @@ export default function ReviewPage() {
                         value={newBack}
                         onChange={(html) => {
                           setNewBack(html);
-                          setAddCardError('');
+                          setAddCardError("");
                         }}
                         placeholder="e.g. cat"
                       />
@@ -932,7 +1017,9 @@ export default function ReviewPage() {
                 </div>
               </div>
 
-              {addCardError && <p className="text-sm text-red-400">{addCardError}</p>}
+              {addCardError && (
+                <p className="text-sm text-red-400">{addCardError}</p>
+              )}
 
               <button
                 type="submit"
@@ -950,7 +1037,7 @@ export default function ReviewPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={() => {
             setShowDeckOptions(false);
-            setDeckOptionsError('');
+            setDeckOptionsError("");
           }}
         >
           <div
@@ -959,12 +1046,14 @@ export default function ReviewPage() {
           >
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium">
-                {deck && deckParentName(deck.name) ? 'Subdeck options' : 'Deck options'}
+                {deck && deckParentName(deck.name)
+                  ? "Subdeck options"
+                  : "Deck options"}
               </p>
               <button
                 onClick={() => {
                   setShowDeckOptions(false);
-                  setDeckOptionsError('');
+                  setDeckOptionsError("");
                 }}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
@@ -980,7 +1069,7 @@ export default function ReviewPage() {
                   value={deckNameInput}
                   onChange={(e) => {
                     setDeckNameInput(e.target.value);
-                    setDeckOptionsError('');
+                    setDeckOptionsError("");
                   }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
@@ -993,25 +1082,29 @@ export default function ReviewPage() {
                   value={newCardsPerDay}
                   onChange={(e) => {
                     setNewCardsPerDay(Number(e.target.value));
-                    setDeckOptionsError('');
+                    setDeckOptionsError("");
                   }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-neutral-400">Max reviews/day</span>
+                <span className="text-xs text-neutral-400">
+                  Max reviews/day
+                </span>
                 <input
                   type="number"
                   min={0}
                   value={reviewsPerDay}
                   onChange={(e) => {
                     setReviewsPerDay(Number(e.target.value));
-                    setDeckOptionsError('');
+                    setDeckOptionsError("");
                   }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
-              {deckOptionsError && <p className="text-sm text-red-400">{deckOptionsError}</p>}
+              {deckOptionsError && (
+                <p className="text-sm text-red-400">{deckOptionsError}</p>
+              )}
               <button
                 type="submit"
                 className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
@@ -1028,7 +1121,7 @@ export default function ReviewPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={() => {
             setShowStudyAhead(false);
-            setStudyAheadError('');
+            setStudyAheadError("");
           }}
         >
           <div
@@ -1040,7 +1133,7 @@ export default function ReviewPage() {
               <button
                 onClick={() => {
                   setShowStudyAhead(false);
-                  setStudyAheadError('');
+                  setStudyAheadError("");
                 }}
                 aria-label="Close"
                 className="text-neutral-400 hover:text-neutral-200"
@@ -1050,9 +1143,10 @@ export default function ReviewPage() {
             </div>
 
             <p className="mb-3 text-xs text-neutral-500">
-              Review cards ahead of schedule, bypassing today's limits. Cards you rate get
-              rescheduled from now, same as any other review. This session isn't saved —
-              refreshing the page ends it and goes back to what's actually due today.
+              Review cards ahead of schedule, bypassing today's limits. Cards
+              you rate get rescheduled from now, same as any other review. This
+              session isn't saved — refreshing the page ends it and goes back to
+              what's actually due today.
             </p>
 
             <form
@@ -1069,12 +1163,14 @@ export default function ReviewPage() {
                   value={studyAheadDays}
                   onChange={(e) => {
                     setStudyAheadDays(Number(e.target.value));
-                    setStudyAheadError('');
+                    setStudyAheadError("");
                   }}
                   className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                 />
               </label>
-              {studyAheadError && <p className="mt-2 text-sm text-red-400">{studyAheadError}</p>}
+              {studyAheadError && (
+                <p className="mt-2 text-sm text-red-400">{studyAheadError}</p>
+              )}
               <button
                 type="submit"
                 className="mt-3 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"

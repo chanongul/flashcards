@@ -155,18 +155,18 @@ export function JotPad() {
               onClick={handleUndo}
               disabled={!canUndo}
               aria-label="Undo last stroke"
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300 disabled:opacity-30 disabled:hover:text-neutral-500"
+              className="flex items-center rounded p-1 text-xs text-neutral-500 hover:text-neutral-300 disabled:opacity-30 disabled:hover:text-neutral-500"
             >
-              <Undo2 size={12} /> Undo
+              <Undo2 size={16} />
             </button>
           )}
           <button
             type="button"
             onClick={handleClear}
             aria-label="Clear jot"
-            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+            className="flex items-center rounded p-1 text-xs text-neutral-500 hover:text-neutral-300"
           >
-            <Eraser size={12} /> Clear
+            <Eraser size={16} />
           </button>
         </div>
       </div>
