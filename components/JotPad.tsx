@@ -26,9 +26,19 @@ const STROKE_COLOR = '#e5e5e5'; // neutral-200, readable on the neutral-950 canv
  * the drawing stay mounted simultaneously (toggled by visibility, not
  * conditional rendering) so switching tabs never loses whichever one
  * you're not currently looking at. */
-export function JotPad() {
+interface JotPadProps {
+  sizeRatio: number;
+  onSizeToggle: () => void;
+  resetSignal: number;
+}
+
+export function JotPad({ sizeRatio, onSizeToggle, resetSignal }: JotPadProps) {
   const [mode, setMode] = useState<'type' | 'draw'>('type');
   const [text, setText] = useState('');
+
+  // Clear the text input whenever the size is toggled.
+  useEffect(() => { setText(''); }, [resetSignal]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
@@ -156,6 +166,15 @@ export function JotPad() {
             }`}
           >
             <PenTool size={12} /> Draw
+          </button>
+          {/* Size toggler */}
+          <button
+            type="button"
+            onClick={onSizeToggle}
+            aria-label="Toggle jot pad size"
+            className="flex items-center rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 tabular-nums"
+          >
+            {Math.round(sizeRatio * 100)}%
           </button>
         </div>
         <div className="flex gap-1">

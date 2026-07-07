@@ -222,7 +222,18 @@ export default function ReviewPage() {
   // card box's own overflow-hidden already does the clipping either of
   // them actually needs) aren't affected by the card box's clipping.
   const JOT_HANDLE_HEIGHT = 16;
-  const JOT_CONTENT_RATIO = 0.6;
+  const SIZE_OPTIONS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+  const [jotSizeIndex, setJotSizeIndex] = useState(
+    SIZE_OPTIONS.indexOf(0.5) // default 50%
+  );
+  const JOT_CONTENT_RATIO = SIZE_OPTIONS[jotSizeIndex];
+
+  function cycleJotSize() {
+    setJotSizeIndex((i) => (i + 1) % SIZE_OPTIONS.length);
+    setJotOffset(0);
+    setJotResetSignal((s) => s + 1);
+  }
+  const [jotResetSignal, setJotResetSignal] = useState(0);
   const [jotOffset, setJotOffset] = useState(0);
   // The panel's height can't be a plain CSS percentage — being a sibling of
   // the card box rather than a child of it (see above), its containing
@@ -313,7 +324,7 @@ export default function ReviewPage() {
     const ro = new ResizeObserver(() => setCardHeight(el.clientHeight + 4));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [current?.id, revealed, jotAreaRef.current]);
+  }, [current?.id, revealed, jotAreaRef.current, jotSizeIndex]);
 
   // A fresh card (including moving to the next one after rating) starts
   // with empty blanks — without this, stale input from the previous cloze
@@ -760,7 +771,7 @@ export default function ReviewPage() {
               <div className="h-1 w-12 rounded-full bg-neutral-500" />
             </div>
             <div className="min-h-0 flex-1">
-              <JotPad />
+              <JotPad sizeRatio={JOT_CONTENT_RATIO} onSizeToggle={cycleJotSize} resetSignal={jotResetSignal} />
             </div>
           </div>
 
