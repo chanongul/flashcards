@@ -10,10 +10,10 @@ const MAX_UNDO_STEPS = 20;
 // Graph-paper grid, drawn as a CSS background (not baked into the canvas's
 // own pixels) so it never shows up in undo/clear/getImageData — it's purely
 // decorative and unaffected by drawing, resizing, or DPR.
-const GRID_SIZE = 20; // px
+const GRID_SIZE = 16; // px
 const GRID_STYLE: React.CSSProperties = {
   backgroundImage:
-    'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
+    'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
   backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
 };
 
