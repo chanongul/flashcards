@@ -231,29 +231,52 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
 
   // Moves the caret out of `span` (stripping the leading ZWSP marker, or
   // dropping the whole span if nothing but the marker was ever typed into
-  // it) and repositions the caret from the SPAN'S OWN position in its
-  // parent — not from wherever the live caret currently happens to be. That
-  // makes turning dim off reliable even if typing left the caret somewhere
-  // slightly different than expected (seen on some mobile keyboards), since
-  // this never depends on reading the current selection to figure out where
-  // to go — only where the span itself sits.
+  // it). Places the caret inside a fresh, plain (non-dim) text node
+  // inserted right after the span — not at an element-level "one index
+  // past the span" boundary. A boundary position like that has no node of
+  // its own to anchor to, and several engines resolve typing there by
+  // appending to the *preceding* node (the span we just exited) instead of
+  // starting fresh content after it, which is exactly why turning dim off
+  // wasn't visibly taking effect (new text kept rendering dim, and the
+  // button re-highlighted the moment typing resumed). The marker node is
+  // swept up later (see cleanupBoundaryMarkers) once real content surrounds
+  // it and it's no longer needed to hold the caret.
   function exitDimSpan(span: HTMLElement) {
     const parent = span.parentNode;
     if (!parent) return;
-    const idx = Array.from(parent.childNodes).indexOf(span as unknown as ChildNode);
-    const placeholderOnly = span.textContent === '' || span.textContent === ZWSP;
-    if (placeholderOnly) {
-      parent.removeChild(span);
-    } else if (span.textContent?.startsWith(ZWSP)) {
+    if (span.textContent?.startsWith(ZWSP)) {
       span.textContent = span.textContent.slice(1);
+    }
+    const placeholderOnly = span.textContent === '';
+    const marker = document.createTextNode(ZWSP);
+    if (placeholderOnly) {
+      parent.replaceChild(marker, span);
+    } else {
+      parent.insertBefore(marker, span.nextSibling);
     }
     const sel = window.getSelection();
     if (!sel) return;
     const newRange = document.createRange();
-    newRange.setStart(parent, Math.min(placeholderOnly ? idx : idx + 1, parent.childNodes.length));
+    newRange.setStart(marker, 1);
     newRange.collapse(true);
     sel.removeAllRanges();
     sel.addRange(newRange);
+  }
+
+  // Removes bare (not inside any [data-dim]/[data-size] span) ZWSP marker
+  // text nodes left behind by exitDimSpan once they're no longer needed —
+  // safe to run wholesale on blur since nothing can still be relying on one
+  // to hold the caret once focus has left the field.
+  function cleanupBoundaryMarkers() {
+    if (!ref.current) return;
+    const walker = document.createTreeWalker(ref.current, NodeFilter.SHOW_TEXT);
+    const toRemove: Text[] = [];
+    let node = walker.nextNode();
+    while (node) {
+      if (node.textContent === ZWSP) toRemove.push(node as Text);
+      node = walker.nextNode();
+    }
+    toRemove.forEach((text) => text.remove());
   }
 
   // Tracks a dim span opened by a no-selection click on this specific
@@ -460,6 +483,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         onBlur={() => {
           finalizePendingDim();
           cleanupEmptyDimSpans();
+          cleanupBoundaryMarkers();
           handleInput();
         }}
         data-placeholder={placeholder}
