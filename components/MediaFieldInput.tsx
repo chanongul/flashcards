@@ -335,13 +335,13 @@ function ImageCropModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onCancel}>
       <div
-        className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+        className="flex w-full max-w-sm flex-col max-h-[90vh] rounded-lg border border-neutral-800 bg-neutral-950 p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="mb-2 text-sm font-medium">Crop image</p>
+        <p className="mb-2 shrink-0 text-sm font-medium">Crop image</p>
         <div
           ref={containerRef}
-          className="relative touch-none select-none overflow-hidden rounded-md"
+          className="relative touch-none select-none overflow-hidden rounded-md mx-auto"
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
@@ -349,7 +349,7 @@ function ImageCropModal({
             ref={imgRef}
             src={src}
             alt=""
-            className="block w-full select-none"
+            className="block max-h-[calc(90vh-140px)] w-auto max-w-full select-none"
             draggable={false}
             onLoad={handleImageLoad}
           />
@@ -369,8 +369,8 @@ function ImageCropModal({
             </div>
           )}
         </div>
-        <p className="mt-2 text-xs text-neutral-500">Drag the corners to resize, or drag inside to move.</p>
-        <div className="mt-3 flex gap-2">
+        <p className="mt-2 shrink-0 text-xs text-neutral-500">Drag the corners to resize, or drag inside to move.</p>
+        <div className="mt-3 flex shrink-0 gap-2">
           <button
             type="button"
             onClick={handleConfirm}

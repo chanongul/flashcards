@@ -650,18 +650,20 @@ export default function ReviewPage() {
                 {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
               </span>
             </span>
-            <button
-              onClick={() => setShowJot((v) => !v)}
-              aria-label={showJot ? "Hide jot sheet" : "Show jot sheet"}
-              aria-pressed={showJot}
-              className={
-                showJot
-                  ? "text-neutral-100"
-                  : "text-neutral-500 hover:text-neutral-300"
-              }
-            >
-              <NotebookPen size={16} />
-            </button>
+            {current && (
+              <button
+                onClick={() => setShowJot((v) => !v)}
+                aria-label={showJot ? "Hide jot sheet" : "Show jot sheet"}
+                aria-pressed={showJot}
+                className={
+                  showJot
+                    ? "text-neutral-100"
+                    : "text-neutral-500 hover:text-neutral-300"
+                }
+              >
+                <NotebookPen size={16} />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -771,7 +773,7 @@ export default function ReviewPage() {
               <div className="h-1 w-12 rounded-full bg-neutral-500" />
             </div>
             <div className="min-h-0 flex-1">
-              <JotPad sizeRatio={JOT_CONTENT_RATIO} onSizeToggle={cycleJotSize} resetSignal={jotResetSignal} />
+              <JotPad sizeRatio={JOT_CONTENT_RATIO} onSizeToggle={cycleJotSize} resetSignal={jotResetSignal} hasCard={!!current} />
             </div>
           </div>
 

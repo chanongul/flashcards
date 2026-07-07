@@ -31,9 +31,10 @@ interface JotPadProps {
   sizeRatio: number;
   onSizeToggle: () => void;
   resetSignal: number;
+  hasCard: boolean;
 }
 
-export function JotPad({ sizeRatio, onSizeToggle, resetSignal }: JotPadProps) {
+export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPadProps) {
   const [mode, setMode] = useState<"type" | "draw">("type");
   const [text, setText] = useState("");
 
@@ -191,15 +192,17 @@ export function JotPad({ sizeRatio, onSizeToggle, resetSignal }: JotPadProps) {
           >
             <PenTool size={12} /> Draw
           </button>
-          {/* Size toggler */}
-          <button
-            type="button"
-            onClick={onSizeToggle}
-            aria-label="Toggle jot pad size"
-            className="flex items-center rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 tabular-nums"
-          >
-            {Math.round(sizeRatio * 100)}%
-          </button>
+          {/* Size toggler — hidden when there's no card to review */}
+          {hasCard && (
+            <button
+              type="button"
+              onClick={onSizeToggle}
+              aria-label="Toggle jot pad size"
+              className="flex items-center rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 tabular-nums"
+            >
+              {Math.round(sizeRatio * 100)}%
+            </button>
+          )}
         </div>
         <div className="flex gap-1">
           {mode === "draw" && (

@@ -22,6 +22,7 @@ import { resolvePendingMediaInHtml } from '@/lib/mediaSync';
 import { useLoading, useLoadingWhen } from './GlobalLoading';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { ClozeEditor } from './ClozeEditor';
+import { TagsInput } from './TagsInput';
 
 const STATE_COLORS: Record<StateLabel, string> = {
   New: 'bg-sky-900/50 text-sky-300',
@@ -96,7 +97,7 @@ export function CardRow({
   const [clozeText, setClozeText] = useState('');
   const [clozeAnswers, setClozeAnswers] = useState<Record<string, string>>({});
   const [clozeSeparateCards, setClozeSeparateCards] = useState(false);
-  const [tagsInput, setTagsInput] = useState(card.tags.join(', '));
+  const [tagsInput, setTagsInput] = useState<string[]>(card.tags);
   const [editError, setEditError] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [history, setHistory] = useState<ReviewHistoryEntry[] | null>(null);
@@ -161,14 +162,14 @@ export function CardRow({
       }
     }
     setDynamicFieldTypes(dynTypes);
-    setTagsInput(card.tags.join(', '));
+    setTagsInput(card.tags);
     setEditError('');
     setEditing(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const tags = parseTagList(tagsInput);
+    const tags = tagsInput;
     // Content belongs to the note, not this specific derived card — for cloze
     // cards, card.id is `${noteId}::${clozeIndex}`, which wouldn't match
     // anything during replay's note-content pass.
@@ -332,11 +333,10 @@ export function CardRow({
               </div>
             </>
           )}
-          <input
+          <TagsInput
             value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="Tags, comma-separated"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs"
+            onChange={setTagsInput}
+            placeholder="Type a tag, press Enter…"
           />
           {editError && <p className="text-xs text-red-400">{editError}</p>}
           <div className="flex gap-2">
