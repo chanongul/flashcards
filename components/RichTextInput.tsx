@@ -229,18 +229,52 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     return null;
   }
 
+  // Moves the caret out of `span` (stripping the leading ZWSP marker, or
+  // dropping the whole span if nothing but the marker was ever typed into
+  // it) and repositions the caret from the SPAN'S OWN position in its
+  // parent — not from wherever the live caret currently happens to be. That
+  // makes turning dim off reliable even if typing left the caret somewhere
+  // slightly different than expected (seen on some mobile keyboards), since
+  // this never depends on reading the current selection to figure out where
+  // to go — only where the span itself sits.
+  function exitDimSpan(span: HTMLElement) {
+    const parent = span.parentNode;
+    if (!parent) return;
+    const idx = Array.from(parent.childNodes).indexOf(span as unknown as ChildNode);
+    const placeholderOnly = span.textContent === '' || span.textContent === ZWSP;
+    if (placeholderOnly) {
+      parent.removeChild(span);
+    } else if (span.textContent?.startsWith(ZWSP)) {
+      span.textContent = span.textContent.slice(1);
+    }
+    const sel = window.getSelection();
+    if (!sel) return;
+    const newRange = document.createRange();
+    newRange.setStart(parent, Math.min(placeholderOnly ? idx : idx + 1, parent.childNodes.length));
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
+  // Tracks a dim span opened by a no-selection click on this specific
+  // element (not by re-deriving "is the caret inside a dim span" from the
+  // current selection each time) — the next click on the button always
+  // means "close it", regardless of exactly where typing left the caret.
+  const pendingDimSpanRef = useRef<HTMLElement | null>(null);
+
+  function finalizePendingDim() {
+    const span = pendingDimSpanRef.current;
+    pendingDimSpanRef.current = null;
+    if (span) exitDimSpan(span);
+  }
+
   // A dim span left holding only the ZWSP placeholder means dim was toggled
   // on (or on then off) but nothing was ever typed into it — drop it so it
   // doesn't linger as an invisible, pointless span in the saved HTML.
-  // Skipped while the caret is still inside it (mid-typing).
   function cleanupEmptyDimSpans() {
-    const sel = window.getSelection();
-    const caretNode =
-      sel && sel.rangeCount > 0 && sel.getRangeAt(0).collapsed ? sel.getRangeAt(0).startContainer : null;
     ref.current?.querySelectorAll('span[data-dim]').forEach((span) => {
-      if (span.textContent !== '' && span.textContent !== ZWSP) return;
-      if (caretNode && span.contains(caretNode)) return;
-      span.remove();
+      if (span === pendingDimSpanRef.current) return;
+      if (span.textContent === '' || span.textContent === ZWSP) span.remove();
     });
   }
 
@@ -260,32 +294,31 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
   function toggleDim() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
+
+    // A pending span is only ever closed explicitly by this button — always
+    // treat the next click as "close it" rather than re-checking whether the
+    // caret is still literally inside it (see exitDimSpan's comment).
+    if (pendingDimSpanRef.current) {
+      finalizePendingDim();
+      ref.current?.focus();
+      handleInput();
+      updateActiveStates();
+      return;
+    }
+
     const originalRange = sel.getRangeAt(0).cloneRange();
 
     if (originalRange.collapsed) {
       const dimAncestor = findDimAncestor(originalRange.startContainer);
       if (dimAncestor) {
-        const parent = dimAncestor.parentNode;
-        if (parent) {
-          const idx = Array.from(parent.childNodes).indexOf(dimAncestor);
-          const placeholderOnly = dimAncestor.textContent === '' || dimAncestor.textContent === ZWSP;
-          if (placeholderOnly) {
-            parent.removeChild(dimAncestor);
-          } else if (dimAncestor.textContent?.startsWith(ZWSP)) {
-            dimAncestor.textContent = dimAncestor.textContent.slice(1);
-          }
-          const newRange = document.createRange();
-          newRange.setStart(parent, Math.min(placeholderOnly ? idx : idx + 1, parent.childNodes.length));
-          newRange.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(newRange);
-        }
+        exitDimSpan(dimAncestor);
       } else {
         const span = document.createElement('span');
         span.setAttribute('data-dim', '');
         const textNode = document.createTextNode(ZWSP);
         span.appendChild(textNode);
         originalRange.insertNode(span);
+        pendingDimSpanRef.current = span;
         const newRange = document.createRange();
         newRange.setStart(textNode, 1);
         newRange.collapse(true);
@@ -422,6 +455,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         onInput={handleInput}
         onFocus={updateActiveStates}
         onBlur={() => {
+          finalizePendingDim();
           cleanupEmptyDimSpans();
           handleInput();
         }}
