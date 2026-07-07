@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Type, PenTool, Eraser } from 'lucide-react';
+import { Type, PenTool, Eraser, Undo2 } from 'lucide-react';
+
+// How many strokes (or clears) back you can undo — capped so the snapshot
+// stack (one full-canvas ImageData per entry) can't grow unbounded.
+const MAX_UNDO_STEPS = 20;
 
 const STROKE_COLOR = '#e5e5e5'; // neutral-200, readable on the neutral-950 canvas bg
 
@@ -19,6 +23,8 @@ export function JotPad() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const undoStackRef = useRef<ImageData[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Sized off the wrapping container, not the canvas itself — the canvas is
   // only ever hidden via visibility (see the className below), never
@@ -35,6 +41,11 @@ export function JotPad() {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
+      // A resize already wipes the canvas's own pixels, and any snapshot
+      // taken at the old dimensions can't be restored onto the new ones —
+      // drop the stack rather than leave undo pointing at stale sizes.
+      undoStackRef.current = [];
+      setCanUndo(false);
     };
 
     resize();
@@ -52,7 +63,28 @@ export function JotPad() {
     };
   }
 
+  // Snapshot the canvas as it stood right before a stroke (or a clear)
+  // starts, so undo can restore exactly that.
+  function pushUndoSnapshot() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx || canvas.width === 0 || canvas.height === 0) return;
+    undoStackRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    if (undoStackRef.current.length > MAX_UNDO_STEPS) undoStackRef.current.shift();
+    setCanUndo(true);
+  }
+
+  function handleUndo() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    const snapshot = undoStackRef.current.pop();
+    if (!canvas || !ctx || !snapshot) return;
+    ctx.putImageData(snapshot, 0, 0);
+    setCanUndo(undoStackRef.current.length > 0);
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    pushUndoSnapshot();
     drawingRef.current = true;
     lastPointRef.current = pointerPos(e);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -85,6 +117,7 @@ export function JotPad() {
       setText('');
       return;
     }
+    pushUndoSnapshot();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -115,14 +148,27 @@ export function JotPad() {
             <PenTool size={12} /> Draw
           </button>
         </div>
-        <button
-          type="button"
-          onClick={handleClear}
-          aria-label="Clear jot"
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
-        >
-          <Eraser size={12} /> Clear
-        </button>
+        <div className="flex gap-1">
+          {mode === 'draw' && (
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={!canUndo}
+              aria-label="Undo last stroke"
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300 disabled:opacity-30 disabled:hover:text-neutral-500"
+            >
+              <Undo2 size={12} /> Undo
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Clear jot"
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+          >
+            <Eraser size={12} /> Clear
+          </button>
+        </div>
       </div>
 
       <div ref={containerRef} className="relative w-full flex-1">
@@ -130,7 +176,7 @@ export function JotPad() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Jot something…"
-          className={`absolute inset-0 h-full w-full resize-none rounded-md border border-neutral-700 bg-neutral-950/30 px-3 py-2 text-sm outline-none ${
+          className={`absolute inset-0 h-full w-full resize-none rounded-md border border-neutral-700 bg-neutral-950/5 px-3 py-2 text-sm outline-none ${
             mode === 'type' ? '' : 'invisible'
           }`}
         />
@@ -140,7 +186,7 @@ export function JotPad() {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          className={`absolute inset-0 h-full w-full touch-none rounded-md border border-neutral-700 bg-neutral-950/30 ${
+          className={`absolute inset-0 h-full w-full touch-none rounded-md border border-neutral-700 bg-neutral-950/5 ${
             mode === 'draw' ? '' : 'invisible'
           }`}
         />
