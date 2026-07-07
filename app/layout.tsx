@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist_Mono } from 'next/font/google';
 import localFont from 'next/font/local';
+import { Smartphone } from 'lucide-react';
 import './globals.css';
 import { SyncManager } from '@/components/SyncManager';
 import { LoadingProvider } from '@/components/GlobalLoading';
@@ -55,6 +56,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SyncManager />
           {children}
         </LoadingProvider>
+        {/* See globals.css's .landscape-lock rule — hidden by default,
+            shown only on phones/tablets (coarse pointer) in landscape. */}
+        <div className="landscape-lock fixed inset-0 z-[200] flex-col items-center justify-center gap-3 bg-neutral-950 p-6 text-center text-neutral-100">
+          <Smartphone size={40} className="rotate-90" />
+          <p className="text-sm text-neutral-400">Rotate your device back to portrait to use Flashcards.</p>
+        </div>
         <script
           dangerouslySetInnerHTML={{
             __html: `
