@@ -212,6 +212,38 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     return moved;
   }
 
+  // A zero-width space so a freshly-inserted, still-empty dim span has a
+  // text node to hold the caret in (an <span></span> with zero children
+  // can't reliably keep focus/caret position across browsers).
+  const ZWSP = '​';
+
+  // Same walk as isDimmed, but returns the span itself — needed to splice
+  // the caret in/out of it for the no-selection ("typing state") case below.
+  function findDimAncestor(node: Node | null): HTMLElement | null {
+    while (node && node !== ref.current) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).hasAttribute('data-dim')) {
+        return node as HTMLElement;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  // A dim span left holding only the ZWSP placeholder means dim was toggled
+  // on (or on then off) but nothing was ever typed into it — drop it so it
+  // doesn't linger as an invisible, pointless span in the saved HTML.
+  // Skipped while the caret is still inside it (mid-typing).
+  function cleanupEmptyDimSpans() {
+    const sel = window.getSelection();
+    const caretNode =
+      sel && sel.rangeCount > 0 && sel.getRangeAt(0).collapsed ? sel.getRangeAt(0).startContainer : null;
+    ref.current?.querySelectorAll('span[data-dim]').forEach((span) => {
+      if (span.textContent !== '' && span.textContent !== ZWSP) return;
+      if (caretNode && span.contains(caretNode)) return;
+      span.remove();
+    });
+  }
+
   // Wraps directly via Range.extractContents()/insertNode() rather than the
   // execCommand('fontSize')-as-wrapping trick applyFontSize uses above —
   // that trick briefly applies a real (huge, size-7) <font> tag to the
@@ -219,11 +251,53 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
   // some engines that flash was visible/sticking around instead of being
   // swapped out synchronously. Opacity has no execCommand equivalent worth
   // routing through anyway, so a plain Range wrap sidesteps the whole issue.
+  //
+  // A collapsed (no text selected) click instead toggles a "typing state",
+  // matching how bold/italic/underline already behave natively: turning on
+  // inserts an empty dim span and parks the caret inside it so whatever's
+  // typed next lands inside (and inherits the style); turning off moves the
+  // caret back out to just after it.
   function toggleDim() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const originalRange = sel.getRangeAt(0).cloneRange();
-    if (originalRange.collapsed) return;
+
+    if (originalRange.collapsed) {
+      const dimAncestor = findDimAncestor(originalRange.startContainer);
+      if (dimAncestor) {
+        const parent = dimAncestor.parentNode;
+        if (parent) {
+          const idx = Array.from(parent.childNodes).indexOf(dimAncestor);
+          const placeholderOnly = dimAncestor.textContent === '' || dimAncestor.textContent === ZWSP;
+          if (placeholderOnly) {
+            parent.removeChild(dimAncestor);
+          } else if (dimAncestor.textContent?.startsWith(ZWSP)) {
+            dimAncestor.textContent = dimAncestor.textContent.slice(1);
+          }
+          const newRange = document.createRange();
+          newRange.setStart(parent, Math.min(placeholderOnly ? idx : idx + 1, parent.childNodes.length));
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+      } else {
+        const span = document.createElement('span');
+        span.setAttribute('data-dim', '');
+        const textNode = document.createTextNode(ZWSP);
+        span.appendChild(textNode);
+        originalRange.insertNode(span);
+        const newRange = document.createRange();
+        newRange.setStart(textNode, 1);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+      ref.current?.focus();
+      handleInput();
+      updateActiveStates();
+      return;
+    }
+
     const wasDimmed = isDimmed(originalRange);
 
     const moved = unwrapOverlappingDim(originalRange);
@@ -347,6 +421,10 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         contentEditable
         onInput={handleInput}
         onFocus={updateActiveStates}
+        onBlur={() => {
+          cleanupEmptyDimSpans();
+          handleInput();
+        }}
         data-placeholder={placeholder}
         className="rich-text-content min-h-[2.5rem] px-3 py-2 text-sm outline-none empty:before:text-neutral-500 empty:before:content-[attr(data-placeholder)]"
       />
