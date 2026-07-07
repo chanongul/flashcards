@@ -271,9 +271,7 @@ export default function ReviewPage() {
 
   useEffect(() => {
     const el = jotAreaRef.current;
-    console.log("el", el);
     if (!el) return;
-    
     setCardHeight(el.clientHeight);
     const ro = new ResizeObserver(() => setCardHeight(el.clientHeight));
     ro.observe(el);
