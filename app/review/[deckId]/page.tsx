@@ -172,11 +172,14 @@ export default function ReviewPage() {
   }
 
   const [showJot, setShowJot] = useState(false);
-  // Vertical position of the floating jot panel, in px from the top of
-  // jotAreaRef — that wrapper starts right below the deck-name/stats row
-  // and is the only thing the panel is positioned/clamped within, which is
-  // what keeps it from ever being dragged up over the header buttons above
-  // it: 0 already means "as high as it can go."
+  // Vertical position of the jot panel's *content* (below the handle), in
+  // px from the top of jotAreaRef (the card box) — 0 means the content sits
+  // flush with the card's own top edge, with the handle itself allowed to
+  // poke up above it by JOT_HANDLE_HEIGHT. jotAreaRef is also the only
+  // thing the panel is positioned/clamped within, which is what keeps it
+  // from ever being dragged down over the Show answer/rating buttons below
+  // the card, or (via the clamp's lower bound) up past the card's own top.
+  const JOT_HANDLE_HEIGHT = 24;
   const [jotOffset, setJotOffset] = useState(0);
   const jotAreaRef = useRef<HTMLDivElement>(null);
   const jotPanelRef = useRef<HTMLDivElement>(null);
@@ -186,7 +189,8 @@ export default function ReviewPage() {
     const area = jotAreaRef.current;
     const panel = jotPanelRef.current;
     if (!area || !panel) return Math.max(0, offset);
-    const max = Math.max(0, area.clientHeight - panel.clientHeight);
+    const contentHeight = panel.clientHeight - JOT_HANDLE_HEIGHT;
+    const max = Math.max(0, area.clientHeight - contentHeight);
     return Math.min(Math.max(0, offset), max);
   }
 
@@ -569,8 +573,11 @@ export default function ReviewPage() {
       )}
 
       {!loading && current && (
-        <div ref={jotAreaRef} className="relative flex flex-1 flex-col gap-4 overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 px-4 text-center">
+        <div className="flex flex-1 flex-col gap-4 overflow-hidden">
+          <div
+            ref={jotAreaRef}
+            className="relative flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 px-4 text-center"
+          >
             {/* Each side is its own scroll region (see ScrollFade). The
                 min-h-full inner wrapper keeps content vertically centered
                 when it fits, but lets it grow past the container and scroll
@@ -634,6 +641,33 @@ export default function ReviewPage() {
                 )}
               </>
             )}
+
+            {/* Always mounted (never conditional on showJot) so its own text/
+                drawing content survives toggling it closed and reopening —
+                only a full page refresh clears it, same as everything else
+                about this being a plain in-memory scratchpad. showJot just
+                toggles visibility. Positioned/clamped within this card box
+                specifically (not the wider area that also includes the
+                buttons below) so it can never be dragged over them. */}
+            <div
+              ref={jotPanelRef}
+              style={{ top: jotOffset - JOT_HANDLE_HEIGHT, height: `calc(50% + ${JOT_HANDLE_HEIGHT}px)` }}
+              className={`absolute left-[-0.5%] right-[-0.5%] z-10 flex flex-col ${showJot ? '' : 'invisible'}`}
+            >
+              <div
+                onPointerDown={handleJotHandlePointerDown}
+                onPointerMove={handleJotHandlePointerMove}
+                onPointerUp={handleJotHandlePointerUp}
+                onPointerCancel={handleJotHandlePointerUp}
+                aria-label="Drag to move the jot sheet"
+                className="flex h-6 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
+              >
+                <div className="h-1 w-10 rounded-full bg-neutral-500" />
+              </div>
+              <div className="min-h-0 flex-1">
+                <JotPad />
+              </div>
+            </div>
           </div>
 
           {!revealed ? (
@@ -671,31 +705,6 @@ export default function ReviewPage() {
               </button>
             </div>
           )}
-
-          {/* Always mounted (never conditional on showJot) so its own text/
-              drawing content survives toggling it closed and reopening —
-              only a full page refresh clears it, same as everything else
-              about this being a plain in-memory scratchpad. showJot just
-              toggles visibility. */}
-          <div
-            ref={jotPanelRef}
-            style={{ top: jotOffset, height: '50%' }}
-            className={`absolute left-[-0.5%] right-[-0.5%] z-10 flex flex-col ${showJot ? '' : 'invisible'}`}
-          >
-            <div
-              onPointerDown={handleJotHandlePointerDown}
-              onPointerMove={handleJotHandlePointerMove}
-              onPointerUp={handleJotHandlePointerUp}
-              onPointerCancel={handleJotHandlePointerUp}
-              aria-label="Drag to move the jot sheet"
-              className="flex shrink-0 touch-none justify-center py-1 cursor-grab active:cursor-grabbing"
-            >
-              <div className="h-1 w-10 rounded-full bg-neutral-500" />
-            </div>
-            <div className="min-h-0 flex-1">
-              <JotPad />
-            </div>
-          </div>
         </div>
       )}
 
