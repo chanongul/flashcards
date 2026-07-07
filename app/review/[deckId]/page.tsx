@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Plus, X, Undo2, List, Settings, CalendarClock, Search } from 'lucide-react';
+import { ArrowLeft, Plus, X, Undo2, List, Settings, CalendarClock, Search, NotebookPen } from 'lucide-react';
 import {
   getDueCards,
   getDueCardsAhead,
@@ -26,6 +26,7 @@ import { Checkbox } from '@/components/Checkbox';
 import { TagsInput } from '@/components/TagsInput';
 import { ScrollFade } from '@/components/ScrollFade';
 import { ClozeEditor } from '@/components/ClozeEditor';
+import { JotPad } from '@/components/JotPad';
 import { resolvePendingMediaInHtml } from '@/lib/mediaSync';
 import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
 import { deckBreadcrumb, deckDisplayName, deckParentName, getDeckAndDescendantIds } from '@/lib/decks';
@@ -170,6 +171,7 @@ export default function ReviewPage() {
     return config;
   }
 
+  const [showJot, setShowJot] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [showStudyAhead, setShowStudyAhead] = useState(false);
@@ -510,17 +512,33 @@ export default function ReviewPage() {
       {deck && (
         <div className="mb-4 flex shrink-0 items-center justify-between">
           <p className="text-sm text-neutral-500">{deckBreadcrumb(deck.name)}</p>
-          <span className="flex gap-2 text-xs font-medium">
-            <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
-              {(aheadCounts ?? deckCounts)?.newCount ?? 0}
+          <div className="flex items-center gap-2">
+            <span className="flex gap-2 text-xs font-medium">
+              <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
+                {(aheadCounts ?? deckCounts)?.newCount ?? 0}
+              </span>
+              <span className="text-orange-600" title={DECK_COUNT_TOOLTIPS.learning}>
+                {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
+              </span>
+              <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
+                {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
+              </span>
             </span>
-            <span className="text-orange-600" title={DECK_COUNT_TOOLTIPS.learning}>
-              {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
-            </span>
-            <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
-              {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
-            </span>
-          </span>
+            <button
+              onClick={() => setShowJot((v) => !v)}
+              aria-label={showJot ? 'Hide jot sheet' : 'Show jot sheet'}
+              aria-pressed={showJot}
+              className={showJot ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-300'}
+            >
+              <NotebookPen size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showJot && current && (
+        <div className="mb-4 shrink-0" key={current.id}>
+          <JotPad />
         </div>
       )}
 
