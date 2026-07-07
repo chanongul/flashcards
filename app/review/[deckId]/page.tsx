@@ -672,27 +672,30 @@ export default function ReviewPage() {
             </div>
           )}
 
-          {showJot && (
+          {/* Always mounted (never conditional on showJot) so its own text/
+              drawing content survives toggling it closed and reopening —
+              only a full page refresh clears it, same as everything else
+              about this being a plain in-memory scratchpad. showJot just
+              toggles visibility. */}
+          <div
+            ref={jotPanelRef}
+            style={{ top: jotOffset, height: '50%' }}
+            className={`absolute left-[-0.5%] right-[-0.5%] z-10 flex flex-col ${showJot ? '' : 'invisible'}`}
+          >
             <div
-              ref={jotPanelRef}
-              style={{ top: jotOffset, height: '50%' }}
-              className="absolute inset-x-0 z-10 flex flex-col"
+              onPointerDown={handleJotHandlePointerDown}
+              onPointerMove={handleJotHandlePointerMove}
+              onPointerUp={handleJotHandlePointerUp}
+              onPointerCancel={handleJotHandlePointerUp}
+              aria-label="Drag to move the jot sheet"
+              className="flex shrink-0 touch-none justify-center py-1 cursor-grab active:cursor-grabbing"
             >
-              <div
-                onPointerDown={handleJotHandlePointerDown}
-                onPointerMove={handleJotHandlePointerMove}
-                onPointerUp={handleJotHandlePointerUp}
-                onPointerCancel={handleJotHandlePointerUp}
-                aria-label="Drag to move the jot sheet"
-                className="flex shrink-0 touch-none justify-center py-1 cursor-grab active:cursor-grabbing"
-              >
-                <div className="h-1 w-10 rounded-full bg-neutral-500" />
-              </div>
-              <div className="min-h-0 flex-1" key={current.id}>
-                <JotPad />
-              </div>
+              <div className="h-1 w-10 rounded-full bg-neutral-500" />
             </div>
-          )}
+            <div className="min-h-0 flex-1">
+              <JotPad />
+            </div>
+          </div>
         </div>
       )}
 
