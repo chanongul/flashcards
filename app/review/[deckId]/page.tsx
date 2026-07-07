@@ -221,7 +221,7 @@ export default function ReviewPage() {
   // within the outer wrapper (which has overflow-hidden removed, since the
   // card box's own overflow-hidden already does the clipping either of
   // them actually needs) aren't affected by the card box's clipping.
-  const JOT_HANDLE_HEIGHT = 12;
+  const JOT_HANDLE_HEIGHT = 16;
   const JOT_CONTENT_RATIO = 0.6;
   const [jotOffset, setJotOffset] = useState(0);
   // The panel's height can't be a plain CSS percentage — being a sibling of
@@ -745,7 +745,7 @@ export default function ReviewPage() {
           <div
             style={{
               top: jotOffset - JOT_HANDLE_HEIGHT,
-              height: cardHeight * JOT_CONTENT_RATIO + JOT_HANDLE_HEIGHT
+              height: cardHeight * JOT_CONTENT_RATIO + JOT_HANDLE_HEIGHT,
             }}
             className={`absolute left-[-5%] right-[-5%] z-20 flex flex-col ${showJot ? "" : "invisible pointer-events-none"}`}
           >
@@ -755,7 +755,7 @@ export default function ReviewPage() {
               onPointerUp={handleJotHandlePointerUp}
               onPointerCancel={handleJotHandlePointerUp}
               aria-label="Drag to move the jot sheet"
-              className="flex h-3 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
+              className="flex h-4 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing"
             >
               <div className="h-1 w-12 rounded-full bg-neutral-500" />
             </div>
