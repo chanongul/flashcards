@@ -1,7 +1,7 @@
 // Minimal service worker: caches the app shell so the PWA opens offline.
 // This is intentionally simple for v1 — no runtime caching strategy tuning yet.
 
-const CACHE_NAME = 'flashcard-app-v5';
+const CACHE_NAME = 'flashcard-app-v6';
 // Separate from CACHE_NAME so bumping the app-shell version above doesn't
 // also evict previously-downloaded images/audio (see the activate handler).
 // Bumped to v2 to purge any audio responses cached under the old
