@@ -116,7 +116,13 @@ export type EventType =
   | 'card_review_undo'
   | 'notetype_create'
   | 'notetype_edit'
-  | 'notetype_delete';
+  | 'notetype_delete'
+  // A tombstone, not a fact about any one entity — replayAllEvents ignores
+  // every event timestamped at or before the latest one of these, on every
+  // device that ever pulls it, which is what makes "reset all data" actually
+  // reach devices other than the one that triggered it (see resetAllData in
+  // lib/sync.ts). entityId is unused (always the resetting user's id).
+  | 'full_reset';
 
 export interface ReviewEvent {
   id: string; // uuid, event id

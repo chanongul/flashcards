@@ -82,25 +82,48 @@ export async function pushEvents() {
   return failed > 0 ? { pushed, failed, error: lastError } : { pushed };
 }
 
-/** Permanently wipes every deck, card, note type, and review event — both
- * the local IndexedDB tables and this user's server-side event log. The
- * server side has to go too, not just local: events are the durable source
- * of truth, so leaving them in place would just have the next sync pull
- * everything straight back. Irreversible — there's no soft-delete/undo
- * path for this, unlike every other destructive action in the app. */
+/** Permanently wipes every deck, card, note type, and review event —
+ * everywhere, not just this device. Deleting this device's local tables and
+ * the server-side log alone isn't enough: any *other* device signed into
+ * the same account still has its own full local copy sitting in IndexedDB,
+ * completely untouched, and pullAndReplay only ever adds events a device is
+ * missing — it never removes ones a device already has. Left alone, that
+ * other device would just go on showing (and even re-syncing) all the old
+ * data forever, oblivious to the reset.
+ *
+ * So this pushes a `full_reset` tombstone through the normal event log
+ * instead of only deleting out-of-band. Every device that ever pulls it
+ * (including this one, on its very next sync) has replayAllEvents ignore
+ * everything at or before its timestamp — see the resetCutoff logic there.
+ * Old rows are also deleted server-side (and the equivalent old rows
+ * dropped locally here) for real cleanup, but that part is just tidiness;
+ * the tombstone is what actually makes the reset reach every device.
+ * Irreversible — there's no soft-delete/undo path for this, unlike every
+ * other destructive action in the app. */
 export async function resetAllData(userId: string) {
-  const { error } = await supabase.from('events').delete().eq('user_id', userId);
-  if (error) throw error;
-
-  await db.transaction('rw', [db.decks, db.cards, db.events, db.noteTypes, db.pendingMedia], async () => {
-    await Promise.all([
-      db.decks.clear(),
-      db.cards.clear(),
-      db.events.clear(),
-      db.noteTypes.clear(),
-      db.pendingMedia.clear(),
-    ]);
+  const event = await logEvent(userId, userId, 'full_reset', {});
+  const { error } = await supabase.from('events').insert({
+    id: event.id,
+    user_id: event.userId,
+    entity_id: event.entityId,
+    type: event.type,
+    payload: event.payload,
+    client_id: event.clientId,
+    timestamp: event.timestamp,
   });
+  if (error) throw error;
+  await db.events.update(event.id, { synced: true });
+
+  const { error: deleteError } = await supabase
+    .from('events')
+    .delete()
+    .eq('user_id', userId)
+    .lt('timestamp', event.timestamp);
+  if (deleteError) throw deleteError;
+
+  await db.pendingMedia.clear();
+  await db.events.where('timestamp').below(event.timestamp).delete();
+  await replayAllEvents();
 }
 
 /** Pull any remote events we don't have locally yet, then replay them. */
@@ -163,7 +186,18 @@ export async function pullAndReplay(userId: string) {
  *      the bare noteId as entityId, which no cloze card id equals anymore.
  */
 export async function replayAllEvents() {
-  const events = await db.events.orderBy('timestamp').toArray();
+  const allEvents = await db.events.orderBy('timestamp').toArray();
+
+  // A full_reset tombstone means "ignore everything up to here" — for every
+  // device, not just the one that created it, since it propagates through
+  // the same push/pull as any other event. Without this, a device that
+  // still has its own pre-reset events sitting locally (never told to
+  // remove them — pullAndReplay only ever adds events it's missing) would
+  // just keep deriving decks/cards/noteTypes from them forever, completely
+  // unaffected by a reset that happened elsewhere. See resetAllData.
+  const resetTimestamps = allEvents.filter((e) => e.type === 'full_reset').map((e) => e.timestamp);
+  const resetCutoff = resetTimestamps.length > 0 ? Math.max(...resetTimestamps) : null;
+  const events = resetCutoff === null ? allEvents : allEvents.filter((e) => e.timestamp > resetCutoff);
 
   const undoneReviewIds = new Set(
     events

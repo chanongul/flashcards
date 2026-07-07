@@ -1012,7 +1012,8 @@ export default function HomePage() {
             </div>
             <p className="mb-3 text-sm text-neutral-400">
               This permanently deletes every deck, card, note type, and review event — on this
-              device and on the server. There is no undo.
+              device, on the server, and on every other device signed into this account once it
+              next syncs. There is no undo.
             </p>
             <label className="block">
               <span className="text-xs text-neutral-500">
