@@ -23,6 +23,8 @@ import { useLoading, useLoadingWhen } from './GlobalLoading';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { ClozeEditor } from './ClozeEditor';
 import { TagsInput } from './TagsInput';
+import { Checkbox } from './Checkbox';
+
 
 const STATE_COLORS: Record<StateLabel, string> = {
   New: 'bg-sky-900/50 text-sky-300',
@@ -66,7 +68,13 @@ interface CardRowProps {
   deckName?: string;
   onSave: (
     cardId: string,
-    changes: Partial<{ front: string; back: string; fields: Record<string, string>; tags: string[] }>
+    changes: Partial<{
+      front: string;
+      back: string;
+      fields: Record<string, string>;
+      tags: string[];
+      reversed: boolean;
+    }>
   ) => void | Promise<void>;
   onDelete: (cardId: string) => void | Promise<void>;
   onToggleFlag: (card: Card) => void | Promise<void>;
@@ -98,6 +106,7 @@ export function CardRow({
   const [clozeAnswers, setClozeAnswers] = useState<Record<string, string>>({});
   const [clozeSeparateCards, setClozeSeparateCards] = useState(false);
   const [tagsInput, setTagsInput] = useState<string[]>(card.tags);
+  const [editReversed, setEditReversed] = useState(false);
   const [editError, setEditError] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [history, setHistory] = useState<ReviewHistoryEntry[] | null>(null);
@@ -109,6 +118,14 @@ export function CardRow({
   const noteType = useLiveQuery(
     () => (card.noteTypeId ? db.noteTypes.get(card.noteTypeId) : undefined),
     [card.noteTypeId]
+  );
+
+  const hasReversedSibling = useLiveQuery(
+    async () => {
+      const sib = await db.cards.get(`${card.noteId}::reversed`);
+      return !!(sib && !sib.deleted);
+    },
+    [card.noteId]
   );
 
   const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
@@ -138,6 +155,12 @@ export function CardRow({
     if (config === 'dynamic') return dynamicFieldTypes[fieldName] ?? 'richtext';
     return config;
   }
+
+  useEffect(() => {
+    if (editing) {
+      setEditReversed(!!hasReversedSibling);
+    }
+  }, [editing, hasReversedSibling]);
 
   function startEdit() {
     setFront(card.front);
@@ -201,7 +224,7 @@ export function CardRow({
             Object.entries(fieldValues).map(async ([key, val]) => [key, await resolvePendingMediaInHtml(val)])
           )
         );
-        await onSave(card.noteId, { fields: resolvedFields, tags });
+        await onSave(card.noteId, { fields: resolvedFields, tags, reversed: editReversed });
       });
     } else if (card.cardType === 'cloze') {
       if (!clozeText.trim()) {
@@ -379,6 +402,12 @@ export function CardRow({
                 </div>
               </div>
             </>
+          )}
+          {card.cardType === 'custom' && noteType?.reversed && (
+            <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
+              <Checkbox checked={editReversed} onChange={setEditReversed} />
+              Also add the reverse card (answer → question)
+            </label>
           )}
           <TagsInput
             value={tagsInput}
