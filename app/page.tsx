@@ -894,13 +894,7 @@ export default function HomePage() {
                 onMouseDown={() => hasChildren && startFoldHold(deck.id)}
                 onMouseUp={cancelFoldHold}
                 onMouseLeave={cancelFoldHold}
-                onTouchStart={(e) => {
-                  if (!hasChildren) return;
-                  // Prevent the browser from treating this as a scroll/pan
-                  // gesture so the hold timer fires reliably on mobile.
-                  e.preventDefault();
-                  startFoldHold(deck.id);
-                }}
+                onTouchStart={() => hasChildren && startFoldHold(deck.id)}
                 onTouchEnd={cancelFoldHold}
                 onTouchCancel={cancelFoldHold}
                 onContextMenu={(e) => e.preventDefault()}
