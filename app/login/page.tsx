@@ -25,7 +25,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-sm p-6 pt-2 md:pt-6 sm:mb-0">
+    <main className="mx-auto mb-4 max-w-sm p-6 pt-0 md:pt-6 sm:mb-0">
       <h1 className="mb-6 text-2xl font-semibold">Sign in</h1>
 
       <form onSubmit={handleSubmit} className="space-y-3">
