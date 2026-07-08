@@ -43,6 +43,7 @@ import { TagsInput } from "@/components/TagsInput";
 import { ScrollFade } from "@/components/ScrollFade";
 import { ClozeEditor } from "@/components/ClozeEditor";
 import { JotPad } from "@/components/JotPad";
+import { CardForm } from "@/components/CardForm";
 import { resolvePendingMediaInHtml } from "@/lib/mediaSync";
 import {
   countCardsByState,
@@ -202,40 +203,7 @@ export default function ReviewPage() {
     }
   }
 
-  // 'basic' | 'cloze', or a NoteType id for a custom type
-  const [newCardType, setNewCardType] = useState<string>("basic");
-  const [newFront, setNewFront] = useState("");
-  const [newBack, setNewBack] = useState("");
-  // Basic has no persisted schema to fix a type to — chosen fresh each time,
-  // defaulting to rich text (matches the field's old, only behavior).
-  const [newFrontType, setNewFrontType] = useState<FieldType>("richtext");
-  const [newBackType, setNewBackType] = useState<FieldType>("richtext");
-  const [newReversed, setNewReversed] = useState(false);
-  const [newClozeText, setNewClozeText] = useState("");
-  const [newClozeAnswers, setNewClozeAnswers] = useState<
-    Record<string, string>
-  >({});
-  const [newClozeSeparateCards, setNewClozeSeparateCards] = useState(false);
-  const [newFields, setNewFields] = useState<Record<string, string>>({});
-  // Only used for custom fields declared 'dynamic' in their note type —
-  // fixed-type fields never read from this.
-  const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>(
-    {},
-  );
-  const [newTags, setNewTags] = useState<string[]>([]);
-  const [addCardError, setAddCardError] = useState("");
 
-  const noteTypes = useLiveQuery(
-    () => db.noteTypes.filter((nt) => !nt.deleted).toArray(),
-    [],
-  );
-  const selectedNoteType = noteTypes?.find((nt) => nt.id === newCardType);
-
-  function resolvedNewFieldType(fieldName: string): FieldType {
-    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? "richtext";
-    if (config === "dynamic") return newFieldTypes[fieldName] ?? "richtext";
-    return config;
-  }
 
   const [showJot, setShowJot] = useState(false);
   // Vertical position of the jot panel's *content* (below the handle), in
@@ -419,139 +387,12 @@ export default function ReviewPage() {
     loadQueue();
   }
 
-  function selectCardType(type: string) {
-    // Clear everything on type switch so values from one type never leak
-    // into another (e.g. basic front/back silently riding along after
-    // switching to a custom type).
-    setNewCardType(type);
-    setNewFront("");
-    setNewBack("");
-    setNewFrontType("richtext");
-    setNewBackType("richtext");
-    setNewReversed(false);
-    setNewClozeText("");
-    setNewClozeAnswers({});
-    setNewClozeSeparateCards(false);
-    setNewFields({});
-    setNewFieldTypes({});
-    setNewTags([]);
-    setAddCardError("");
-  }
-
   function closeAddModal() {
     setShowAddModal(false);
-    selectCardType("basic");
     if (typeof window !== "undefined" && window.location.search.includes("add=true")) {
       const cleanUrl = window.location.pathname;
       window.history.replaceState(null, "", cleanUrl);
     }
-  }
-
-  async function handleAddCard(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-
-    const tags = newTags;
-
-    if (selectedNoteType) {
-      const isFilled = (f: string) =>
-        fieldHasContent(newFields[f] ?? "", resolvedNewFieldType(f));
-      const missingLabelField = selectedNoteType.fields.find((f) =>
-        fieldNeedsLabel(newFields[f] ?? "", resolvedNewFieldType(f)),
-      );
-      if (missingLabelField) {
-        setAddCardError(
-          `Add a label for "${missingLabelField}" (used for search).`,
-        );
-        return;
-      }
-      if (!selectedNoteType.questionFields.some(isFilled)) {
-        setAddCardError("Fill in at least one question field.");
-        return;
-      }
-      if (!selectedNoteType.answerFields.some(isFilled)) {
-        setAddCardError("Fill in at least one answer field.");
-        return;
-      }
-      // Any image/audio inserted while composing this card was only ever
-      // queued locally (see RichTextInput) — resolve it to a real upload
-      // now that the card is actually being saved, so an abandoned edit
-      // never leaves an orphaned file in R2.
-      await withLoading(async () => {
-        const resolvedFields = Object.fromEntries(
-          await Promise.all(
-            Object.entries(newFields).map(async ([key, val]) => [
-              key,
-              await resolvePendingMediaInHtml(val),
-            ]),
-          ),
-        );
-        await createCard(
-          user.id,
-          params.deckId,
-          selectedNoteType.id,
-          "",
-          "",
-          tags,
-          resolvedFields,
-          newReversed,
-        );
-      });
-    } else if (newCardType === "cloze") {
-      if (!newClozeText.trim()) {
-        setAddCardError("Enter the cloze text.");
-        return;
-      }
-      const letters = clozeBlankLetters(newClozeText);
-      if (letters.length === 0) {
-        setAddCardError("Click + to mark at least one blank.");
-        return;
-      }
-      if (letters.some((letter) => !newClozeAnswers[letter]?.trim())) {
-        setAddCardError("Fill in an answer for every blank.");
-        return;
-      }
-      const clozeText = buildClozeText(
-        newClozeText,
-        newClozeAnswers,
-        newClozeSeparateCards,
-      );
-      await withLoading(() =>
-        createCard(user.id, params.deckId, "cloze", clozeText.trim(), "", tags),
-      );
-    } else {
-      if (fieldNeedsLabel(newFront, newFrontType)) {
-        setAddCardError("Add a label for the front (used for search).");
-        return;
-      }
-      if (fieldNeedsLabel(newBack, newBackType)) {
-        setAddCardError("Add a label for the back (used for search).");
-        return;
-      }
-      if (
-        !fieldHasContent(newFront, newFrontType) ||
-        !fieldHasContent(newBack, newBackType)
-      ) {
-        setAddCardError("Fill in both front and back.");
-        return;
-      }
-      await withLoading(async () => {
-        const resolvedFront = await resolvePendingMediaInHtml(newFront);
-        const resolvedBack = await resolvePendingMediaInHtml(newBack);
-        await createCard(
-          user.id,
-          params.deckId,
-          newCardType,
-          resolvedFront,
-          resolvedBack,
-          tags,
-          undefined,
-          newReversed,
-        );
-      });
-    }
-    closeAddModal();
-    loadQueue();
   }
 
   function openDeckOptions() {
@@ -897,239 +738,25 @@ export default function ReviewPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddCard} className="space-y-2">
-              <div className="flex flex-wrap gap-1 text-xs">
-                {(["basic", "cloze"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => selectCardType(type)}
-                    className={`rounded-md px-3 py-1.5 ${
-                      newCardType === type
-                        ? "bg-neutral-100 text-neutral-900"
-                        : "border border-neutral-700 text-neutral-400"
-                    }`}
-                  >
-                    {type === "basic" ? "Basic" : "Cloze"}
-                  </button>
-                ))}
-                {noteTypes?.map((nt) => (
-                  <button
-                    key={nt.id}
-                    type="button"
-                    onClick={() => selectCardType(nt.id)}
-                    className={`rounded-md px-3 py-1.5 ${
-                      newCardType === nt.id
-                        ? "bg-neutral-100 text-neutral-900"
-                        : "border border-neutral-700 text-neutral-400"
-                    }`}
-                  >
-                    {nt.name}
-                  </button>
-                ))}
-              </div>
-
-              {selectedNoteType ? (
-                <>
-                  {/* div, not label: a label forwards clicks to its first
-                      labelable descendant, which inside RichTextInput is the
-                      Bold toolbar button — clicking the field was toggling
-                      bold. contentEditable isn't labelable, so nothing is
-                      lost by using a plain div. */}
-                  {selectedNoteType.questionFields.map((fieldName) => {
-                    const isDynamic =
-                      (selectedNoteType.fieldTypes?.[fieldName] ??
-                        "richtext") === "dynamic";
-                    const type = resolvedNewFieldType(fieldName);
-                    return (
-                      <div key={fieldName + "-q"}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-neutral-500">
-                            {fieldName}
-                            <span className="text-neutral-600 font-medium"> (question)</span>
-                          </span>
-                          {isDynamic && (
-                            <FieldTypeToggle
-                              value={type}
-                              onChange={(t) => {
-                                setNewFieldTypes((f) => ({
-                                  ...f,
-                                  [fieldName]: t,
-                                }));
-                                setNewFields((f) => ({
-                                  ...f,
-                                  [fieldName]: "",
-                                }));
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="mt-0.5">
-                          <FieldValueInput
-                            type={type}
-                            value={newFields[fieldName] ?? ""}
-                            onChange={(html) => {
-                              setNewFields((f) => ({
-                                ...f,
-                                [fieldName]: html,
-                              }));
-                              setAddCardError("");
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(selectedNoteType.questionFields.length > 1 || selectedNoteType.answerFields.length > 1) && (
-                    <hr className="border-neutral-800 my-1" />
-                  )}
-                  {selectedNoteType.answerFields.map((fieldName) => {
-                    const isDynamic =
-                      (selectedNoteType.fieldTypes?.[fieldName] ??
-                        "richtext") === "dynamic";
-                    const type = resolvedNewFieldType(fieldName);
-                    return (
-                      <div key={fieldName + "-a"}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-neutral-500">
-                            {fieldName}
-                            <span className="text-neutral-600 font-medium"> (answer)</span>
-                          </span>
-                          {isDynamic && (
-                            <FieldTypeToggle
-                              value={type}
-                              onChange={(t) => {
-                                setNewFieldTypes((f) => ({
-                                  ...f,
-                                  [fieldName]: t,
-                                }));
-                                setNewFields((f) => ({
-                                  ...f,
-                                  [fieldName]: "",
-                                }));
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="mt-0.5">
-                          <FieldValueInput
-                            type={type}
-                            value={newFields[fieldName] ?? ""}
-                            onChange={(html) => {
-                              setNewFields((f) => ({
-                                ...f,
-                                [fieldName]: html,
-                              }));
-                              setAddCardError("");
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {selectedNoteType.reversed && (
-                    <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
-                      <Checkbox
-                        checked={newReversed}
-                        onChange={setNewReversed}
-                      />
-                      Also add the reverse card (answer → question)
-                    </label>
-                  )}
-                </>
-              ) : newCardType === "cloze" ? (
-                <ClozeEditor
-                  initialText=""
-                  initialAnswers={{}}
-                  initialSeparateCards={false}
-                  onChange={(text, answers, separateCards) => {
-                    setNewClozeText(text);
-                    setNewClozeAnswers(answers);
-                    setNewClozeSeparateCards(separateCards);
-                    setAddCardError("");
-                  }}
-                />
-              ) : (
-                <>
-                  {/* divs, not labels — see the custom-fields comment above
-                      (label click-forwarding hits the Bold toolbar button). */}
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-neutral-500">Front</span>
-                      <FieldTypeToggle
-                        value={newFrontType}
-                        onChange={(t) => {
-                          setNewFrontType(t);
-                          setNewFront("");
-                        }}
-                      />
-                    </div>
-                    <div className="mt-0.5">
-                      <FieldValueInput
-                        type={newFrontType}
-                        value={newFront}
-                        onChange={(html) => {
-                          setNewFront(html);
-                          setAddCardError("");
-                        }}
-                        placeholder="e.g. 猫"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-neutral-500">Back</span>
-                      <FieldTypeToggle
-                        value={newBackType}
-                        onChange={(t) => {
-                          setNewBackType(t);
-                          setNewBack("");
-                        }}
-                      />
-                    </div>
-                    <div className="mt-0.5">
-                      <FieldValueInput
-                        type={newBackType}
-                        value={newBack}
-                        onChange={(html) => {
-                          setNewBack(html);
-                          setAddCardError("");
-                        }}
-                        placeholder="e.g. cat"
-                      />
-                    </div>
-                  </div>
-                  <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
-                    <Checkbox checked={newReversed} onChange={setNewReversed} />
-                    Also add the reverse card (back → front)
-                  </label>
-                </>
-              )}
-
-              {/* div, not label: with chips present, a label's click-forward
-                  target would be the first chip's remove button. */}
-              <div>
-                <span className="text-xs text-neutral-500">Tags</span>
-                <div className="mt-0.5">
-                  <TagsInput
-                    value={newTags}
-                    onChange={setNewTags}
-                    placeholder="Type a tag, press Enter…"
-                  />
-                </div>
-              </div>
-
-              {addCardError && (
-                <p className="text-sm text-red-400">{addCardError}</p>
-              )}
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-              >
-                Create
-              </button>
-            </form>
+            <CardForm
+              mode="create"
+              onSubmit={async (data) => {
+                if (!user) return;
+                await createCard(
+                  user.id,
+                  params.deckId,
+                  data.cardType,
+                  data.front,
+                  data.back,
+                  data.tags,
+                  data.fields,
+                  data.reversed
+                );
+                closeAddModal();
+                loadQueue();
+              }}
+              onCancel={closeAddModal}
+            />
           </div>
         </div>
       )}

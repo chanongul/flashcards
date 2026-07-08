@@ -31,6 +31,7 @@ import {
   deleteNoteType,
   cloneNoteType,
   resetAllData,
+  createCard,
 } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
@@ -44,6 +45,7 @@ import { TodayStatusSummary } from '@/components/TodayStatusSummary';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Checkbox } from '@/components/Checkbox';
 import { shouldDropUp } from '@/lib/dropdownMenu';
+import { CardForm } from '@/components/CardForm';
 
 // One row in the note-type editor's question/answer field lists — a name
 // plus its declared type (or 'dynamic', deferring the choice to each note).
@@ -243,8 +245,9 @@ export default function HomePage() {
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+  const [actionsAddCardDeck, setActionsAddCardDeck] = useState<Deck | null>(null);
 
-  useBodyScrollLock(showCreateDeck || !!subdeckParent || showNoteTypes || showResetConfirm);
+  useBodyScrollLock(showCreateDeck || !!subdeckParent || showNoteTypes || showResetConfirm || !!actionsAddCardDeck);
 
   async function handleResetAllData() {
     if (!user || resetConfirmText !== 'RESET') return;
@@ -605,13 +608,16 @@ export default function HomePage() {
                       actionsDeckDropUp ? 'bottom-full mb-1' : 'top-full mt-1'
                     }`}
                   >
-                    <Link
-                      href={`/review/${deck.id}?add=true`}
+                    <button
+                      onClick={() => {
+                        setActionsAddCardDeck(deck);
+                        setActionsDeck(null);
+                      }}
                       aria-label="Add card"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
                       <Plus size={16} />
-                    </Link>
+                    </button>
                     <button
                       onClick={() => {
                         handleAddSubdeck(deck);
@@ -1133,6 +1139,49 @@ export default function HomePage() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {actionsAddCardDeck && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setActionsAddCardDeck(null)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium">
+                New card in &ldquo;{deckDisplayName(actionsAddCardDeck.name)}&rdquo;
+              </p>
+              <button
+                onClick={() => setActionsAddCardDeck(null)}
+                aria-label="Close"
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <CardForm
+              mode="create"
+              onSubmit={async (data) => {
+                if (!user) return;
+                await createCard(
+                  user.id,
+                  actionsAddCardDeck.id,
+                  data.cardType,
+                  data.front,
+                  data.back,
+                  data.tags,
+                  data.fields,
+                  data.reversed
+                );
+                setActionsAddCardDeck(null);
+              }}
+              onCancel={() => setActionsAddCardDeck(null)}
+            />
           </div>
         </div>
       )}
