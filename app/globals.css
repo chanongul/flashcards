@@ -160,3 +160,11 @@ input, textarea, select, [contenteditable] {
   line-height: 1.5 !important;
 }
 
+/* Replace the browser's default blue focus ring with orange across every
+ * text input, textarea, select, and rich-text contenteditable in the app. */
+input:focus,
+textarea:focus,
+select:focus,
+[contenteditable]:focus {
+  outline-color: theme('colors.orange.600') !important;
+}
