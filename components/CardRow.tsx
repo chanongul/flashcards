@@ -283,6 +283,9 @@ export function CardRow({
                   </div>
                 );
               })}
+              {noteType && (noteType.questionFields.length > 1 || noteType.answerFields.length > 1) && (
+                <hr className="border-neutral-800 my-1" />
+              )}
               {(noteType?.answerFields ?? []).map((fieldName) => {
                 const isDynamic = (noteType?.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
                 const type = resolvedFieldType(fieldName);

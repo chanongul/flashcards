@@ -965,6 +965,9 @@ export default function ReviewPage() {
                       </div>
                     );
                   })}
+                  {(selectedNoteType.questionFields.length > 1 || selectedNoteType.answerFields.length > 1) && (
+                    <hr className="border-neutral-800 my-1" />
+                  )}
                   {selectedNoteType.answerFields.map((fieldName) => {
                     const isDynamic =
                       (selectedNoteType.fieldTypes?.[fieldName] ??
