@@ -182,8 +182,14 @@ export function CardRow({
         setEditError(`Add a label for "${missingLabelField}" (used for search).`);
         return;
       }
-      if (fields.every((f) => !fieldHasContent(fieldValues[f] ?? '', resolvedFieldType(f)))) {
-        setEditError('Fill in at least one field.');
+      const isFilled = (f: string) =>
+        fieldHasContent(fieldValues[f] ?? '', resolvedFieldType(f));
+      if (!noteType?.questionFields.some(isFilled)) {
+        setEditError('Fill in at least one question field.');
+        return;
+      }
+      if (!noteType?.answerFields.some(isFilled)) {
+        setEditError('Fill in at least one answer field.');
         return;
       }
       // Any image/audio inserted while editing was only ever queued locally
