@@ -4,6 +4,7 @@ import {
   DEFAULT_NEW_CARDS_PER_DAY,
   DEFAULT_REVIEWS_PER_DAY,
   type FieldTypeConfig,
+  type TextFormat,
 } from './db';
 import { logEvent, replayAllEvents, pushEvents, resetAllData as resetAllDataInSync } from './sync';
 import { stateLabel, sortQueue, type Grade } from './fsrs';
@@ -199,7 +200,9 @@ export async function createNoteType(
   questionFields: string[],
   answerFields: string[],
   fieldTypes: Record<string, FieldTypeConfig> = {},
-  reversed = false
+  reversed = false,
+  fieldChoices: Record<string, string[]> = {},
+  fieldTemplates: Record<string, TextFormat> = {}
 ) {
   const id = crypto.randomUUID();
   await logEvent(userId, id, 'notetype_create', {
@@ -209,6 +212,8 @@ export async function createNoteType(
     answerFields,
     fieldTypes,
     reversed,
+    fieldChoices,
+    fieldTemplates,
   });
   await replayAllEvents();
   void pushEvents();
@@ -224,6 +229,8 @@ export async function editNoteType(
     questionFields: string[];
     answerFields: string[];
     fieldTypes: Record<string, FieldTypeConfig>;
+    fieldChoices: Record<string, string[]>;
+    fieldTemplates: Record<string, TextFormat>;
     reversed: boolean;
   }>
 ) {
@@ -261,7 +268,9 @@ export async function cloneNoteType(userId: string, noteTypeId: string) {
     nt.questionFields,
     nt.answerFields,
     nt.fieldTypes,
-    nt.reversed
+    nt.reversed,
+    nt.fieldChoices,
+    nt.fieldTemplates
   );
 }
 

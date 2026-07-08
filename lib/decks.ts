@@ -20,6 +20,16 @@ export function deckParentName(fullName: string): string | null {
   return idx === -1 ? null : fullName.slice(0, idx);
 }
 
+// Hard cap on how many "::"-delimited levels a deck path can have (a
+// top-level deck is level 1) — past this the indented list UI gets cramped
+// and nesting stops being a useful way to organize decks.
+export const MAX_DECK_DEPTH = 5;
+
+/** How many levels deep a deck path is — a top-level deck is 1. */
+export function deckDepth(fullName: string): number {
+  return fullName.split('::').length;
+}
+
 /** All ancestor full-path names, nearest-parent last. Doesn't include fullName itself. */
 export function ancestorNames(fullName: string): string[] {
   const parts = fullName.split('::');

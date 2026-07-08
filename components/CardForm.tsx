@@ -77,6 +77,7 @@ export function CardForm({
   function resolvedFieldType(fieldName: string): FieldType {
     const config = selectedNoteType?.fieldTypes?.[fieldName] ?? 'richtext';
     if (config === 'dynamic') return dynamicFieldTypes[fieldName] ?? 'richtext';
+    if (config === 'asset') return dynamicFieldTypes[fieldName] ?? 'image';
     return config;
   }
 
@@ -105,8 +106,12 @@ export function CardForm({
       setFieldValues(reconciled);
       const dynTypes: Record<string, FieldType> = {};
       for (const f of selectedNoteType.fields) {
-        if ((selectedNoteType.fieldTypes?.[f] ?? 'richtext') === 'dynamic') {
+        const config = selectedNoteType.fieldTypes?.[f] ?? 'richtext';
+        if (config === 'dynamic') {
           dynTypes[f] = inferFieldType(reconciled[f] ?? '');
+        } else if (config === 'asset') {
+          const inferred = inferFieldType(reconciled[f] ?? '');
+          dynTypes[f] = inferred === 'richtext' ? 'image' : inferred;
         }
       }
       setDynamicFieldTypes(dynTypes);
@@ -266,8 +271,9 @@ export function CardForm({
       {selectedNoteType ? (
         <>
           {selectedNoteType.questionFields.map((fieldName) => {
-            const isDynamic =
-              (selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
+            const fieldConfig = selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext';
+            const isDynamic = fieldConfig === 'dynamic';
+            const isAsset = fieldConfig === 'asset';
             const type = resolvedFieldType(fieldName);
             return (
               <div key={fieldName + '-q'}>
@@ -276,9 +282,10 @@ export function CardForm({
                     {fieldName}
                     <span className="text-neutral-600 font-medium"> (question)</span>
                   </span>
-                  {isDynamic && (
+                  {(isDynamic || isAsset) && (
                     <FieldTypeToggle
                       value={type}
+                      types={isAsset ? ['image', 'audio'] : undefined}
                       onChange={(t) => {
                         setDynamicFieldTypes((f) => ({
                           ...f,
@@ -296,6 +303,8 @@ export function CardForm({
                   <FieldValueInput
                     type={type}
                     value={fieldValues[fieldName] ?? ''}
+                    options={selectedNoteType.fieldChoices?.[fieldName]}
+                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldName] : undefined}
                     onChange={(html) => {
                       setFieldValues((f) => ({
                         ...f,
@@ -313,8 +322,9 @@ export function CardForm({
             <hr className="border-neutral-800 my-1" />
           )}
           {selectedNoteType.answerFields.map((fieldName) => {
-            const isDynamic =
-              (selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
+            const fieldConfig = selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext';
+            const isDynamic = fieldConfig === 'dynamic';
+            const isAsset = fieldConfig === 'asset';
             const type = resolvedFieldType(fieldName);
             return (
               <div key={fieldName + '-a'}>
@@ -323,9 +333,10 @@ export function CardForm({
                     {fieldName}
                     <span className="text-neutral-600 font-medium"> (answer)</span>
                   </span>
-                  {isDynamic && (
+                  {(isDynamic || isAsset) && (
                     <FieldTypeToggle
                       value={type}
+                      types={isAsset ? ['image', 'audio'] : undefined}
                       onChange={(t) => {
                         setDynamicFieldTypes((f) => ({
                           ...f,
@@ -343,6 +354,8 @@ export function CardForm({
                   <FieldValueInput
                     type={type}
                     value={fieldValues[fieldName] ?? ''}
+                    options={selectedNoteType.fieldChoices?.[fieldName]}
+                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldName] : undefined}
                     onChange={(html) => {
                       setFieldValues((f) => ({
                         ...f,

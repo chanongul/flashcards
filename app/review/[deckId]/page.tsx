@@ -12,7 +12,7 @@ import {
   List,
   Settings,
   CalendarClock,
-  Search,
+  FolderSearch,
   NotebookPen,
 } from "lucide-react";
 import {
@@ -485,7 +485,7 @@ export default function ReviewPage() {
             aria-label="Browse this deck"
             className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
           >
-            <Search size={16} />
+            <FolderSearch size={16} />
           </Link>
           <button
             onClick={() => {

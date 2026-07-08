@@ -12,7 +12,7 @@ import { useUser } from '@/lib/useUser';
 import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { cardSearchText } from '@/lib/search';
-import { getDeckAndDescendantIds, deckDisplayName } from '@/lib/decks';
+import { getDeckAndDescendantIds, deckDisplayName, deckParentName } from '@/lib/decks';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { useSmartBack } from '@/lib/useSmartBack';
 import { sync } from '@/lib/sync';
@@ -32,6 +32,8 @@ export default function DeckBrowsePage() {
 
   const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
   const deckNameById = new Map((decks ?? []).map((d) => [d.id, d.name]));
+  const currentDeckName = deckNameById.get(params.deckId) ?? '';
+  const isSubdeck = deckParentName(currentDeckName) !== null;
 
   // Scope: this deck plus every subdeck (matches what reviewing the deck
   // covers), rather than browse's whole-collection search.
@@ -154,7 +156,7 @@ export default function DeckBrowsePage() {
           aria-label="Sync now"
           title="Sync now"
         >
-          Browse deck
+          {isSubdeck ? 'Browse subdeck' : 'Browse deck'}
         </h1>
         <button
           onClick={() => setFavoritesOnly((v) => !v)}
@@ -171,7 +173,7 @@ export default function DeckBrowsePage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search this deck's cards…"
+          placeholder={`Search this ${isSubdeck ? 'subdeck' : 'deck'}'s cards…`}
           autoFocus
           className="w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 pl-9 pr-3 text-sm"
         />
@@ -203,7 +205,9 @@ export default function DeckBrowsePage() {
         {hasActiveFilter ? (
           filtered.length === 0 && <p className="text-sm text-neutral-500">No cards match.</p>
         ) : (
-          <p className="text-sm text-neutral-500">Type to search this deck's cards.</p>
+          <p className="text-sm text-neutral-500">
+            Type to search this {isSubdeck ? 'subdeck' : 'deck'}'s cards.
+          </p>
         )}
       </ul>
 

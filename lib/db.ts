@@ -30,16 +30,34 @@ export interface FsrsState {
   last_review: number | null;
 }
 
-// The actual widget/content a single field holds: plain formatted text, or
-// exactly one image, or exactly one audio clip — never mixed in one field.
-export type FieldType = 'richtext' | 'image' | 'audio';
+// The actual widget/content a single field holds: plain formatted text,
+// exactly one image, exactly one audio clip, or one value picked from a
+// fixed list of options (never mixed in one field).
+export type FieldType = 'richtext' | 'image' | 'audio' | 'choice';
 
 // What gets declared per field on a custom NoteType. 'dynamic' means "let
 // each note choose its own FieldType for this field" (same toggle UI and
 // content-based inference as Basic's Front/Back, which have no persistent
-// per-type schema to fix a type to); a fixed FieldType means every note of
-// this type always shows that one widget for this field, no toggle.
-export type FieldTypeConfig = FieldType | 'dynamic';
+// per-type schema to fix a type to); 'asset' is the same per-note deferred
+// choice narrowed to just image/audio (no text/choice option) — for a field
+// that's always some piece of media, but not always the same kind; a fixed
+// FieldType means every note of this type always shows that one widget for
+// this field, no toggle.
+export type FieldTypeConfig = FieldType | 'dynamic' | 'asset';
+
+// The rich text effects RichTextInput's toolbar exposes, captured as flags
+// rather than HTML — used wherever an effect applies to a whole string at
+// once (a choice field's picked option, a note type's per-field starter
+// template) rather than to part of a live selection. size===3 means normal
+// (no wrapping span); see FONT_SIZE_VALUES in lib/sanitize.ts for the
+// allowed non-normal steps.
+export interface TextFormat {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  dim: boolean;
+  size: number;
+}
 
 // A custom note type: an ordered field list plus which fields render on the
 // question vs answer. One note type produces exactly one card template (not
@@ -51,6 +69,17 @@ export interface NoteType {
   questionFields: string[]; // subset/order of `fields` shown on the question
   answerFields: string[]; // subset/order of `fields` shown on the answer
   fieldTypes: Record<string, FieldTypeConfig>; // per-field type; missing entries default to 'richtext'
+  // Shared option list for a field whose fieldTypes entry is 'choice' — one
+  // list per field name, reused by every note of this type (not settable
+  // per-note the way 'dynamic' fields are, since the options themselves live
+  // here on the type, not on any one note's content).
+  fieldChoices: Record<string, string[]>;
+  // Starter formatting for a 'richtext' or 'choice' field, captured from
+  // whatever effects were toggled on that field's name while defining the
+  // type — applied (format only, never the name's own text) as the format
+  // a brand-new card's blank field starts in. Not meaningful for other
+  // field types.
+  fieldTemplates: Record<string, TextFormat>;
   reversed: boolean; // whether notes of this type may opt into an answer->question sibling card
   deleted: boolean;
   createdAt: number;

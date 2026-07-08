@@ -11,6 +11,7 @@ import {
   Search,
   FolderPlus,
   LayoutTemplate,
+  FilePlus,
   Plus,
   MoreVertical,
   Copy,
@@ -18,8 +19,11 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Deck, type NoteType, type FieldTypeConfig } from '@/lib/db';
-import { FieldTypeConfigToggle } from '@/components/MediaFieldInput';
+import { db, type Deck, type NoteType, type FieldTypeConfig, type TextFormat } from '@/lib/db';
+import { FieldTypeConfigToggle, readTextFormat, buildFormattedText, NORMAL_TEXT_FORMAT } from '@/components/MediaFieldInput';
+import { TagsInput } from '@/components/TagsInput';
+import { RichTextInput } from '@/components/RichTextInput';
+import { stripHtml } from '@/lib/sanitize';
 import { useLoading, useLoadingWhen } from '@/components/GlobalLoading';
 import {
   createDeck,
@@ -39,7 +43,14 @@ import { createClient } from '@/utils/supabase/client';
 import { sync } from '@/lib/sync';
 import { syncPendingMedia } from '@/lib/mediaSync';
 import { countCardsByState, DECK_COUNT_TOOLTIPS, type DeckCounts } from '@/lib/stats';
-import { deckDisplayName, deckParentName, ancestorNames, flattenDeckTree } from '@/lib/decks';
+import {
+  deckDisplayName,
+  deckParentName,
+  ancestorNames,
+  flattenDeckTree,
+  deckDepth,
+  MAX_DECK_DEPTH,
+} from '@/lib/decks';
 import { ReviewHeatmap } from '@/components/ReviewHeatmap';
 import { TodayStatusSummary } from '@/components/TodayStatusSummary';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -49,9 +60,16 @@ import { CardForm } from '@/components/CardForm';
 
 // One row in the note-type editor's question/answer field lists — a name
 // plus its declared type (or 'dynamic', deferring the choice to each note).
+// `choices` only matters when type === 'choice': the shared option list
+// every note of this type picks from for this field.
 interface FieldRow {
   name: string;
   type: FieldTypeConfig;
+  choices: string[];
+  // Starter formatting for this field, captured from whatever rich text
+  // effects were toggled on its name (only meaningful — and only editable —
+  // when type is 'richtext' or 'choice'). See NoteType.fieldTemplates.
+  format: TextFormat;
 }
 
 export default function HomePage() {
@@ -201,14 +219,84 @@ export default function HomePage() {
   const [actionsDeckDropUp, setActionsDeckDropUp] = useState(false);
   const [renameDeckError, setRenameDeckError] = useState('');
 
+  // Which decks are currently folded (their subdecks hidden) — press-and-hold
+  // on a deck with children toggles it. Session-only (not persisted), same
+  // as every other view-only UI toggle in this component.
+  const [collapsedDeckIds, setCollapsedDeckIds] = useState<Set<string>>(new Set());
+  const FOLD_HOLD_MS = 500;
+  const foldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set true the instant the hold timer fires, so the click that follows the
+  // release (mouseup/touchend always synthesizes one) can be swallowed
+  // instead of navigating — same "did a hold already happen" pattern as
+  // press-hold's own reset-button gesture below, just per-deck instead of a
+  // single shared target.
+  const foldTriggeredRef = useRef(false);
+
+  function toggleDeckFold(deckId: string) {
+    setCollapsedDeckIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(deckId)) next.delete(deckId);
+      else next.add(deckId);
+      return next;
+    });
+  }
+
+  function startFoldHold(deckId: string) {
+    foldTriggeredRef.current = false;
+    if (foldHoldTimeout.current) clearTimeout(foldHoldTimeout.current);
+    foldHoldTimeout.current = setTimeout(() => {
+      foldTriggeredRef.current = true;
+      toggleDeckFold(deckId);
+    }, FOLD_HOLD_MS);
+  }
+
+  function cancelFoldHold() {
+    if (foldHoldTimeout.current) clearTimeout(foldHoldTimeout.current);
+    foldHoldTimeout.current = null;
+  }
+
+  // Swallows the click a long-press's release always synthesizes — without
+  // this, holding a deck to fold it would also navigate into the deck the
+  // instant the finger/mouse lifts.
+  function handleDeckLinkClick(e: React.MouseEvent) {
+    if (foldTriggeredRef.current) {
+      e.preventDefault();
+      foldTriggeredRef.current = false;
+    }
+  }
+
+  // Holding the "Decks" heading (a much longer hold than a single deck row's,
+  // since this is a broader/harder-to-undo-by-accident action) toggles every
+  // foldable deck at once — see toggleAllDeckFold below, defined after
+  // `decks` is available; referencing it here works because function
+  // declarations are hoisted for the whole component body.
+  const ALL_FOLD_HOLD_MS = 2000;
+  const allFoldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function startAllFoldHold() {
+    if (allFoldHoldTimeout.current) clearTimeout(allFoldHoldTimeout.current);
+    allFoldHoldTimeout.current = setTimeout(() => {
+      toggleAllDeckFold();
+    }, ALL_FOLD_HOLD_MS);
+  }
+
+  function cancelAllFoldHold() {
+    if (allFoldHoldTimeout.current) clearTimeout(allFoldHoldTimeout.current);
+    allFoldHoldTimeout.current = null;
+  }
+
   const [showNoteTypes, setShowNoteTypes] = useState(false);
   const [noteTypePage, setNoteTypePage] = useState<'list' | 'create'>('list');
   const [editingNoteTypeId, setEditingNoteTypeId] = useState<string | null>(null);
   const [noteTypeActionsId, setNoteTypeActionsId] = useState<string | null>(null);
   const [noteTypeActionsDropUp, setNoteTypeActionsDropUp] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
-  const [newQuestionFields, setNewQuestionFields] = useState<FieldRow[]>([{ name: '', type: 'richtext' }]);
-  const [newAnswerFields, setNewAnswerFields] = useState<FieldRow[]>([{ name: '', type: 'richtext' }]);
+  const [newQuestionFields, setNewQuestionFields] = useState<FieldRow[]>([
+    { name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT },
+  ]);
+  const [newAnswerFields, setNewAnswerFields] = useState<FieldRow[]>([
+    { name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT },
+  ]);
   const [newTypeReversed, setNewTypeReversed] = useState(false);
   const [noteTypeError, setNoteTypeError] = useState('');
   // Drag-reorder tracking: dragIndex stored in a ref (no re-render needed),
@@ -275,6 +363,10 @@ export default function HomePage() {
       setCreateDeckError(`A deck named "${name.replaceAll('::', '>')}" already exists.`);
       return;
     }
+    if (deckDepth(name) > MAX_DECK_DEPTH) {
+      setCreateDeckError(`Decks can only nest ${MAX_DECK_DEPTH} levels deep.`);
+      return;
+    }
     await withLoading(() => createDeck(user.id, name));
     setNewDeckName('');
     setCreateDeckError('');
@@ -315,14 +407,15 @@ export default function HomePage() {
     setEditingDeckId(null);
   }
 
-  function handleDeleteDeck(deckId: string) {
+  function handleDeleteDeck(deck: Deck) {
+    const kind = deckParentName(deck.name) !== null ? 'subdeck' : 'deck';
     setConfirmState({
-      title: 'Delete deck',
-      message: 'Delete this deck, its subdecks, and all their cards? This cannot be undone.',
+      title: `Delete ${kind}`,
+      message: `Delete this ${kind}, its subdecks, and all their cards? This cannot be undone.`,
       onConfirm: async () => {
         if (!user) return;
-        await deleteDeck(user.id, deckId);
-        if (editingDeckId === deckId) setEditingDeckId(null);
+        await deleteDeck(user.id, deck.id);
+        if (editingDeckId === deck.id) setEditingDeckId(null);
         setConfirmState(null);
       },
     });
@@ -358,6 +451,10 @@ export default function HomePage() {
       setSubdeckError(`A subdeck named "${name}" already exists here.`);
       return;
     }
+    if (deckDepth(fullName) > MAX_DECK_DEPTH) {
+      setSubdeckError(`Decks can only nest ${MAX_DECK_DEPTH} levels deep.`);
+      return;
+    }
     await withLoading(() => createDeck(user.id, fullName));
     closeSubdeckModal();
   }
@@ -373,8 +470,8 @@ export default function HomePage() {
   function openCreateNoteType() {
     setEditingNoteTypeId(null);
     setNewTypeName('');
-    setNewQuestionFields([{ name: '', type: 'richtext' }]);
-    setNewAnswerFields([{ name: '', type: 'richtext' }]);
+    setNewQuestionFields([{ name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT }]);
+    setNewAnswerFields([{ name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT }]);
     setNewTypeReversed(false);
     setNoteTypeError('');
     setNoteTypePage('create');
@@ -383,12 +480,21 @@ export default function HomePage() {
   function openEditNoteType(nt: NoteType) {
     setEditingNoteTypeId(nt.id);
     setNewTypeName(nt.name);
-    const toRow = (name: string): FieldRow => ({ name, type: nt.fieldTypes?.[name] ?? 'richtext' });
+    const toRow = (name: string): FieldRow => ({
+      name,
+      type: nt.fieldTypes?.[name] ?? 'richtext',
+      choices: nt.fieldChoices?.[name] ?? [],
+      format: nt.fieldTemplates?.[name] ?? NORMAL_TEXT_FORMAT,
+    });
     setNewQuestionFields(
-      nt.questionFields.length ? nt.questionFields.map(toRow) : [{ name: '', type: 'richtext' }]
+      nt.questionFields.length
+        ? nt.questionFields.map(toRow)
+        : [{ name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT }]
     );
     setNewAnswerFields(
-      nt.answerFields.length ? nt.answerFields.map(toRow) : [{ name: '', type: 'richtext' }]
+      nt.answerFields.length
+        ? nt.answerFields.map(toRow)
+        : [{ name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT }]
     );
     setNewTypeReversed(nt.reversed);
     setNoteTypeError('');
@@ -417,6 +523,13 @@ export default function HomePage() {
       setNoteTypeError('Add at least one answer field.');
       return;
     }
+    const emptyChoiceField = [...questionRows, ...answerRows].find(
+      (f) => f.type === 'choice' && f.choices.filter((c) => c.trim()).length === 0
+    );
+    if (emptyChoiceField) {
+      setNoteTypeError(`Add at least one option for "${emptyChoiceField.name}".`);
+      return;
+    }
     const questionFields = questionRows.map((f) => f.name);
     const answerFields = answerRows.map((f) => f.name);
     // `fields` (the full set a note of this type holds) is just the union of
@@ -424,6 +537,16 @@ export default function HomePage() {
     // for it to drift out of sync with what's actually shown on each side.
     const fields = Array.from(new Set([...questionFields, ...answerFields]));
     const fieldTypes = Object.fromEntries([...questionRows, ...answerRows].map((f) => [f.name, f.type]));
+    const fieldChoices = Object.fromEntries(
+      [...questionRows, ...answerRows]
+        .filter((f) => f.type === 'choice')
+        .map((f) => [f.name, f.choices.map((c) => c.trim()).filter(Boolean)])
+    );
+    const fieldTemplates = Object.fromEntries(
+      [...questionRows, ...answerRows]
+        .filter((f) => f.type === 'richtext' || f.type === 'choice')
+        .map((f) => [f.name, f.format])
+    );
     if (editingNoteTypeId) {
       await withLoading(() =>
         editNoteType(user.id, editingNoteTypeId, {
@@ -432,12 +555,24 @@ export default function HomePage() {
           questionFields,
           answerFields,
           fieldTypes,
+          fieldChoices,
+          fieldTemplates,
           reversed: newTypeReversed,
         })
       );
     } else {
       await withLoading(() =>
-        createNoteType(user.id, name, fields, questionFields, answerFields, fieldTypes, newTypeReversed)
+        createNoteType(
+          user.id,
+          name,
+          fields,
+          questionFields,
+          answerFields,
+          fieldTypes,
+          newTypeReversed,
+          fieldChoices,
+          fieldTemplates
+        )
       );
     }
     setNoteTypeError('');
@@ -468,6 +603,45 @@ export default function HomePage() {
   }
 
   const deckRows = flattenDeckTree(decks ?? []);
+
+  // A deck "has children" if some other deck's name is "thisDeck::...".
+  const deckNamesWithChildren = new Set(
+    (decks ?? [])
+      .map((d) => deckParentName(d.name))
+      .filter((name): name is string => name !== null)
+  );
+  const foldableDeckIds = (decks ?? [])
+    .filter((d) => deckNamesWithChildren.has(d.name))
+    .map((d) => d.id);
+
+  // Holding the "Decks" heading toggles every foldable deck at once — if
+  // everything's already folded, unfold all; otherwise fold all (matches a
+  // typical "collapse all" control's behavior, and means the gesture is
+  // idempotent regardless of whatever mixed state individual holds left
+  // things in).
+  function toggleAllDeckFold() {
+    setCollapsedDeckIds((prev) => {
+      const allFolded = foldableDeckIds.length > 0 && foldableDeckIds.every((id) => prev.has(id));
+      return allFolded ? new Set() : new Set(foldableDeckIds);
+    });
+  }
+
+  // flattenDeckTree already puts a deck's descendants immediately after it
+  // (pre-order), so hiding a collapsed deck's subtree is one linear pass:
+  // once we hit a collapsed deck, skip every following row deeper than it,
+  // stopping the skip as soon as depth returns to that level or shallower.
+  const visibleDeckRows: typeof deckRows = [];
+  let hideBelowDepth: number | null = null;
+  for (const row of deckRows) {
+    if (hideBelowDepth !== null) {
+      if (row.depth > hideBelowDepth) continue;
+      hideBelowDepth = null;
+    }
+    visibleDeckRows.push(row);
+    if (collapsedDeckIds.has(row.deck.id) && deckNamesWithChildren.has(row.deck.name)) {
+      hideBelowDepth = row.depth;
+    }
+  }
 
   return (
     <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
@@ -509,19 +683,30 @@ export default function HomePage() {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Decks</h2>
+        <h2
+          className="select-none text-xl font-bold"
+          onMouseDown={startAllFoldHold}
+          onMouseUp={cancelAllFoldHold}
+          onMouseLeave={cancelAllFoldHold}
+          onTouchStart={startAllFoldHold}
+          onTouchEnd={cancelAllFoldHold}
+          onTouchCancel={cancelAllFoldHold}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          Decks
+        </h2>
         <div className="flex items-center gap-2 text-neutral-400">
           <Link
             href="/browse"
             aria-label="Browse cards"
-            className="rounded-md border border-neutral-700 p-2 hover:text-neutral-200"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
           >
             <Search size={16} />
           </Link>
           <button
             onClick={() => setShowNoteTypes(true)}
             aria-label="Manage custom card types"
-            className="rounded-md border border-neutral-700 p-2 hover:text-neutral-200"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
           >
             <LayoutTemplate size={16} />
           </button>
@@ -529,8 +714,10 @@ export default function HomePage() {
       </div>
 
       <ul className="space-y-2">
-        {deckRows.map(({ deck, depth }) =>
-          editingDeckId === deck.id ? (
+        {visibleDeckRows.map(({ deck, depth }) => {
+          const hasChildren = deckNamesWithChildren.has(deck.name);
+          const isFolded = hasChildren && collapsedDeckIds.has(deck.id);
+          return editingDeckId === deck.id ? (
             <li key={deck.id} style={{ marginLeft: depth * 16 }}>
               <form onSubmit={handleSaveDeckName} className="flex gap-2">
                 <div className="flex-1">
@@ -541,14 +728,14 @@ export default function HomePage() {
                       setRenameDeckError('');
                     }}
                     autoFocus
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                    className="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 px-4"
                   />
                   {renameDeckError && <p className="mt-1 text-sm text-red-400">{renameDeckError}</p>}
                 </div>
                 <button
                   type="submit"
                   aria-label="Save"
-                  className="rounded-md border border-neutral-700 p-2 text-neutral-300 hover:text-neutral-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-300 hover:text-neutral-100"
                 >
                   <Check size={16} />
                 </button>
@@ -559,7 +746,7 @@ export default function HomePage() {
                     setRenameDeckError('');
                   }}
                   aria-label="Cancel"
-                  className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                 >
                   <X size={16} />
                 </button>
@@ -573,7 +760,17 @@ export default function HomePage() {
             >
               <Link
                 href={`/review/${deck.id}`}
-                className="flex h-10 flex-1 items-center justify-between rounded-md border border-neutral-800 px-4 hover:bg-neutral-900"
+                onClick={handleDeckLinkClick}
+                onMouseDown={() => hasChildren && startFoldHold(deck.id)}
+                onMouseUp={cancelFoldHold}
+                onMouseLeave={cancelFoldHold}
+                onTouchStart={() => hasChildren && startFoldHold(deck.id)}
+                onTouchEnd={cancelFoldHold}
+                onTouchCancel={cancelFoldHold}
+                onContextMenu={(e) => hasChildren && e.preventDefault()}
+                className={`flex h-10 flex-1 select-none items-center justify-between rounded-md border border-neutral-800 px-4 hover:bg-neutral-900 ${
+                  isFolded ? 'bg-white/[0.025]' : ''
+                }`}
               >
                 <span>{deckDisplayName(deck.name)}</span>
                 <span className="flex gap-2 text-xs font-medium">
@@ -616,18 +813,20 @@ export default function HomePage() {
                       aria-label="Add card"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Plus size={16} />
+                      <FilePlus size={16} />
                     </button>
-                    <button
-                      onClick={() => {
-                        handleAddSubdeck(deck);
-                        setActionsDeck(null);
-                      }}
-                      aria-label="Add subdeck"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <FolderPlus size={16} />
-                    </button>
+                    {deckDepth(deck.name) < MAX_DECK_DEPTH && (
+                      <button
+                        onClick={() => {
+                          handleAddSubdeck(deck);
+                          setActionsDeck(null);
+                        }}
+                        aria-label="Add subdeck"
+                        className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      >
+                        <FolderPlus size={16} />
+                      </button>
+                    )}
                     {depth === 0 && (
                       <button
                         onClick={() => {
@@ -652,7 +851,7 @@ export default function HomePage() {
                     </button>
                     <button
                       onClick={() => {
-                        handleDeleteDeck(deck.id);
+                        handleDeleteDeck(deck);
                         setActionsDeck(null);
                       }}
                       aria-label="Delete deck"
@@ -664,8 +863,8 @@ export default function HomePage() {
                 </>
               )}
             </li>
-          )
-        )}
+          );
+        })}
         {decks?.length === 0 && (
           <p className="text-sm text-neutral-500">No decks yet — add one below.</p>
         )}
@@ -932,26 +1131,26 @@ export default function HomePage() {
                             : 'border-neutral-800'
                         }`}
                       >
-                        <div className="flex gap-2">
-                          {newQuestionFields.length > 1 && (
-                            <span
-                              onPointerDown={() => { dragHandleActivatedQRef.current = true; }}
-                              className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
-                              title="Drag to reorder"
-                            >
-                              <GripVertical size={14} />
-                            </span>
-                          )}
-                          <input
-                            value={field.name}
-                            onChange={(e) =>
-                              setNewQuestionFields((fs) =>
-                                fs.map((f, fi) => (fi === i ? { ...f, name: e.target.value } : f))
-                              )
-                            }
-                            placeholder="Field name (e.g. Word)"
-                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                          />
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            {newQuestionFields.length > 1 && (
+                              <span
+                                onPointerDown={() => { dragHandleActivatedQRef.current = true; }}
+                                className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+                                title="Drag to reorder"
+                              >
+                                <GripVertical size={14} />
+                              </span>
+                            )}
+                            <FieldTypeConfigToggle
+                              value={field.type}
+                              onChange={(type) =>
+                                setNewQuestionFields((fs) =>
+                                  fs.map((f, fi) => (fi === i ? { ...f, type, choices: [] } : f))
+                                )
+                              }
+                            />
+                          </div>
                           {newQuestionFields.length > 1 && (
                             <button
                               type="button"
@@ -965,17 +1164,54 @@ export default function HomePage() {
                             </button>
                           )}
                         </div>
-                        <FieldTypeConfigToggle
-                          value={field.type}
-                          onChange={(type) =>
-                            setNewQuestionFields((fs) => fs.map((f, fi) => (fi === i ? { ...f, type } : f)))
-                          }
-                        />
+                        {field.type === 'richtext' || field.type === 'choice' ? (
+                          <RichTextInput
+                            value={buildFormattedText(field.name, field.format)}
+                            onChange={(html) =>
+                              setNewQuestionFields((fs) =>
+                                fs.map((f, fi) =>
+                                  fi === i
+                                    ? { ...f, name: stripHtml(html).trim(), format: readTextFormat(html) }
+                                    : f
+                                )
+                              )
+                            }
+                            placeholder="Field name (e.g. Word)"
+                            formatEntireValue
+                          />
+                        ) : (
+                          <input
+                            value={field.name}
+                            onChange={(e) =>
+                              setNewQuestionFields((fs) =>
+                                fs.map((f, fi) => (fi === i ? { ...f, name: e.target.value } : f))
+                              )
+                            }
+                            placeholder="Field name (e.g. Word)"
+                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                          />
+                        )}
+                        {field.type === 'choice' && (
+                          <TagsInput
+                            value={field.choices}
+                            onChange={(choices) =>
+                              setNewQuestionFields((fs) =>
+                                fs.map((f, fi) => (fi === i ? { ...f, choices } : f))
+                              )
+                            }
+                            placeholder="Type an option, press Enter…"
+                          />
+                        )}
                       </div>
                     ))}
                     <button
                       type="button"
-                      onClick={() => setNewQuestionFields((fs) => [...fs, { name: '', type: 'richtext' }])}
+                      onClick={() =>
+                        setNewQuestionFields((fs) => [
+                          ...fs,
+                          { name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT },
+                        ])
+                      }
                       aria-label="Add question field"
                       className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                     >
@@ -1009,26 +1245,26 @@ export default function HomePage() {
                             : 'border-neutral-800'
                         }`}
                       >
-                        <div className="flex gap-2">
-                          {newAnswerFields.length > 1 && (
-                            <span
-                              onPointerDown={() => { dragHandleActivatedARef.current = true; }}
-                              className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
-                              title="Drag to reorder"
-                            >
-                              <GripVertical size={14} />
-                            </span>
-                          )}
-                          <input
-                            value={field.name}
-                            onChange={(e) =>
-                              setNewAnswerFields((fs) =>
-                                fs.map((f, fi) => (fi === i ? { ...f, name: e.target.value } : f))
-                              )
-                            }
-                            placeholder="Field name (e.g. Meaning)"
-                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                          />
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            {newAnswerFields.length > 1 && (
+                              <span
+                                onPointerDown={() => { dragHandleActivatedARef.current = true; }}
+                                className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+                                title="Drag to reorder"
+                              >
+                                <GripVertical size={14} />
+                              </span>
+                            )}
+                            <FieldTypeConfigToggle
+                              value={field.type}
+                              onChange={(type) =>
+                                setNewAnswerFields((fs) =>
+                                  fs.map((f, fi) => (fi === i ? { ...f, type, choices: [] } : f))
+                                )
+                              }
+                            />
+                          </div>
                           {newAnswerFields.length > 1 && (
                             <button
                               type="button"
@@ -1042,17 +1278,54 @@ export default function HomePage() {
                             </button>
                           )}
                         </div>
-                        <FieldTypeConfigToggle
-                          value={field.type}
-                          onChange={(type) =>
-                            setNewAnswerFields((fs) => fs.map((f, fi) => (fi === i ? { ...f, type } : f)))
-                          }
-                        />
+                        {field.type === 'richtext' || field.type === 'choice' ? (
+                          <RichTextInput
+                            value={buildFormattedText(field.name, field.format)}
+                            onChange={(html) =>
+                              setNewAnswerFields((fs) =>
+                                fs.map((f, fi) =>
+                                  fi === i
+                                    ? { ...f, name: stripHtml(html).trim(), format: readTextFormat(html) }
+                                    : f
+                                )
+                              )
+                            }
+                            placeholder="Field name (e.g. Meaning)"
+                            formatEntireValue
+                          />
+                        ) : (
+                          <input
+                            value={field.name}
+                            onChange={(e) =>
+                              setNewAnswerFields((fs) =>
+                                fs.map((f, fi) => (fi === i ? { ...f, name: e.target.value } : f))
+                              )
+                            }
+                            placeholder="Field name (e.g. Meaning)"
+                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                          />
+                        )}
+                        {field.type === 'choice' && (
+                          <TagsInput
+                            value={field.choices}
+                            onChange={(choices) =>
+                              setNewAnswerFields((fs) =>
+                                fs.map((f, fi) => (fi === i ? { ...f, choices } : f))
+                              )
+                            }
+                            placeholder="Type an option, press Enter…"
+                          />
+                        )}
                       </div>
                     ))}
                     <button
                       type="button"
-                      onClick={() => setNewAnswerFields((fs) => [...fs, { name: '', type: 'richtext' }])}
+                      onClick={() =>
+                        setNewAnswerFields((fs) => [
+                          ...fs,
+                          { name: '', type: 'richtext', choices: [], format: NORMAL_TEXT_FORMAT },
+                        ])
+                      }
                       aria-label="Add answer field"
                       className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                     >

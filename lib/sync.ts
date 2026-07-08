@@ -245,6 +245,8 @@ export async function replayAllEvents() {
           questionFields: p.questionFields ?? existing?.questionFields ?? [],
           answerFields: p.answerFields ?? existing?.answerFields ?? [],
           fieldTypes: p.fieldTypes ?? existing?.fieldTypes ?? {},
+          fieldChoices: p.fieldChoices ?? existing?.fieldChoices ?? {},
+          fieldTemplates: p.fieldTemplates ?? existing?.fieldTemplates ?? {},
           reversed: p.reversed ?? existing?.reversed ?? false,
           // Was hardcoded `false` — meaning any edit event silently revived a
           // deleted note type regardless of replay order. Preserve it like

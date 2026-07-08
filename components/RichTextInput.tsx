@@ -3,20 +3,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bold, Italic, Underline, EyeDashed } from 'lucide-react';
 import { sanitizeRichText } from '@/lib/sanitize';
+import type { TextFormat } from '@/lib/db';
 
 interface RichTextInputProps {
   value: string; // sanitized HTML
   onChange: (html: string) => void;
   placeholder?: string;
+  // Format a brand-new, still-empty field should start typing in (see
+  // NoteType.fieldTemplates) — applied once, the first time this field is
+  // focused while still empty. Never touches non-empty content.
+  initialFormat?: TextFormat;
+  // When set, every toolbar click formats the field's entire content
+  // instead of just the current selection — for a use case like a note
+  // type's field-name template (see app/page.tsx), where the value is
+  // always reasoned about as one whole-string template rather than
+  // partially-styled text, so requiring a manual select-all first would
+  // just be friction.
+  formatEntireValue?: boolean;
 }
 
 const MIN_SIZE = 1;
 const MAX_SIZE = 5;
 const NORMAL_SIZE = 3;
 
-export function RichTextInput({ value, onChange, placeholder }: RichTextInputProps) {
+export function RichTextInput({
+  value,
+  onChange,
+  placeholder,
+  initialFormat,
+  formatEntireValue,
+}: RichTextInputProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState({ bold: false, italic: false, underline: false, dim: false });
+  const seededTemplateRef = useRef(false);
 
   // Sync external value changes (e.g. switching which card is open) — but
   // never while this field has focus. Echoing the value back through the DOM
@@ -30,6 +49,30 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
       ref.current.innerHTML = value;
     }
   }, [value]);
+
+  // Selects the whole field before delegating to a toolbar action — exec(),
+  // toggleDim(), and applyFontSize() already correctly handle an arbitrary
+  // (non-collapsed) selection, including a mixed-formatting one, so feeding
+  // them a full-content range is all formatEntireValue needs; no change to
+  // their own logic. Focuses first, then sets the range, matching
+  // toggleDim's own note about re-focusing after setting a selection
+  // clobbering it on some engines.
+  function withWholeSelection(action: () => void) {
+    if (!formatEntireValue) {
+      action();
+      return;
+    }
+    const el = ref.current;
+    if (el) {
+      el.focus();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+    action();
+  }
 
   function updateActiveStates() {
     if (document.activeElement !== ref.current) return;
@@ -590,7 +633,22 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     }, 0);
   }
 
-
+  // Applies initialFormat's effects to the (still-empty) collapsed caret,
+  // reusing the exact same "toggle with no selection" branches the toolbar
+  // buttons themselves use for a manual click — bold/italic/underline/size
+  // ride the browser's own native typing-state (no DOM trace at all until
+  // something is actually typed), and dim reuses its existing pending-span
+  // mechanism, whose blur-time cleanup already handles "opened but never
+  // typed into" for free. Guarded so it only ever fires once per mount.
+  function seedInitialFormat() {
+    if (!initialFormat || seededTemplateRef.current) return;
+    seededTemplateRef.current = true;
+    if (initialFormat.bold) exec('bold');
+    if (initialFormat.italic) exec('italic');
+    if (initialFormat.underline) exec('underline');
+    if (initialFormat.dim) toggleDim();
+    if (initialFormat.size !== NORMAL_SIZE) applyFontSize(initialFormat.size);
+  }
 
   return (
     <div className="rounded-md border border-neutral-700 bg-neutral-900">
@@ -598,7 +656,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => exec('bold')}
+          onClick={() => withWholeSelection(() => exec('bold'))}
           aria-label="Bold"
           aria-pressed={active.bold}
           className={`rounded p-1 ${
@@ -612,7 +670,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => exec('italic')}
+          onClick={() => withWholeSelection(() => exec('italic'))}
           aria-label="Italic"
           aria-pressed={active.italic}
           className={`rounded p-1 ${
@@ -626,7 +684,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => exec('underline')}
+          onClick={() => withWholeSelection(() => exec('underline'))}
           aria-label="Underline"
           aria-pressed={active.underline}
           className={`rounded p-1 ${
@@ -640,7 +698,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={toggleDim}
+          onClick={() => withWholeSelection(toggleDim)}
           aria-label="Dim text"
           aria-pressed={active.dim}
           className={`rounded p-1 ${
@@ -655,7 +713,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => step(-1)}
+          onClick={() => withWholeSelection(() => step(-1))}
           aria-label="Smaller text"
           title="Smaller text"
           className="rounded px-1.5 text-xs leading-6 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
@@ -665,7 +723,7 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => step(1)}
+          onClick={() => withWholeSelection(() => step(1))}
           aria-label="Bigger text"
           title="Bigger text"
           className="rounded px-1.5 text-lg leading-6 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
@@ -677,7 +735,16 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
         ref={ref}
         contentEditable
         onInput={handleInput}
-        onFocus={updateActiveStates}
+        onFocus={() => {
+          updateActiveStates();
+          // Deferred one tick so the browser has finished placing its own
+          // collapsed selection in the newly-focused (empty) div first —
+          // seedInitialFormat's exec()/toggleDim()/applyFontSize calls all
+          // need window.getSelection() to already have a range to act on,
+          // same as when a toolbar button triggers them after a manual
+          // click (which always lands after focus is already established).
+          if (!value.trim()) setTimeout(() => seedInitialFormat(), 0);
+        }}
         onBlur={() => {
           finalizePendingDim();
           cleanupEmptyDimSpans();

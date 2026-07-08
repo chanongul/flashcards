@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft, FolderSearch } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
 import { editCard, deleteCard, cloneCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
@@ -146,7 +146,7 @@ export default function AllCardsPage() {
           aria-label="Browse this deck"
           className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
         >
-          <Search size={16} />
+          <FolderSearch size={16} />
         </Link>
       </div>
 
