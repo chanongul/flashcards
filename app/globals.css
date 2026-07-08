@@ -155,3 +155,8 @@ body {
     overscroll-behavior: none;
   }
 }
+
+input, textarea, select, [contenteditable] {
+  line-height: 1.5 !important;
+}
+
