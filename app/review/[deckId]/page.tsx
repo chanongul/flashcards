@@ -660,54 +660,7 @@ export default function ReviewPage() {
         </div>
       </div>
 
-      {deck && (
-        <div className="mb-4 flex shrink-0 items-center justify-between">
-          <p
-            className="cursor-pointer text-sm text-neutral-500 select-none"
-            onMouseDown={startPressHoldTimers}
-            onMouseUp={endPressHoldTimers}
-            onTouchStart={startPressHoldTimers}
-            onTouchEnd={endPressHoldTimers}
-            onTouchCancel={cancelPressHoldTimers}
-            onClick={handleTitleClick}
-            role="button"
-            aria-label="Sync now"
-            title="Sync now"
-          >
-            {deckBreadcrumb(deck.name)}
-          </p>
-          <div className="flex items-center gap-4">
-            <span className="flex gap-2 text-xs font-medium">
-              <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
-                {(aheadCounts ?? deckCounts)?.newCount ?? 0}
-              </span>
-              <span
-                className="text-orange-600"
-                title={DECK_COUNT_TOOLTIPS.learning}
-              >
-                {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
-              </span>
-              <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
-                {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
-              </span>
-            </span>
-            {current && (
-              <button
-                onClick={() => setShowJot((v) => !v)}
-                aria-label={showJot ? "Hide jot sheet" : "Show jot sheet"}
-                aria-pressed={showJot}
-                className={
-                  showJot
-                    ? "text-neutral-100"
-                    : "text-neutral-500 hover:text-neutral-300"
-                }
-              >
-                <NotebookPen size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {!loading && current && (
         <div className="relative flex flex-1 flex-col gap-4">
@@ -785,6 +738,55 @@ export default function ReviewPage() {
               </>
             )}
           </div>
+
+          {deck && (
+            <div className="flex shrink-0 items-center justify-between px-1">
+              <p
+                className="cursor-pointer text-sm text-neutral-500 select-none"
+                onMouseDown={startPressHoldTimers}
+                onMouseUp={endPressHoldTimers}
+                onTouchStart={startPressHoldTimers}
+                onTouchEnd={endPressHoldTimers}
+                onTouchCancel={cancelPressHoldTimers}
+                onClick={handleTitleClick}
+                role="button"
+                aria-label="Sync now"
+                title="Sync now"
+              >
+                {deckBreadcrumb(deck.name)}
+              </p>
+              <div className="flex items-center gap-4">
+                <span className="flex gap-2 text-xs font-medium">
+                  <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
+                    {(aheadCounts ?? deckCounts)?.newCount ?? 0}
+                  </span>
+                  <span
+                    className="text-orange-600"
+                    title={DECK_COUNT_TOOLTIPS.learning}
+                  >
+                    {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
+                  </span>
+                  <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
+                    {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
+                  </span>
+                </span>
+                {current && (
+                  <button
+                    onClick={() => setShowJot((v) => !v)}
+                    aria-label={showJot ? "Hide jot sheet" : "Show jot sheet"}
+                    aria-pressed={showJot}
+                    className={
+                      showJot
+                        ? "text-neutral-100"
+                        : "text-neutral-500 hover:text-neutral-300"
+                    }
+                  >
+                    <NotebookPen size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Always mounted (never conditional on showJot) so its own text/
               drawing content survives toggling it closed and reopening —
