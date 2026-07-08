@@ -19,7 +19,7 @@ interface ClozeEditorProps {
 }
 
 const CHIP_CLASS =
-  'inline-block select-none rounded bg-neutral-700 px-1.5 text-xs font-semibold text-neutral-100 align-middle';
+  'inline-block rounded bg-neutral-700 px-1.5 text-xs font-semibold text-neutral-100 align-middle';
 
 // Builds the contentEditable's seed HTML from a {{A}}-style draft via DOM
 // APIs (not string concatenation), so the browser handles escaping any

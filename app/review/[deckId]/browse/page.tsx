@@ -145,7 +145,7 @@ export default function DeckBrowsePage() {
           <ArrowLeft size={16} />
         </button>
         <h1
-          className="cursor-pointer text-lg font-semibold select-none"
+          className="cursor-pointer text-lg font-semibold"
           onMouseDown={startPressHoldTimers}
           onMouseUp={endPressHoldTimers}
           onTouchStart={startPressHoldTimers}

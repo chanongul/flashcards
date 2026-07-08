@@ -596,7 +596,7 @@ export default function ReviewPage() {
           {deck && (
             <div className="flex shrink-0 items-center justify-between px-1">
               <p
-                className="cursor-pointer text-sm text-neutral-500 select-none"
+                className="cursor-pointer text-sm text-neutral-500"
                 onMouseDown={startPressHoldTimers}
                 onMouseUp={endPressHoldTimers}
                 onTouchStart={startPressHoldTimers}

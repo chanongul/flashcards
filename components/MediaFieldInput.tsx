@@ -430,7 +430,7 @@ function ImageCropModal({
         <p className="mb-2 shrink-0 text-sm font-medium">Crop image</p>
         <div
           ref={containerRef}
-          className="relative touch-none select-none overflow-hidden rounded-md mx-auto"
+          className="relative touch-none overflow-hidden rounded-md mx-auto"
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
@@ -438,7 +438,7 @@ function ImageCropModal({
             ref={imgRef}
             src={src}
             alt=""
-            className="block max-h-[calc(90vh-140px)] w-auto max-w-full select-none"
+            className="block max-h-[calc(90vh-140px)] w-auto max-w-full"
             draggable={false}
             onLoad={handleImageLoad}
           />
