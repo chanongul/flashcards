@@ -40,7 +40,13 @@ export default function AllCardsPage() {
 
   async function handleSaveEdit(
     cardId: string,
-    changes: Partial<{ front: string; back: string; fields: Record<string, string>; tags: string[] }>
+    changes: Partial<{
+      front: string;
+      back: string;
+      fields: Record<string, string>;
+      tags: string[];
+      reversed: boolean;
+    }>
   ) {
     if (!user) return;
     await editCard(user.id, cardId, changes);
