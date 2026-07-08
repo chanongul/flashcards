@@ -249,7 +249,22 @@ export function CardRow({
               return (
                 <div key={fieldName}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-neutral-500">{fieldName}</span>
+                    <span className="text-xs text-neutral-500">
+                      {fieldName}
+                      {noteType && (
+                        <span className="text-neutral-600 font-medium">
+                          {' '}
+                          (
+                          {[
+                            noteType.questionFields.includes(fieldName) && 'question',
+                            noteType.answerFields.includes(fieldName) && 'answer',
+                          ]
+                            .filter(Boolean)
+                            .join(' + ')}
+                          )
+                        </span>
+                      )}
+                    </span>
                     {isDynamic && (
                       <FieldTypeToggle
                         value={type}
