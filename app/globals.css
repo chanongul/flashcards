@@ -161,10 +161,14 @@ input, textarea, select, [contenteditable] {
 }
 
 /* Replace the browser's default blue focus ring with orange across every
- * text input, textarea, select, and rich-text contenteditable in the app. */
+ * text input, textarea, select, and rich-text contenteditable in the app.
+ * outline-color covers Chrome/Firefox; box-shadow is also needed because
+ * Safari Mobile renders its focus glow as a box-shadow, not an outline —
+ * outline-color alone is silently ignored there. */
 input:focus,
 textarea:focus,
 select:focus,
 [contenteditable]:focus {
-  outline-color: theme('colors.orange.600') !important;
+  outline-color: #ea580c !important;
+  box-shadow: 0 0 0 3px rgb(234 88 12 / 0.4) !important;
 }
