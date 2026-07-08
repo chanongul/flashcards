@@ -302,6 +302,15 @@ export default function ReviewPage() {
   const [showDeckOptions, setShowDeckOptions] = useState(false);
   const [showStudyAhead, setShowStudyAhead] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const query = new URLSearchParams(window.location.search);
+      if (query.get("add") === "true") {
+        setShowAddModal(true);
+      }
+    }
+  }, []);
+
   useBodyScrollLock(showAddModal || showDeckOptions || showStudyAhead);
 
   const [deckNameInput, setDeckNameInput] = useState("");
@@ -432,6 +441,10 @@ export default function ReviewPage() {
   function closeAddModal() {
     setShowAddModal(false);
     selectCardType("basic");
+    if (typeof window !== "undefined" && window.location.search.includes("add=true")) {
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState(null, "", cleanUrl);
+    }
   }
 
   async function handleAddCard(e: React.FormEvent) {

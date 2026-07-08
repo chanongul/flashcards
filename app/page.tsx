@@ -605,6 +605,13 @@ export default function HomePage() {
                       actionsDeckDropUp ? 'bottom-full mb-1' : 'top-full mt-1'
                     }`}
                   >
+                    <Link
+                      href={`/review/${deck.id}?add=true`}
+                      aria-label="Add card"
+                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <Plus size={16} />
+                    </Link>
                     <button
                       onClick={() => {
                         handleAddSubdeck(deck);
