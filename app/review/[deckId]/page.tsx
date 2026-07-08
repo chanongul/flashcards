@@ -454,7 +454,7 @@ export default function ReviewPage() {
   }
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-1rem)] max-w-md flex-col p-6 sm:h-dvh">
+    <main className="mx-auto flex h-[calc(100dvh-1rem)] max-w-md flex-col p-6 pt-2 md:pt-6 sm:h-dvh">
       <div className="mb-4 flex shrink-0 items-center justify-between">
         <button
           onClick={goBack}
