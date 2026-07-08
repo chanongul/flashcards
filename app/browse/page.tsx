@@ -124,7 +124,7 @@ export default function BrowsePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-0 md:pt-6 sm:mb-0">
+    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={goBack}
