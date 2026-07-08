@@ -921,31 +921,61 @@ export default function ReviewPage() {
                       Bold toolbar button — clicking the field was toggling
                       bold. contentEditable isn't labelable, so nothing is
                       lost by using a plain div. */}
-                  {selectedNoteType.fields.map((fieldName) => {
+                  {selectedNoteType.questionFields.map((fieldName) => {
                     const isDynamic =
                       (selectedNoteType.fieldTypes?.[fieldName] ??
                         "richtext") === "dynamic";
                     const type = resolvedNewFieldType(fieldName);
                     return (
-                      <div key={fieldName}>
+                      <div key={fieldName + "-q"}>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs text-neutral-500">
                             {fieldName}
-                            <span className="text-neutral-600">
-                              {" "}
-                              (
-                              {[
-                                selectedNoteType.questionFields.includes(
-                                  fieldName,
-                                ) && "question",
-                                selectedNoteType.answerFields.includes(
-                                  fieldName,
-                                ) && "answer",
-                              ]
-                                .filter(Boolean)
-                                .join(" + ")}
-                              )
-                            </span>
+                            <span className="text-neutral-600 font-medium"> (question)</span>
+                          </span>
+                          {isDynamic && (
+                            <FieldTypeToggle
+                              value={type}
+                              onChange={(t) => {
+                                setNewFieldTypes((f) => ({
+                                  ...f,
+                                  [fieldName]: t,
+                                }));
+                                setNewFields((f) => ({
+                                  ...f,
+                                  [fieldName]: "",
+                                }));
+                              }}
+                            />
+                          )}
+                        </div>
+                        <div className="mt-0.5">
+                          <FieldValueInput
+                            type={type}
+                            value={newFields[fieldName] ?? ""}
+                            onChange={(html) => {
+                              setNewFields((f) => ({
+                                ...f,
+                                [fieldName]: html,
+                              }));
+                              setAddCardError("");
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {selectedNoteType.answerFields.map((fieldName) => {
+                    const isDynamic =
+                      (selectedNoteType.fieldTypes?.[fieldName] ??
+                        "richtext") === "dynamic";
+                    const type = resolvedNewFieldType(fieldName);
+                    return (
+                      <div key={fieldName + "-a"}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-neutral-500">
+                            {fieldName}
+                            <span className="text-neutral-600 font-medium"> (answer)</span>
                           </span>
                           {isDynamic && (
                             <FieldTypeToggle

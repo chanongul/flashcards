@@ -249,51 +249,74 @@ export function CardRow({
             // div, not label: a label forwards clicks to its first labelable
             // descendant — inside RichTextInput that's the Bold toolbar
             // button, so clicking the field was toggling bold.
-            (noteType?.fields ?? []).map((fieldName) => {
-              const isDynamic = (noteType?.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
-              const type = resolvedFieldType(fieldName);
-              return (
-                <div key={fieldName}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-neutral-500">
-                      {fieldName}
-                      {noteType && (
-                        <span className="text-neutral-600 font-medium">
-                          {' '}
-                          (
-                          {[
-                            noteType.questionFields.includes(fieldName) && 'question',
-                            noteType.answerFields.includes(fieldName) && 'answer',
-                          ]
-                            .filter(Boolean)
-                            .join(' + ')}
-                          )
-                        </span>
+            <>
+              {(noteType?.questionFields ?? []).map((fieldName) => {
+                const isDynamic = (noteType?.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
+                const type = resolvedFieldType(fieldName);
+                return (
+                  <div key={fieldName + '-q'}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-neutral-500">
+                        {fieldName}
+                        <span className="text-neutral-600 font-medium"> (question)</span>
+                      </span>
+                      {isDynamic && (
+                        <FieldTypeToggle
+                          value={type}
+                          onChange={(t) => {
+                            setDynamicFieldTypes((d) => ({ ...d, [fieldName]: t }));
+                            setFieldValues((f) => ({ ...f, [fieldName]: '' }));
+                          }}
+                        />
                       )}
-                    </span>
-                    {isDynamic && (
-                      <FieldTypeToggle
-                        value={type}
-                        onChange={(t) => {
-                          setDynamicFieldTypes((d) => ({ ...d, [fieldName]: t }));
-                          setFieldValues((f) => ({ ...f, [fieldName]: '' }));
+                    </div>
+                    <div className="mt-0.5">
+                      <FieldValueInput
+                        type={type}
+                        value={fieldValues[fieldName] ?? ''}
+                        onChange={(html) => {
+                          setFieldValues((f) => ({ ...f, [fieldName]: html }));
+                          setEditError('');
                         }}
                       />
-                    )}
+                    </div>
                   </div>
-                  <div className="mt-0.5">
-                    <FieldValueInput
-                      type={type}
-                      value={fieldValues[fieldName] ?? ''}
-                      onChange={(html) => {
-                        setFieldValues((f) => ({ ...f, [fieldName]: html }));
-                        setEditError('');
-                      }}
-                    />
+                );
+              })}
+              {(noteType?.answerFields ?? []).map((fieldName) => {
+                const isDynamic = (noteType?.fieldTypes?.[fieldName] ?? 'richtext') === 'dynamic';
+                const type = resolvedFieldType(fieldName);
+                return (
+                  <div key={fieldName + '-a'}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-neutral-500">
+                        {fieldName}
+                        <span className="text-neutral-600 font-medium"> (answer)</span>
+                      </span>
+                      {isDynamic && (
+                        <FieldTypeToggle
+                          value={type}
+                          onChange={(t) => {
+                            setDynamicFieldTypes((d) => ({ ...d, [fieldName]: t }));
+                            setFieldValues((f) => ({ ...f, [fieldName]: '' }));
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="mt-0.5">
+                      <FieldValueInput
+                        type={type}
+                        value={fieldValues[fieldName] ?? ''}
+                        onChange={(html) => {
+                          setFieldValues((f) => ({ ...f, [fieldName]: html }));
+                          setEditError('');
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </>
           ) : card.cardType === 'cloze' ? (
             <ClozeEditor
               initialText={clozeText}
