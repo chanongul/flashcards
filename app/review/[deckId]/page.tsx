@@ -682,7 +682,7 @@ export default function ReviewPage() {
               Show answer
             </button>
           ) : (
-            <div className="grid shrink-0 grid-cols-4 gap-px">
+            <div className="grid shrink-0 grid-cols-4 gap-0">
               <button
                 onClick={() => handleRate(Rating.Again)}
                 className="rounded-l-full bg-red-700 py-3 text-sm"
