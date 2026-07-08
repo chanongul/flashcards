@@ -682,28 +682,28 @@ export default function ReviewPage() {
               Show answer
             </button>
           ) : (
-            <div className="grid shrink-0 grid-cols-4 gap-2">
+            <div className="grid shrink-0 grid-cols-4 gap-px">
               <button
                 onClick={() => handleRate(Rating.Again)}
-                className="rounded-full bg-red-700 py-3 text-sm"
+                className="rounded-l-full bg-red-700 py-3 text-sm"
               >
                 Again
               </button>
               <button
                 onClick={() => handleRate(Rating.Hard)}
-                className="rounded-full bg-orange-700 py-3 text-sm"
+                className="rounded-none bg-orange-700 py-3 text-sm"
               >
                 Hard
               </button>
               <button
                 onClick={() => handleRate(Rating.Good)}
-                className="rounded-full bg-yellow-600 py-3 text-sm"
+                className="rounded-none bg-yellow-600 py-3 text-sm"
               >
                 Good
               </button>
               <button
                 onClick={() => handleRate(Rating.Easy)}
-                className="rounded-full bg-green-600 py-3 text-sm"
+                className="rounded-r-full bg-green-600 py-3 text-sm"
               >
                 Easy
               </button>
