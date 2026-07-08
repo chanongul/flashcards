@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   LogOut,
@@ -240,11 +240,16 @@ export default function HomePage() {
   const [renameDeckError, setRenameDeckError] = useState("");
 
   // Which decks are currently folded (their subdecks hidden) — press-and-hold
-  // on a deck with children toggles it. Session-only (not persisted), same
-  // as every other view-only UI toggle in this component.
-  const [collapsedDeckIds, setCollapsedDeckIds] = useState<Set<string>>(
-    new Set(),
-  );
+  // on the ellipsis button of a deck with children toggles it. Persisted to
+  // localStorage so the fold state survives page refreshes.
+  const DECK_COLLAPSED_KEY = "flashcards:deck-collapsed";
+  const [collapsedDeckIds, setCollapsedDeckIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(DECK_COLLAPSED_KEY);
+      if (stored) return new Set(JSON.parse(stored) as string[]);
+    } catch {}
+    return new Set();
+  });
   const FOLD_HOLD_MS = 500;
   const foldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set true the instant the hold timer fires, so the click that follows the
@@ -262,6 +267,16 @@ export default function HomePage() {
       return next;
     });
   }
+
+  // Sync collapsed state to localStorage whenever it changes.
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        DECK_COLLAPSED_KEY,
+        JSON.stringify([...collapsedDeckIds]),
+      );
+    } catch {}
+  }, [collapsedDeckIds]);
 
   function startFoldHold(deckId: string) {
     foldTriggeredRef.current = false;
@@ -836,13 +851,7 @@ export default function HomePage() {
               <Link
                 href={`/review/${deck.id}`}
                 onClick={handleDeckLinkClick}
-                onMouseDown={() => hasChildren && startFoldHold(deck.id)}
-                onMouseUp={cancelFoldHold}
-                onMouseLeave={cancelFoldHold}
-                onTouchStart={() => hasChildren && startFoldHold(deck.id)}
-                onTouchEnd={cancelFoldHold}
-                onTouchCancel={cancelFoldHold}
-                onContextMenu={(e) => hasChildren && e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
                 className={`flex h-10 flex-1 items-center justify-between rounded-md border border-neutral-800 px-4 hover:bg-neutral-900 ${
                   isFolded ? "bg-white/[0.025]" : ""
                 }`}
@@ -871,6 +880,10 @@ export default function HomePage() {
               </Link>
               <button
                 onClick={(e) => {
+                  if (foldTriggeredRef.current) {
+                    foldTriggeredRef.current = false;
+                    return;
+                  }
                   const opening = actionsDeck?.id !== deck.id;
                   setActionsDeck(opening ? deck : null);
                   if (opening)
@@ -878,6 +891,19 @@ export default function HomePage() {
                       shouldDropUp(e.currentTarget.getBoundingClientRect()),
                     );
                 }}
+                onMouseDown={() => hasChildren && startFoldHold(deck.id)}
+                onMouseUp={cancelFoldHold}
+                onMouseLeave={cancelFoldHold}
+                onTouchStart={(e) => {
+                  if (!hasChildren) return;
+                  // Prevent the browser from treating this as a scroll/pan
+                  // gesture so the hold timer fires reliably on mobile.
+                  e.preventDefault();
+                  startFoldHold(deck.id);
+                }}
+                onTouchEnd={cancelFoldHold}
+                onTouchCancel={cancelFoldHold}
+                onContextMenu={(e) => e.preventDefault()}
                 aria-label="Deck actions"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
               >
