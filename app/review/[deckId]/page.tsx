@@ -263,9 +263,7 @@ export default function ReviewPage() {
   function cycleJotSize() {
     setJotSizeIndex((i) => (i + 1) % SIZE_OPTIONS.length);
     setJotOffset(0);
-    setJotResetSignal((s) => s + 1);
   }
-  const [jotResetSignal, setJotResetSignal] = useState(0);
   const [jotOffset, setJotOffset] = useState(0);
   // The panel's height can't be a plain CSS percentage — being a sibling of
   // the card box rather than a child of it (see above), its containing
@@ -816,7 +814,7 @@ export default function ReviewPage() {
               <div className="h-1 w-12 rounded-full bg-neutral-500" />
             </div>
             <div className="min-h-0 flex-1">
-              <JotPad sizeRatio={JOT_CONTENT_RATIO} onSizeToggle={cycleJotSize} resetSignal={jotResetSignal} hasCard={!!current} />
+              <JotPad sizeRatio={JOT_CONTENT_RATIO} onSizeToggle={cycleJotSize} hasCard={!!current} />
             </div>
           </div>
 

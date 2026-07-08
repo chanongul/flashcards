@@ -47,7 +47,76 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     return () => document.removeEventListener('selectionchange', updateActiveStates);
   }, []);
 
+  function isNodeStyled(node: Node, command: string): boolean {
+    let curr: Node | null = node;
+    while (curr && curr !== ref.current) {
+      if (curr.nodeType === Node.ELEMENT_NODE) {
+        const el = curr as HTMLElement;
+        const tag = el.tagName.toUpperCase();
+        if (command === 'bold') {
+          if (tag === 'B' || tag === 'STRONG') return true;
+          const fw = el.style.fontWeight;
+          if (fw === 'bold' || fw === 'bolder' || (parseInt(fw, 10) >= 600)) return true;
+        } else if (command === 'italic') {
+          if (tag === 'I' || tag === 'EM') return true;
+          const fs = el.style.fontStyle;
+          if (fs === 'italic' || fs === 'oblique') return true;
+        } else if (command === 'underline') {
+          if (tag === 'U' || tag === 'INS') return true;
+          const td = el.style.textDecorationLine || el.style.textDecoration;
+          if (td.includes('underline')) return true;
+        }
+      }
+      curr = curr.parentNode;
+    }
+    try {
+      const parentEl = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+      if (parentEl) {
+        const style = window.getComputedStyle(parentEl);
+        if (command === 'bold') {
+          const fw = style.fontWeight;
+          if (fw === 'bold' || fw === 'bolder' || parseInt(fw, 10) >= 600) return true;
+        } else if (command === 'italic') {
+          if (style.fontStyle === 'italic' || style.fontStyle === 'oblique') return true;
+        } else if (command === 'underline') {
+          if (style.textDecorationLine.includes('underline') || style.textDecoration.includes('underline')) return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
   function exec(command: string) {
+    const sel = window.getSelection();
+    const isOn = document.queryCommandState(command);
+    if (isOn && sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (!range.collapsed) {
+        const container = range.commonAncestorContainer;
+        const root = container.nodeType === Node.TEXT_NODE ? container.parentNode! : container;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let n = walker.nextNode();
+        let hasMixed = false;
+        while (n) {
+          if (range.intersectsNode(n) && (n as Text).data.trim().length > 0) {
+            if (!isNodeStyled(n, command)) {
+              hasMixed = true;
+              break;
+            }
+          }
+          n = walker.nextNode();
+        }
+        if (hasMixed) {
+          // Force-apply: turn off, then turn back on so everything is styled.
+          document.execCommand(command);
+          document.execCommand(command);
+          ref.current?.focus();
+          handleInput();
+          updateActiveStates();
+          return;
+        }
+      }
+    }
     document.execCommand(command);
     ref.current?.focus();
     handleInput();
@@ -180,21 +249,46 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
     onChange(sanitizeRichText(ref.current.innerHTML));
   }
 
-  // Same ancestor-walk shape as getCurrentLevel above, but for a boolean
-  // instead of a size level.
   function isDimmed(range: Range): boolean {
-    let node: Node | null = range.startContainer;
-    if (node.nodeType === Node.ELEMENT_NODE && node.childNodes[range.startOffset]) {
-      node = node.childNodes[range.startOffset];
-    }
-    while (node && node !== ref.current) {
-      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).hasAttribute('data-dim')) {
-        return true;
+    if (range.collapsed) {
+      let node: Node | null = range.startContainer;
+      if (node.nodeType === Node.ELEMENT_NODE && node.childNodes[range.startOffset]) {
+        node = node.childNodes[range.startOffset];
       }
-      node = node.parentNode;
+      while (node && node !== ref.current) {
+        if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).hasAttribute('data-dim')) {
+          return true;
+        }
+        node = node.parentNode;
+      }
+      return false;
     }
-    return false;
+    // Non-collapsed: every non-whitespace text node inside the range must be
+    // inside a [data-dim] ancestor in the live DOM.
+    const container = range.commonAncestorContainer;
+    const root = container.nodeType === Node.TEXT_NODE ? container.parentNode! : container;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n = walker.nextNode();
+    let hasText = false;
+    while (n) {
+      if (range.intersectsNode(n) && (n as Text).data.trim().length > 0) {
+        hasText = true;
+        let p: Node | null = n;
+        let dimmed = false;
+        while (p && p !== ref.current) {
+          if (p.nodeType === Node.ELEMENT_NODE && (p as HTMLElement).hasAttribute('data-dim')) {
+            dimmed = true;
+            break;
+          }
+          p = p.parentNode;
+        }
+        if (!dimmed) return false;
+      }
+      n = walker.nextNode();
+    }
+    return hasText;
   }
+
 
   // Same shape as unwrapOverlappingSizes above, but for [data-dim] spans.
   function unwrapOverlappingDim(range: Range): ChildNode[] {
@@ -314,6 +408,86 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
   // inserts an empty dim span and parks the caret inside it so whatever's
   // typed next lands inside (and inherits the style); turning off moves the
   // caret back out to just after it.
+  function isInactiveFormattingElement(el: HTMLElement): boolean {
+    const tag = el.tagName.toUpperCase();
+    if (tag === 'B' || tag === 'STRONG' || el.style.fontWeight === 'bold') {
+      return !document.queryCommandState('bold');
+    }
+    if (tag === 'I' || tag === 'EM' || el.style.fontStyle === 'italic') {
+      return !document.queryCommandState('italic');
+    }
+    if (tag === 'U' || tag === 'INS' || (el.style.textDecorationLine || el.style.textDecoration || '').includes('underline')) {
+      return !document.queryCommandState('underline');
+    }
+    return false;
+  }
+
+  function getCleanInsertionRange(range: Range): Range {
+    const newRange = range.cloneRange();
+    if (!range.collapsed) return newRange;
+
+    let container = range.startContainer;
+    let offset = range.startOffset;
+
+    while (true) {
+      if (container.nodeType === Node.TEXT_NODE) {
+        const textVal = container.nodeValue || '';
+        if (offset === textVal.length) {
+          const parent = container.parentNode;
+          if (parent && parent !== ref.current) {
+            const idx = Array.from(parent.childNodes).indexOf(container as ChildNode);
+            container = parent;
+            offset = idx + 1;
+            continue;
+          }
+        } else if (offset === 0) {
+          const parent = container.parentNode;
+          if (parent && parent !== ref.current) {
+            const idx = Array.from(parent.childNodes).indexOf(container as ChildNode);
+            container = parent;
+            offset = idx;
+            continue;
+          }
+        }
+      } else if (container.nodeType === Node.ELEMENT_NODE) {
+        const el = container as HTMLElement;
+        const children = Array.from(el.childNodes);
+        if (offset === children.length && el !== ref.current) {
+          if (isInactiveFormattingElement(el)) {
+            const parent = el.parentNode;
+            if (parent) {
+              const idx = Array.from(parent.childNodes).indexOf(el);
+              container = parent;
+              offset = idx + 1;
+              continue;
+            }
+          }
+        } else if (offset === 0 && el !== ref.current) {
+          if (isInactiveFormattingElement(el)) {
+            const parent = el.parentNode;
+            if (parent) {
+              const idx = Array.from(parent.childNodes).indexOf(el);
+              container = parent;
+              offset = idx;
+              continue;
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    newRange.setStart(container, offset);
+    newRange.setEnd(container, offset);
+    return newRange;
+  }
+
+  // Splicing inline dim spans. Clicking the dim button with selection wraps
+  // it in a [data-dim] span; clicking with just a caret inserts a pending
+  // dim span (containing a ZWSP marker so it has visual layout width to hold
+  // focus) and locks the button active, so the next characters typed are
+  // dimmed. Clicking again with that pending span still empty pops the
+  // caret back out to just after it.
   function toggleDim() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -335,9 +509,10 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
       return;
     }
 
-    const originalRange = sel.getRangeAt(0).cloneRange();
+    let originalRange = sel.getRangeAt(0).cloneRange();
 
     if (originalRange.collapsed) {
+      originalRange = getCleanInsertionRange(originalRange);
       const dimAncestor = findDimAncestor(originalRange.startContainer);
       if (dimAncestor) {
         exitDimSpan(dimAncestor);
@@ -361,38 +536,61 @@ export function RichTextInput({ value, onChange, placeholder }: RichTextInputPro
 
     const wasDimmed = isDimmed(originalRange);
 
+    // unwrapOverlappingDim removes [data-dim] spans and moves their children
+    // out into the surrounding DOM. It returns those moved child nodes so we
+    // can reconstruct a selection over them after the mutation — originalRange
+    // boundaries can become stale/collapsed after the span removal.
     const moved = unwrapOverlappingDim(originalRange);
 
-    const rangeToWrap = document.createRange();
-    if (moved.length > 0) {
-      rangeToWrap.setStartBefore(moved[0]);
-      rangeToWrap.setEndAfter(moved[moved.length - 1]);
-    } else {
-      rangeToWrap.setStart(originalRange.startContainer, originalRange.startOffset);
-      rangeToWrap.setEnd(originalRange.endContainer, originalRange.endOffset);
-    }
-
     if (wasDimmed) {
-      sel.removeAllRanges();
-      sel.addRange(rangeToWrap);
+      ref.current?.focus();
       handleInput();
-      updateActiveStates();
+      // Rebuild the selection from the now-unwrapped nodes inside a timeout
+      // to ensure React updates have finished rendering.
+      setTimeout(() => {
+        const currentSel = window.getSelection();
+        if (!currentSel) return;
+        ref.current?.focus();
+        currentSel.removeAllRanges();
+        if (moved.length > 0) {
+          const r = document.createRange();
+          r.setStartBefore(moved[0]);
+          r.setEndAfter(moved[moved.length - 1]);
+          currentSel.addRange(r);
+        } else {
+          currentSel.addRange(originalRange);
+        }
+        updateActiveStates();
+      }, 0);
       return;
     }
 
+    // Not fully dimmed (none or mixed) → apply dim to the full original range.
+    // originalRange is live and still covers the full original selection after
+    // the unwrap (the unwrapped nodes are inside it, no boundaries removed).
     const span = document.createElement('span');
     span.setAttribute('data-dim', '');
-    span.appendChild(rangeToWrap.extractContents());
-    rangeToWrap.insertNode(span);
+    span.appendChild(originalRange.extractContents());
+    originalRange.insertNode(span);
 
-    const newRange = document.createRange();
-    newRange.selectNodeContents(span);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-
+    ref.current?.focus();
     handleInput();
-    updateActiveStates();
+
+    // Select the newly dimmed contents inside a timeout to ensure React updates
+    // have finished rendering.
+    setTimeout(() => {
+      const currentSel = window.getSelection();
+      if (!currentSel) return;
+      ref.current?.focus();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      currentSel.removeAllRanges();
+      currentSel.addRange(newRange);
+      updateActiveStates();
+    }, 0);
   }
+
+
 
   return (
     <div className="rounded-md border border-neutral-700 bg-neutral-900">

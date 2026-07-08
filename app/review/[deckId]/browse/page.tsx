@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Link from 'next/link';
+
+
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Search, List } from 'lucide-react';
+import { ArrowLeft, Search, Star } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
 import { editCard, deleteCard, cloneCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
@@ -22,6 +23,7 @@ export default function DeckBrowsePage() {
   const { user, loading: userLoading } = useUser();
   useLoadingWhen(userLoading || !user);
   const [query, setQuery] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [confirmState, setConfirmState] = useState<{
     title: string;
     message: string;
@@ -40,8 +42,9 @@ export default function DeckBrowsePage() {
 
   // Same matching algorithm as the global browse page (both share cardSearchText).
   const filtered = (deckCards ?? []).filter((card) => {
-    if (!query.trim()) return false;
+    if (favoritesOnly && !card.flagged) return false;
     const q = query.trim().toLowerCase();
+    if (!q) return favoritesOnly;
     const text = cardSearchText(card);
     const deckName = deckNameById.get(card.deckId) ?? '';
     const tags = card.tags.join(' ');
@@ -51,6 +54,7 @@ export default function DeckBrowsePage() {
       tags.toLowerCase().includes(q)
     );
   });
+  const hasActiveFilter = query.trim() !== '' || favoritesOnly;
 
   async function handleSaveEdit(
     cardId: string,
@@ -146,13 +150,14 @@ export default function DeckBrowsePage() {
         >
           Browse deck
         </h1>
-        <Link
-          href={`/review/${params.deckId}/all`}
-          aria-label="View all cards"
-          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+        <button
+          onClick={() => setFavoritesOnly((v) => !v)}
+          aria-label={favoritesOnly ? 'Show all cards' : 'Show favorites only'}
+          aria-pressed={favoritesOnly}
+          className={`text-yellow-400 ${favoritesOnly ? '' : 'opacity-40 hover:opacity-70'}`}
         >
-          <List size={16} />
-        </Link>
+          <Star size={20} fill="currentColor" />
+        </button>
       </div>
 
       <div className="relative mb-4">
@@ -166,7 +171,7 @@ export default function DeckBrowsePage() {
         />
       </div>
 
-      {query.trim() && (
+      {hasActiveFilter && (
         <p className="mb-2 text-xs text-neutral-500">
           {filtered.length} card{filtered.length === 1 ? '' : 's'}
         </p>
@@ -189,7 +194,7 @@ export default function DeckBrowsePage() {
             onClone={handleClone}
           />
         ))}
-        {query.trim() ? (
+        {hasActiveFilter ? (
           filtered.length === 0 && <p className="text-sm text-neutral-500">No cards match.</p>
         ) : (
           <p className="text-sm text-neutral-500">Type to search this deck's cards.</p>

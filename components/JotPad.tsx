@@ -30,22 +30,21 @@ const LINE_WIDTH_MULTIPLIER = 2;
 interface JotPadProps {
   sizeRatio: number;
   onSizeToggle: () => void;
-  resetSignal: number;
   hasCard: boolean;
 }
 
-export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPadProps) {
+export function JotPad({ sizeRatio, onSizeToggle, hasCard }: JotPadProps) {
   const [mode, setMode] = useState<"type" | "draw">("type");
   const [text, setText] = useState("");
 
-  // Clear the text input whenever the size is toggled.
-  useEffect(() => {
-    setText("");
-    // A size toggle also wipes any unsaved canvas state (resize observer clears
-    // pixels automatically), so drop the undo stack too.
-    undoStackRef.current = [];
-    setCanUndo(false);
-  }, [resetSignal]);
+  // Tracks whether the canvas has any drawn content so we can warn before
+  // a size change (which would clear it). Set to true on first stroke,
+  // false after an explicit canvas clear or a confirmed size-change clear.
+  const hasDrawingRef = useRef(false);
+  // When the user clicks the size toggle while a drawing exists, we park
+  // the pending toggle here and show a confirmation instead of firing
+  // onSizeToggle immediately.
+  const [confirmClearForSize, setConfirmClearForSize] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,11 +67,16 @@ export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPad
       const rect = container.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      // A resize already wipes the canvas's own pixels, and any snapshot
-      // taken at the old dimensions can't be restored onto the new ones —
-      // drop the stack rather than leave undo pointing at stale sizes.
+      const newW = Math.round(rect.width * dpr);
+      const newH = Math.round(rect.height * dpr);
+      // Skip if nothing changed (avoids unnecessary clears when the observer
+      // fires for unrelated reasons, e.g. scrollbar appearance).
+      if (canvas.width === newW && canvas.height === newH) return;
+
+      canvas.width = newW;
+      canvas.height = newH;
+
+      // Undo snapshots were taken at the old dimensions — drop them.
       undoStackRef.current = [];
       setCanUndo(false);
     };
@@ -82,6 +86,34 @@ export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPad
     ro.observe(container);
     return () => ro.disconnect();
   }, []);
+
+  function clearCanvas() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    undoStackRef.current = [];
+    setCanUndo(false);
+    hasDrawingRef.current = false;
+  }
+
+  // Called when the user clicks the size % button. If the canvas has a
+  // drawing, we pause and ask for confirmation; otherwise toggle immediately.
+  function handleSizeToggleClick() {
+    if (hasDrawingRef.current) {
+      setConfirmClearForSize(true);
+    } else {
+      onSizeToggle();
+    }
+  }
+
+  // User confirmed: clear the canvas and resize.
+  function handleConfirmSizeChange() {
+    clearCanvas();
+    setConfirmClearForSize(false);
+    onSizeToggle();
+  }
 
   function pointerPos(e: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current!;
@@ -113,11 +145,14 @@ export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPad
     if (!canvas || !ctx || !snapshot) return;
     ctx.putImageData(snapshot, 0, 0);
     setCanUndo(undoStackRef.current.length > 0);
+    // If undo empties the stack the canvas is effectively blank again.
+    if (undoStackRef.current.length === 0) hasDrawingRef.current = false;
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     pushUndoSnapshot();
     drawingRef.current = true;
+    hasDrawingRef.current = true;
     lastPointRef.current = pointerPos(e);
     e.currentTarget.setPointerCapture(e.pointerId);
   }
@@ -196,7 +231,7 @@ export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPad
           {hasCard && (
             <button
               type="button"
-              onClick={onSizeToggle}
+              onClick={handleSizeToggleClick}
               aria-label="Toggle jot pad size"
               className="flex items-center rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200 tabular-nums"
             >
@@ -263,6 +298,38 @@ export function JotPad({ sizeRatio, onSizeToggle, resetSignal, hasCard }: JotPad
           }`}
         />
       </div>
+
+      {/* Confirmation modal: shown when the user clicks size toggle while a drawing exists */}
+      {confirmClearForSize && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setConfirmClearForSize(false)}
+        >
+          <div
+            className="w-full max-w-xs rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="mb-1 text-sm font-medium">Change pad size?</p>
+            <p className="mb-4 text-xs text-neutral-400">
+              Resizing will clear your current drawing. Your typed text will be kept.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmSizeChange}
+                className="flex-1 rounded-md bg-neutral-100 py-2 text-xs font-medium text-neutral-900"
+              >
+                Change size
+              </button>
+              <button
+                onClick={() => setConfirmClearForSize(false)}
+                className="flex-1 rounded-md border border-neutral-700 py-2 text-xs text-neutral-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

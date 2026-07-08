@@ -15,6 +15,7 @@ import {
   MoreVertical,
   Copy,
   ArrowLeft,
+  GripVertical,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Deck, type NoteType, type FieldTypeConfig } from '@/lib/db';
@@ -208,6 +209,27 @@ export default function HomePage() {
   const [newAnswerFields, setNewAnswerFields] = useState<FieldRow[]>([{ name: '', type: 'richtext' }]);
   const [newTypeReversed, setNewTypeReversed] = useState(false);
   const [noteTypeError, setNoteTypeError] = useState('');
+  // Drag-reorder tracking: dragIndex stored in a ref (no re-render needed),
+  // dragOverIndex stored in state so the drop-target highlight updates live
+  // as the user hovers over different items.
+  const dragIndexQRef = useRef<number | null>(null);
+  const [dragOverIndexQ, setDragOverIndexQ] = useState<number | null>(null);
+  const dragIndexARef = useRef<number | null>(null);
+  const [dragOverIndexA, setDragOverIndexA] = useState<number | null>(null);
+  // Set to true by the grip handle's onPointerDown so onDragStart knows the
+  // drag was legitimately initiated from the handle and not from an accidental
+  // drag on the input field or other row content.
+  const dragHandleActivatedQRef = useRef(false);
+  const dragHandleActivatedARef = useRef(false);
+  // Swaps items at indices `a` and `b` in a copy of `arr`.
+  function swapItems<T>(arr: T[], a: number, b: number): T[] {
+    if (a === b) return arr;
+    const next = [...arr];
+    [next[a], next[b]] = [next[b], next[a]];
+    return next;
+  }
+
+
   const noteTypes = useLiveQuery(
     () => db.noteTypes.filter((nt) => !nt.deleted).toArray(),
     []
@@ -495,7 +517,7 @@ export default function HomePage() {
           </Link>
           <button
             onClick={() => setShowNoteTypes(true)}
-            aria-label="Manage custom note/card types"
+            aria-label="Manage custom card types"
             className="rounded-md border border-neutral-700 p-2 hover:text-neutral-200"
           >
             <LayoutTemplate size={16} />
@@ -758,7 +780,7 @@ export default function HomePage() {
             {noteTypePage === 'list' ? (
               <>
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-medium">Custom note/card types</p>
+                  <p className="text-sm font-medium">Custom card types</p>
                   <button
                     onClick={closeNoteTypesModal}
                     aria-label="Close"
@@ -780,7 +802,7 @@ export default function HomePage() {
                           setNoteTypeActionsId(opening ? nt.id : null);
                           if (opening) setNoteTypeActionsDropUp(shouldDropUp(e.currentTarget.getBoundingClientRect()));
                         }}
-                        aria-label="Custom note/card type actions"
+                        aria-label="Custom card type actions"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                       >
                         <MoreVertical size={14} />
@@ -799,7 +821,7 @@ export default function HomePage() {
                                 openEditNoteType(nt);
                                 setNoteTypeActionsId(null);
                               }}
-                              aria-label="Edit custom note/card type"
+                              aria-label="Edit custom card type"
                               className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                             >
                               <Pencil size={16} />
@@ -809,7 +831,7 @@ export default function HomePage() {
                                 handleCloneNoteType(nt.id);
                                 setNoteTypeActionsId(null);
                               }}
-                              aria-label="Duplicate custom note/card type"
+                              aria-label="Duplicate custom card type"
                               className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                             >
                               <Copy size={16} />
@@ -819,7 +841,7 @@ export default function HomePage() {
                                 handleDeleteNoteType(nt.id);
                                 setNoteTypeActionsId(null);
                               }}
-                              aria-label="Delete custom note/card type"
+                              aria-label="Delete custom card type"
                               className="flex h-9 w-9 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
                             >
                               <Trash2 size={16} />
@@ -830,13 +852,13 @@ export default function HomePage() {
                     </li>
                   ))}
                   {(!noteTypes || noteTypes.length === 0) && (
-                    <p className="text-sm text-neutral-500">No custom note/card types yet.</p>
+                    <p className="text-sm text-neutral-500">No custom card types yet.</p>
                   )}
                 </ul>
 
                 <button
                   onClick={openCreateNoteType}
-                  aria-label="New custom note/card type"
+                  aria-label="New custom card type"
                   className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                 >
                   <Plus size={16} />
@@ -856,7 +878,7 @@ export default function HomePage() {
                     <ArrowLeft size={16} />
                   </button>
                   <p className="text-sm font-medium">
-                    {editingNoteTypeId ? 'Edit custom note/card type' : 'New custom note/card type'}
+                    {editingNoteTypeId ? 'Edit card type' : 'New card type'}
                   </p>
                 </div>
 
@@ -874,8 +896,39 @@ export default function HomePage() {
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-neutral-400">Question fields</p>
                     {newQuestionFields.map((field, i) => (
-                      <div key={i} className="space-y-1 rounded-md border border-neutral-800 p-2">
+                      <div
+                        key={i}
+                        draggable={newQuestionFields.length > 1}
+                        onDragStart={(e) => {
+                          if (!dragHandleActivatedQRef.current) { e.preventDefault(); return; }
+                          dragHandleActivatedQRef.current = false;
+                          dragIndexQRef.current = i;
+                        }}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverIndexQ(i); }}
+                        onDrop={() => {
+                          const from = dragIndexQRef.current;
+                          if (from !== null && dragOverIndexQ !== null)
+                            setNewQuestionFields((fs) => swapItems(fs, from, dragOverIndexQ));
+                          dragIndexQRef.current = null;
+                          setDragOverIndexQ(null);
+                        }}
+                        onDragEnd={() => { dragHandleActivatedQRef.current = false; dragIndexQRef.current = null; setDragOverIndexQ(null); }}
+                        className={`space-y-1 rounded-md border p-2 transition-colors ${
+                          dragOverIndexQ === i && dragIndexQRef.current !== i
+                            ? 'border-neutral-400 bg-neutral-800/60'
+                            : 'border-neutral-800'
+                        }`}
+                      >
                         <div className="flex gap-2">
+                          {newQuestionFields.length > 1 && (
+                            <span
+                              onPointerDown={() => { dragHandleActivatedQRef.current = true; }}
+                              className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+                              title="Drag to reorder"
+                            >
+                              <GripVertical size={14} />
+                            </span>
+                          )}
                           <input
                             value={field.name}
                             onChange={(e) =>
@@ -920,8 +973,39 @@ export default function HomePage() {
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-neutral-400">Answer fields</p>
                     {newAnswerFields.map((field, i) => (
-                      <div key={i} className="space-y-1 rounded-md border border-neutral-800 p-2">
+                      <div
+                        key={i}
+                        draggable={newAnswerFields.length > 1}
+                        onDragStart={(e) => {
+                          if (!dragHandleActivatedARef.current) { e.preventDefault(); return; }
+                          dragHandleActivatedARef.current = false;
+                          dragIndexARef.current = i;
+                        }}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverIndexA(i); }}
+                        onDrop={() => {
+                          const from = dragIndexARef.current;
+                          if (from !== null && dragOverIndexA !== null)
+                            setNewAnswerFields((fs) => swapItems(fs, from, dragOverIndexA));
+                          dragIndexARef.current = null;
+                          setDragOverIndexA(null);
+                        }}
+                        onDragEnd={() => { dragHandleActivatedARef.current = false; dragIndexARef.current = null; setDragOverIndexA(null); }}
+                        className={`space-y-1 rounded-md border p-2 transition-colors ${
+                          dragOverIndexA === i && dragIndexARef.current !== i
+                            ? 'border-neutral-400 bg-neutral-800/60'
+                            : 'border-neutral-800'
+                        }`}
+                      >
                         <div className="flex gap-2">
+                          {newAnswerFields.length > 1 && (
+                            <span
+                              onPointerDown={() => { dragHandleActivatedARef.current = true; }}
+                              className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+                              title="Drag to reorder"
+                            >
+                              <GripVertical size={14} />
+                            </span>
+                          )}
                           <input
                             value={field.name}
                             onChange={(e) =>
