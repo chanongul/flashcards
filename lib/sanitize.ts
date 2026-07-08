@@ -126,11 +126,24 @@ export function extractSearchableText(html: string): string {
   if (typeof document === 'undefined') return html;
   const template = document.createElement('template');
   template.innerHTML = html;
+
+  // Replace <br> tags with a space so separate lines/fields do not run together.
+  template.content.querySelectorAll('br').forEach((br) => {
+    br.replaceWith(document.createTextNode(' '));
+  });
+
+  // Ensure block elements have spacing between them
+  template.content.querySelectorAll('div, p').forEach((el) => {
+    if (el.nextSibling) {
+      el.after(document.createTextNode(' '));
+    }
+  });
+
   const text = template.content.textContent ?? '';
   const labels: string[] = [];
   template.content.querySelectorAll('img, audio').forEach((el) => {
     const label = el.tagName === 'IMG' ? el.getAttribute('alt') : el.getAttribute('title');
     if (label) labels.push(label);
   });
-  return [text, ...labels].join(' ').trim();
+  return [text, ...labels].join(' ').replace(/\s+/g, ' ').trim();
 }
