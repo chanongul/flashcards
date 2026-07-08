@@ -34,7 +34,73 @@ export function sanitizeRichText(html: string): string {
   const template = document.createElement('template');
   template.innerHTML = html;
   sanitizeNode(template.content);
+  trimBrTags(template.content);
+  collapseConsecutiveBrs(template.content);
   return template.innerHTML;
+}
+
+/** Trims leading/trailing <br>s and collapses runs of consecutive ones,
+ * without the full sanitizeNode pass — for content assembled from pieces
+ * that are each already individually sanitized (e.g. a custom note type's
+ * front/back, built by joining several fields' stored HTML with '<br>' at
+ * replay time in lib/sync.ts). An empty/unused field in that join
+ * contributes nothing but its separator, which otherwise stacks into a
+ * leading/trailing or doubled-up <br> right at the field boundary — the
+ * same shape of artifact sanitizeRichText already prevents within a single
+ * field, just showing up here instead since the join happens after each
+ * field was already sanitized on its own. */
+export function cleanupBrs(html: string): string {
+  if (typeof document === 'undefined') return html;
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  trimBrTags(template.content);
+  collapseConsecutiveBrs(template.content);
+  return template.innerHTML;
+}
+
+function trimBrTags(fragment: DocumentFragment) {
+  // Trim leading <br> tags
+  while (fragment.firstChild) {
+    const first = fragment.firstChild;
+    if (first.nodeType === 1 && (first as HTMLElement).tagName === 'BR') {
+      fragment.removeChild(first);
+    } else if (first.nodeType === 3 && !(first as Text).data.trim()) {
+      fragment.removeChild(first);
+    } else {
+      break;
+    }
+  }
+
+  // Trim trailing <br> tags
+  while (fragment.lastChild) {
+    const last = fragment.lastChild;
+    if (last.nodeType === 1 && (last as HTMLElement).tagName === 'BR') {
+      fragment.removeChild(last);
+    } else if (last.nodeType === 3 && !(last as Text).data.trim()) {
+      fragment.removeChild(last);
+    } else {
+      break;
+    }
+  }
+}
+
+function collapseConsecutiveBrs(fragment: DocumentFragment) {
+  const brs = Array.from(fragment.querySelectorAll('br'));
+  let consecutiveCount = 0;
+  for (const br of brs) {
+    let next = br.nextSibling;
+    while (next && next.nodeType === 3 && !next.textContent?.trim()) {
+      next = next.nextSibling;
+    }
+    if (next && next.nodeType === 1 && (next as HTMLElement).tagName === 'BR') {
+      consecutiveCount++;
+      if (consecutiveCount >= 2) {
+        br.remove();
+      }
+    } else {
+      consecutiveCount = 0;
+    }
+  }
 }
 
 function unwrap(node: Node, el: HTMLElement) {

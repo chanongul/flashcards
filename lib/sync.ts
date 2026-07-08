@@ -11,6 +11,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { newFsrsState, schedule, type Grade } from './fsrs';
 import { clozeNumbers } from './cloze';
+import { cleanupBrs } from './sanitize';
 
 const supabase = createClient();
 
@@ -317,8 +318,8 @@ export async function replayAllEvents() {
       // dangerouslySetInnerHTML), and HTML collapses literal newlines into a
       // single space, which stacked multiple fields horizontally instead of
       // vertically.
-      const front = noteTypeDef.questionFields.map((f) => note.fields[f] ?? '').join('<br>');
-      const back = noteTypeDef.answerFields.map((f) => note.fields[f] ?? '').join('<br>');
+      const front = cleanupBrs(noteTypeDef.questionFields.map((f) => note.fields[f] ?? '').join('<br>'));
+      const back = cleanupBrs(noteTypeDef.answerFields.map((f) => note.fields[f] ?? '').join('<br>'));
       // Same pattern as basic notes: front/back stay as the type's own
       // question/answer rendering for both cards — questionText/answerText
       // do the actual display-time swap based on isReversed.
