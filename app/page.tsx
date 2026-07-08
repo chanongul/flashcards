@@ -258,6 +258,12 @@ export default function HomePage() {
   // press-hold's own reset-button gesture below, just per-deck instead of a
   // single shared target.
   const foldTriggeredRef = useRef(false);
+  // Timestamp of the last fold/unfold. Used as a fallback gate in onClick:
+  // on mobile, when unfolding adds new DOM rows the browser fires a synthetic
+  // mousedown before the click, which calls startFoldHold and resets
+  // foldTriggeredRef to false before onClick runs — so foldTriggeredRef alone
+  // can't suppress the menu. The timestamp check is immune to this.
+  const lastFoldTimestampRef = useRef(0);
 
   function toggleDeckFold(deckId: string) {
     setCollapsedDeckIds((prev) => {
@@ -283,6 +289,7 @@ export default function HomePage() {
     if (foldHoldTimeout.current) clearTimeout(foldHoldTimeout.current);
     foldHoldTimeout.current = setTimeout(() => {
       foldTriggeredRef.current = true;
+      lastFoldTimestampRef.current = Date.now();
       toggleDeckFold(deckId);
     }, FOLD_HOLD_MS);
   }
@@ -880,7 +887,10 @@ export default function HomePage() {
               </Link>
               <button
                 onClick={(e) => {
-                  if (foldTriggeredRef.current) {
+                  if (
+                    foldTriggeredRef.current ||
+                    Date.now() - lastFoldTimestampRef.current < 600
+                  ) {
                     foldTriggeredRef.current = false;
                     return;
                   }
