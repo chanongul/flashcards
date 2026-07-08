@@ -14,6 +14,7 @@ import { useLoadingWhen } from '@/components/GlobalLoading';
 import { sortQueue } from '@/lib/fsrs';
 import { useSmartBack } from '@/lib/useSmartBack';
 import { sync } from '@/lib/sync';
+import { getDeckAndDescendantIds } from '@/lib/decks';
 
 export default function AllCardsPage() {
   const params = useParams<{ deckId: string }>();
@@ -22,13 +23,15 @@ export default function AllCardsPage() {
   useLoadingWhen(userLoading || !user);
 
   const allCards = useLiveQuery(
-    () =>
-      db.cards
+    async () => {
+      const deckIds = await getDeckAndDescendantIds(params.deckId);
+      return db.cards
         .where('deckId')
-        .equals(params.deckId)
+        .anyOf(deckIds)
         .filter((c) => !c.deleted)
         .toArray()
-        .then(sortQueue),
+        .then(sortQueue);
+    },
     [params.deckId]
   );
 
