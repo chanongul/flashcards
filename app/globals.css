@@ -160,6 +160,22 @@ input, textarea, select, [contenteditable] {
   line-height: 1.5 !important;
 }
 
+/* iOS Safari's blue focus glow is part of the *native* form-control chrome
+ * it renders for an input/textarea that hasn't had its default appearance
+ * stripped — that native rendering sits outside normal CSS paint order, so
+ * overriding outline-color/box-shadow alone (below) was silently getting
+ * ignored there even with !important. -webkit-appearance: none turns that
+ * native chrome off entirely, which is what actually lets the custom ring
+ * below take over as the only focus indicator. Checkbox.tsx's native
+ * checkbox already opts into this itself; file inputs are excluded since
+ * they're always hidden triggers for a custom button (never focused/typed
+ * into), and radio/button/submit aren't text fields at all. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]),
+textarea {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Replace the browser's default blue focus ring with orange across every
  * text input, textarea, select, and rich-text contenteditable in the app.
  * outline-color covers Chrome/Firefox; box-shadow is also needed because
