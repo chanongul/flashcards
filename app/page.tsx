@@ -738,7 +738,7 @@ export default function HomePage() {
     <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
-          className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-80"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
+          className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-50"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
           onMouseDown={startPressHoldTimers}
