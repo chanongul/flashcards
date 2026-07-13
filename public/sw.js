@@ -1,11 +1,17 @@
 // Minimal service worker: caches the app shell so the PWA opens offline.
 // This is intentionally simple for v1 — no runtime caching strategy tuning yet.
 
-// Bumped to v8: dynamic routes (/review/<deckId>[...]) are now also cached
-// under a normalized "shell" key (deck id replaced with a placeholder) — see
-// findShellKey()/the fetch handler below — plus the fetch handler no longer
-// lets a failed request reject uncaught.
-const CACHE_NAME = 'flashcard-app-v8';
+// Bumped to v9: the fetch handler now bails out for any cross-origin
+// request before it can reach the caching logic at all — v7/v8 cached
+// EVERY successful same-page GET indiscriminately, which included the
+// Supabase client's own API calls (e.g. pullAndReplay's GET to
+// /rest/v1/events — a fetch event fires for every request a controlled
+// page makes, not just same-origin ones). Once cached, the cache-first
+// check above would keep serving that first-ever response forever, so a
+// sync pull would silently stop ever seeing new events from other devices
+// — while fully online. Bumping the cache name also purges any such
+// already-poisoned entries from v7/v8 installs.
+const CACHE_NAME = 'flashcard-app-v9';
 // Separate from CACHE_NAME so bumping the app-shell version above doesn't
 // also evict previously-downloaded images/audio (see the activate handler).
 // Bumped to v2 to purge any audio responses cached under the old
@@ -60,6 +66,17 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Only ever intercept same-origin http(s) requests. A service worker's
+  // fetch event fires for every request a controlled page makes — not just
+  // same-origin ones — so this single guard rules out two different
+  // problems at once: extension content-script requests (chrome-extension://,
+  // moz-extension://), whose scheme makes cache.put() throw synchronously,
+  // and any cross-origin API call (Supabase, etc.), which must always hit
+  // the network live rather than risk being cache-first'd from a stale
+  // snapshot — see the CACHE_NAME comment above for what that broke.
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
   // Media is immutable per URL (every upload gets a fresh UUID filename), so
   // it's safe to cache-first and never revalidate. Write-through on a
   // successful fetch — unlike the generic fallback below, this is the one
@@ -89,40 +106,84 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first, write-through on a successful fetch, with a network-failure
-  // fallback (in priority order: exact URL, id-normalized shell key, cached
-  // app shell for a navigation). Previously this only ever read from the
-  // cache — nothing populated it (APP_SHELL precaches just '/' and
-  // '/manifest.json' at install time), so Next's fingerprinted JS/CSS
-  // bundles (_next/static/...) were fetched live on literally every visit
-  // and never available offline, even after having been fetched
-  // successfully many times before. Safe to cache broadly the same way
-  // media is above: Next.js fingerprints these URLs per build (the hash is
-  // in the filename), so a given URL's content is immutable — a stale
-  // *previous* build's chunks just become dead weight once a new deploy's
-  // HTML stops referencing their (now different) hashed filenames, not a
-  // source of serving outdated code under a live URL.
+  // Write-through caching helper shared by both strategies below: on a
+  // successful GET, cache under the exact URL and (if this is a dynamic
+  // /review/<deckId>[...] route) also under its id-normalized shell key.
+  async function cacheResponse(response) {
+    if (!(response.ok && event.request.method === 'GET')) return;
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(event.request, response.clone());
+    const shellKey = findShellKey(event.request);
+    if (shellKey) cache.put(shellKey, response.clone());
+  }
+
+  async function fallbackResponse() {
+    const shellKey = findShellKey(event.request);
+    const shell = shellKey && (await caches.match(shellKey));
+    if (shell) return shell;
+    if (event.request.mode === 'navigate') {
+      const appShell = await caches.match('/');
+      if (appShell) return appShell;
+    }
+    return null;
+  }
+
+  // Top-level navigations (typing a URL, reopening a tab, following a link
+  // as a full page load — as opposed to Next's client-side RSC data
+  // fetches) stay network-first, matching this app's pre-existing behavior
+  // before offline-routing support was added here: a document can change
+  // and the server's middleware needs to actually run on every normal
+  // online visit (e.g. to refresh the session cookie), so unlike static
+  // assets a navigation must not silently start being served from a
+  // months-old cache entry just because one was written once. The cache is
+  // still populated and still used as the offline fallback, in both
+  // directions — the shell-key fallback for a page pattern only tested
+  // offline is what fixed the original "can't route to /review/[id] while
+  // offline" bug, and that fallback path is unaffected by this being
+  // network-first for the happy path.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          const response = await fetch(event.request);
+          await cacheResponse(response);
+          return response;
+        } catch (err) {
+          const fallback = await fallbackResponse();
+          if (fallback) return fallback;
+          throw err;
+        }
+      })()
+    );
+    return;
+  }
+
+  // Everything else (Next's client-navigation RSC data fetches, fingerprinted
+  // JS/CSS bundles, etc.) stays cache-first, write-through on a successful
+  // fetch. Previously this only ever read from the cache — nothing populated
+  // it (APP_SHELL precaches just '/' and '/manifest.json' at install time),
+  // so Next's fingerprinted bundles (_next/static/...) were fetched live on
+  // literally every visit and never available offline, even after having
+  // been fetched successfully many times before. Safe here specifically
+  // because Next fingerprints these URLs per build (the hash is in the
+  // filename) — a given URL's content is immutable, so a stale *previous*
+  // build's chunks just become dead weight once a new deploy's HTML stops
+  // referencing their (now different) hashed filenames, not a source of
+  // serving outdated code under a live URL. RSC data fetches aren't
+  // fingerprinted the same way, but their content is driven entirely by
+  // client-side IndexedDB state (see findShellKey's comment), so serving a
+  // cached one is never actually wrong, just occasionally a version behind.
   event.respondWith(
     (async () => {
       const cached = await caches.match(event.request);
       if (cached) return cached;
-
-      const shellKey = findShellKey(event.request);
       try {
         const response = await fetch(event.request);
-        if (response.ok && event.request.method === 'GET') {
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(event.request, response.clone());
-          if (shellKey) cache.put(shellKey, response.clone());
-        }
+        await cacheResponse(response);
         return response;
       } catch (err) {
-        const shell = shellKey && (await caches.match(shellKey));
-        if (shell) return shell;
-        if (event.request.mode === 'navigate') {
-          const appShell = await caches.match('/');
-          if (appShell) return appShell;
-        }
+        const fallback = await fallbackResponse();
+        if (fallback) return fallback;
         throw err;
       }
     })()
