@@ -17,6 +17,9 @@ import {
   Copy,
   ArrowLeft,
   GripVertical,
+  Download,
+  Upload,
+  ChevronDown,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -71,6 +74,17 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Checkbox } from "@/components/Checkbox";
 import { shouldDropUp } from "@/lib/dropdownMenu";
 import { CardForm } from "@/components/CardForm";
+import {
+  exportToJson,
+  parseImportJson,
+  applyImportJson,
+  parseCsv,
+  applyCsvImport,
+  type ImportPayload,
+  type ImportSummary,
+  type CsvRow,
+} from "@/lib/exportImport";
+import { downloadTextFile } from "@/lib/download";
 
 // One row in the note-type editor's question/answer field lists — a name
 // plus its declared type (or 'dynamic', deferring the choice to each note).
@@ -363,12 +377,120 @@ export default function HomePage() {
     null,
   );
 
+  const [showImport, setShowImport] = useState(false);
+  const [importKind, setImportKind] = useState<"json" | "csv" | null>(null);
+  const [importJsonData, setImportJsonData] = useState<ImportPayload | null>(
+    null,
+  );
+  const [importCsvRows, setImportCsvRows] = useState<CsvRow[]>([]);
+  const [importParseErrors, setImportParseErrors] = useState<string[]>([]);
+  const [importError, setImportError] = useState("");
+  const [importCsvDeckId, setImportCsvDeckId] = useState("");
+  const [importCsvNewDeckName, setImportCsvNewDeckName] = useState("");
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(
+    null,
+  );
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  function closeImportModal() {
+    setShowImport(false);
+    setImportKind(null);
+    setImportJsonData(null);
+    setImportCsvRows([]);
+    setImportParseErrors([]);
+    setImportError("");
+    setImportCsvDeckId("");
+    setImportCsvNewDeckName("");
+    setImportSummary(null);
+  }
+
+  async function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setImportSummary(null);
+    setImportError("");
+    setImportJsonData(null);
+    setImportCsvRows([]);
+    setImportParseErrors([]);
+
+    const text = await file.text();
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      setImportKind("csv");
+      const { rows, errors } = parseCsv(text);
+      setImportCsvRows(rows);
+      setImportParseErrors(errors);
+      if (rows.length === 0 && errors.length === 0) {
+        setImportError("No rows found in this file.");
+      }
+      return;
+    }
+
+    setImportKind("json");
+    const result = parseImportJson(text);
+    if ("error" in result) {
+      setImportError(result.error);
+      return;
+    }
+    setImportJsonData(result.data);
+  }
+
+  async function handleConfirmImport() {
+    if (!user) return;
+    if (importKind === "json" && importJsonData) {
+      const summary = await withLoading(() =>
+        applyImportJson(user.id, importJsonData),
+      );
+      setImportSummary(summary);
+      setImportJsonData(null);
+      return;
+    }
+    if (importKind === "csv" && importCsvRows.length > 0) {
+      let deckId = importCsvDeckId;
+      const newName = importCsvNewDeckName.trim();
+      if (!deckId && newName) {
+        deckId = await withLoading(() => createDeck(user.id, newName));
+      }
+      if (!deckId) {
+        setImportError("Pick a deck (or name a new one) for these cards.");
+        return;
+      }
+      const summary = await withLoading(() =>
+        applyCsvImport(user.id, deckId, importCsvRows),
+      );
+      setImportSummary(summary);
+      setImportCsvRows([]);
+    }
+  }
+
+  async function handleExportAll() {
+    const json = await exportToJson("all");
+    downloadTextFile(
+      `flashcards-export-${new Date().toISOString().slice(0, 10)}.json`,
+      json,
+    );
+  }
+
+  async function handleExportDeck(deck: Deck) {
+    const json = await exportToJson({ deckId: deck.id });
+    const slug = deck.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    downloadTextFile(
+      `${slug || "deck"}-export-${new Date().toISOString().slice(0, 10)}.json`,
+      json,
+    );
+  }
+
   useBodyScrollLock(
     showCreateDeck ||
       !!subdeckParent ||
       showNoteTypes ||
       showResetConfirm ||
-      !!actionsAddCardDeck,
+      !!actionsAddCardDeck ||
+      showImport,
   );
 
   async function handleResetAllData() {
@@ -808,6 +930,22 @@ export default function HomePage() {
           >
             <LayoutTemplate size={16} />
           </button>
+          <button
+            onClick={handleExportAll}
+            aria-label="Export all decks"
+            title="Export all decks"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
+          >
+            <Download size={16} />
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            aria-label="Import"
+            title="Import"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
+          >
+            <Upload size={16} />
+          </button>
         </div>
       </div>
 
@@ -939,6 +1077,16 @@ export default function HomePage() {
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
                       <FilePlus size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportDeck(deck);
+                        setActionsDeck(null);
+                      }}
+                      aria-label="Export deck"
+                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <Download size={16} />
                     </button>
                     {deckDepth(deck.name) < MAX_DECK_DEPTH && (
                       <button
@@ -1682,6 +1830,164 @@ export default function HomePage() {
               }}
               onCancel={() => setActionsAddCardDeck(null)}
             />
+          </div>
+        </div>
+      )}
+
+      {showImport && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={closeImportModal}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium">Import</p>
+              <button
+                onClick={closeImportModal}
+                aria-label="Close"
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {importSummary ? (
+              <div className="space-y-3">
+                <p className="text-sm text-neutral-300">
+                  {importKind === "csv" ? (
+                    <>
+                      Added {importSummary.notesCreated} card
+                      {importSummary.notesCreated === 1 ? "" : "s"}.
+                    </>
+                  ) : (
+                    <>
+                      {importSummary.decksCreated} deck
+                      {importSummary.decksCreated === 1 ? "" : "s"} created,{" "}
+                      {importSummary.noteTypesCreated} note type
+                      {importSummary.noteTypesCreated === 1 ? "" : "s"} created,{" "}
+                      {importSummary.notesCreated} card
+                      {importSummary.notesCreated === 1 ? "" : "s"} added,{" "}
+                      {importSummary.notesEdited} card
+                      {importSummary.notesEdited === 1 ? "" : "s"} updated.
+                    </>
+                  )}
+                </p>
+                {importSummary.skipped.length > 0 && (
+                  <ul className="space-y-1 rounded-md border border-neutral-800 bg-neutral-900 p-2 text-xs text-neutral-400">
+                    {importSummary.skipped.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  onClick={closeImportModal}
+                  className="w-full rounded-md bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-900"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".json,.csv"
+                  className="hidden"
+                  onChange={handleImportFileChange}
+                />
+                <button
+                  onClick={() => importFileInputRef.current?.click()}
+                  className="w-full rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+                >
+                  Choose file (.json or .csv)
+                </button>
+
+                {importError && (
+                  <p className="text-xs text-red-400">{importError}</p>
+                )}
+
+                {importKind === "csv" && importCsvRows.length > 0 && (
+                  <>
+                    <p className="text-xs text-neutral-500">
+                      {importCsvRows.length} card
+                      {importCsvRows.length === 1 ? "" : "s"} found.
+                    </p>
+                    {importParseErrors.length > 0 && (
+                      <ul className="space-y-1 rounded-md border border-neutral-800 bg-neutral-900 p-2 text-xs text-neutral-400">
+                        {importParseErrors.map((e, i) => (
+                          <li key={i}>{e}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <label className="block">
+                      <span className="text-xs text-neutral-500">Deck</span>
+                      <div className="relative mt-0.5">
+                        <select
+                          value={importCsvDeckId}
+                          onChange={(e) => {
+                            setImportCsvDeckId(e.target.value);
+                            if (e.target.value) setImportCsvNewDeckName("");
+                          }}
+                          className="w-full appearance-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 pr-8 text-sm"
+                        >
+                          <option value="">+ New deck</option>
+                          {deckRows.map(({ deck, depth }) => (
+                            <option key={deck.id} value={deck.id}>
+                              {"  ".repeat(depth)}
+                              {deckDisplayName(deck.name)}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown
+                          size={14}
+                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
+                        />
+                      </div>
+                    </label>
+                    {!importCsvDeckId && (
+                      <input
+                        type="text"
+                        value={importCsvNewDeckName}
+                        onChange={(e) => setImportCsvNewDeckName(e.target.value)}
+                        placeholder="New deck name"
+                        className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                      />
+                    )}
+                  </>
+                )}
+
+                {importKind === "json" && importJsonData && (
+                  <p className="text-xs text-neutral-500">
+                    {importJsonData.notes.length} note
+                    {importJsonData.notes.length === 1 ? "" : "s"},{" "}
+                    {importJsonData.noteTypes.length} note type
+                    {importJsonData.noteTypes.length === 1 ? "" : "s"},{" "}
+                    {importJsonData.decks.length} deck
+                    {importJsonData.decks.length === 1 ? "" : "s"} referenced.
+                  </p>
+                )}
+
+                {(importJsonData || importCsvRows.length > 0) && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={closeImportModal}
+                      className="flex-1 rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmImport}
+                      className="flex-1 rounded-md bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-900"
+                    >
+                      Import
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
