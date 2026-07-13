@@ -34,9 +34,17 @@ export function TagsInput({ value, onChange, placeholder }: TagsInputProps) {
     }
   }
 
+  // Sorted only for display — the underlying `value` order stays whatever
+  // it was (insertion order), since Backspace above removes value's last
+  // entry to mean "the most recently added tag", independent of how the
+  // chips are currently laid out on screen.
+  const sortedValue = [...value].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' })
+  );
+
   return (
     <div className="flex w-full flex-wrap items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs">
-      {value.map((tag) => (
+      {sortedValue.map((tag) => (
         <span
           key={tag}
           className="flex items-center gap-1 rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-300"

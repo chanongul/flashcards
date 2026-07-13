@@ -1,9 +1,13 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type FieldType, type NoteType } from '@/lib/db';
-import { clozeBlankLetters, buildClozeText, parseClozeToDraft } from '@/lib/cloze';
+import React, { useEffect, useState, useMemo } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, type FieldType, type NoteType } from "@/lib/db";
+import {
+  clozeBlankLetters,
+  buildClozeText,
+  parseClozeToDraft,
+} from "@/lib/cloze";
 import {
   FieldTypeToggle,
   FieldValueInput,
@@ -11,23 +15,23 @@ import {
   fieldHasContent,
   fieldNeedsLabel,
   reconcileFieldValues,
-} from './MediaFieldInput';
-import { resolvePendingMediaInHtml } from '@/lib/mediaSync';
-import { useLoading } from './GlobalLoading';
-import { Checkbox } from './Checkbox';
-import { ClozeEditor } from './ClozeEditor';
-import { TagsInput } from './TagsInput';
+} from "./MediaFieldInput";
+import { resolvePendingMediaInHtml } from "@/lib/mediaSync";
+import { useLoading } from "./GlobalLoading";
+import { Checkbox } from "./Checkbox";
+import { ClozeEditor } from "./ClozeEditor";
+import { TagsInput } from "./TagsInput";
 
 interface CardFormProps {
-  mode: 'create' | 'edit';
-  initialCardType?: 'basic' | 'cloze' | string;
+  mode: "create" | "edit";
+  initialCardType?: "basic" | "cloze" | string;
   initialFront?: string;
   initialBack?: string;
   initialFields?: Record<string, string>;
   initialTags?: string[];
   initialReversed?: boolean;
   onSubmit: (data: {
-    cardType: 'basic' | 'cloze' | string;
+    cardType: "basic" | "cloze" | string;
     front: string;
     back: string;
     fields: Record<string, string>;
@@ -40,9 +44,9 @@ interface CardFormProps {
 
 export function CardForm({
   mode,
-  initialCardType = 'basic',
-  initialFront = '',
-  initialBack = '',
+  initialCardType = "basic",
+  initialFront = "",
+  initialBack = "",
   initialFields = {},
   initialTags = [],
   initialReversed = false,
@@ -51,39 +55,47 @@ export function CardForm({
   submitLabel,
 }: CardFormProps) {
   const { withLoading } = useLoading();
-  const noteTypes = useLiveQuery(() => db.noteTypes.filter((nt) => !nt.deleted).toArray(), []);
+  const noteTypes = useLiveQuery(
+    () => db.noteTypes.filter((nt) => !nt.deleted).toArray(),
+    [],
+  );
 
-  const [cardType, setCardType] = useState<'basic' | 'cloze' | string>(initialCardType);
+  const [cardType, setCardType] = useState<"basic" | "cloze" | string>(
+    initialCardType,
+  );
   const [front, setFront] = useState(initialFront);
   const [back, setBack] = useState(initialBack);
-  const [frontType, setFrontType] = useState<FieldType>('richtext');
-  const [backType, setBackType] = useState<FieldType>('richtext');
+  const [frontType, setFrontType] = useState<FieldType>("richtext");
+  const [backType, setBackType] = useState<FieldType>("richtext");
 
-  const [clozeText, setClozeText] = useState('');
+  const [clozeText, setClozeText] = useState("");
   const [clozeAnswers, setClozeAnswers] = useState<Record<string, string>>({});
   const [clozeSeparateCards, setClozeSeparateCards] = useState(false);
 
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(initialFields);
-  const [dynamicFieldTypes, setDynamicFieldTypes] = useState<Record<string, FieldType>>({});
+  const [fieldValues, setFieldValues] =
+    useState<Record<string, string>>(initialFields);
+  const [dynamicFieldTypes, setDynamicFieldTypes] = useState<
+    Record<string, FieldType>
+  >({});
   const [tagsInput, setTagsInput] = useState<string[]>(initialTags);
   const [editReversed, setEditReversed] = useState(initialReversed);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const selectedNoteType = useMemo(() => {
-    if (cardType === 'basic' || cardType === 'cloze') return undefined;
+    if (cardType === "basic" || cardType === "cloze") return undefined;
     return noteTypes?.find((nt) => nt.id === cardType);
   }, [cardType, noteTypes]);
 
   function resolvedFieldType(fieldName: string): FieldType {
-    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? 'richtext';
-    if (config === 'dynamic') return dynamicFieldTypes[fieldName] ?? 'richtext';
-    if (config === 'asset') return dynamicFieldTypes[fieldName] ?? 'image';
+    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? "richtext";
+    if (config === "dynamic") return dynamicFieldTypes[fieldName] ?? "richtext";
+    if (config === "asset") return dynamicFieldTypes[fieldName] ?? "image";
     return config;
   }
 
   // Setup form states when editing
   useEffect(() => {
-    if (mode === 'edit') {
+    if (mode === "edit") {
       setCardType(initialCardType);
       setFront(initialFront);
       setBack(initialBack);
@@ -98,40 +110,47 @@ export function CardForm({
       setTagsInput(initialTags);
       setEditReversed(initialReversed);
     }
-  }, [mode, initialCardType, initialFront, initialBack, initialTags, initialReversed]);
+  }, [
+    mode,
+    initialCardType,
+    initialFront,
+    initialBack,
+    initialTags,
+    initialReversed,
+  ]);
 
   useEffect(() => {
-    if (mode === 'edit' && selectedNoteType) {
+    if (mode === "edit" && selectedNoteType) {
       const reconciled = reconcileFieldValues(initialFields, selectedNoteType);
       setFieldValues(reconciled);
       const dynTypes: Record<string, FieldType> = {};
       for (const f of selectedNoteType.fields) {
-        const config = selectedNoteType.fieldTypes?.[f] ?? 'richtext';
-        if (config === 'dynamic') {
-          dynTypes[f] = inferFieldType(reconciled[f] ?? '');
-        } else if (config === 'asset') {
-          const inferred = inferFieldType(reconciled[f] ?? '');
-          dynTypes[f] = inferred === 'richtext' ? 'image' : inferred;
+        const config = selectedNoteType.fieldTypes?.[f] ?? "richtext";
+        if (config === "dynamic") {
+          dynTypes[f] = inferFieldType(reconciled[f] ?? "");
+        } else if (config === "asset") {
+          const inferred = inferFieldType(reconciled[f] ?? "");
+          dynTypes[f] = inferred === "richtext" ? "image" : inferred;
         }
       }
       setDynamicFieldTypes(dynTypes);
     }
   }, [mode, selectedNoteType, initialFields]);
 
-  function selectCardType(type: 'basic' | 'cloze' | string) {
+  function selectCardType(type: "basic" | "cloze" | string) {
     setCardType(type);
-    setFront('');
-    setBack('');
-    setFrontType('richtext');
-    setBackType('richtext');
+    setFront("");
+    setBack("");
+    setFrontType("richtext");
+    setBackType("richtext");
     setEditReversed(false);
-    setClozeText('');
+    setClozeText("");
     setClozeAnswers({});
     setClozeSeparateCards(false);
     setFieldValues({});
     setDynamicFieldTypes({});
     setTagsInput([]);
-    setError('');
+    setError("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -139,21 +158,22 @@ export function CardForm({
 
     if (selectedNoteType) {
       const isFilled = (f: string) =>
-        fieldHasContent(fieldValues[f] ?? '', resolvedFieldType(f));
+        fieldHasContent(fieldValues[f] ?? "", resolvedFieldType(f));
       const missingLabelField = selectedNoteType.fields.find((f) =>
-        fieldNeedsLabel(fieldValues[f] ?? '', resolvedFieldType(f))
+        fieldNeedsLabel(fieldValues[f] ?? "", resolvedFieldType(f)),
       );
       if (missingLabelField) {
-        const label = selectedNoteType.fieldNames?.[missingLabelField] ?? missingLabelField;
+        const label =
+          selectedNoteType.fieldNames?.[missingLabelField] ?? missingLabelField;
         setError(`Add a label for "${label}" (used for search).`);
         return;
       }
       if (!selectedNoteType.questionFields.some(isFilled)) {
-        setError('Fill in at least one question field.');
+        setError("Fill in at least one question field.");
         return;
       }
       if (!selectedNoteType.answerFields.some(isFilled)) {
-        setError('Fill in at least one answer field.');
+        setError("Fill in at least one answer field.");
         return;
       }
 
@@ -163,42 +183,42 @@ export function CardForm({
             Object.entries(fieldValues).map(async ([key, val]) => [
               key,
               await resolvePendingMediaInHtml(val),
-            ])
-          )
+            ]),
+          ),
         );
         await onSubmit({
           cardType,
-          front: '',
-          back: '',
+          front: "",
+          back: "",
           fields: resolvedFields,
           tags: tagsInput,
           reversed: editReversed,
         });
       });
-    } else if (cardType === 'cloze') {
+    } else if (cardType === "cloze") {
       if (!clozeText.trim()) {
-        setError('Enter the cloze text.');
+        setError("Enter the cloze text.");
         return;
       }
       const letters = clozeBlankLetters(clozeText);
       if (letters.length === 0) {
-        setError('Click + to mark at least one blank.');
+        setError("Click + to mark at least one blank.");
         return;
       }
       if (letters.some((letter) => !clozeAnswers[letter]?.trim())) {
-        setError('Fill in an answer for every blank.');
+        setError("Fill in an answer for every blank.");
         return;
       }
       const formattedClozeText = buildClozeText(
         clozeText,
         clozeAnswers,
-        clozeSeparateCards
+        clozeSeparateCards,
       );
       await withLoading(async () => {
         await onSubmit({
           cardType,
           front: formattedClozeText.trim(),
-          back: '',
+          back: "",
           fields: {},
           tags: tagsInput,
           reversed: false,
@@ -206,15 +226,18 @@ export function CardForm({
       });
     } else {
       if (fieldNeedsLabel(front, frontType)) {
-        setError('Add a label for the front (used for search).');
+        setError("Add a label for the front (used for search).");
         return;
       }
       if (fieldNeedsLabel(back, backType)) {
-        setError('Add a label for the back (used for search).');
+        setError("Add a label for the back (used for search).");
         return;
       }
-      if (!fieldHasContent(front, frontType) || !fieldHasContent(back, backType)) {
-        setError('Fill in both front and back.');
+      if (
+        !fieldHasContent(front, frontType) ||
+        !fieldHasContent(back, backType)
+      ) {
+        setError("Fill in both front and back.");
         return;
       }
       await withLoading(async () => {
@@ -232,24 +255,24 @@ export function CardForm({
     }
   }
 
-  const defaultSubmitLabel = mode === 'create' ? 'Add' : 'Save';
+  const defaultSubmitLabel = mode === "create" ? "Add" : "Save";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
-      {mode === 'create' && (
+      {mode === "create" && (
         <div className="flex flex-wrap gap-1 text-xs">
-          {(['basic', 'cloze'] as const).map((type) => (
+          {(["basic", "cloze"] as const).map((type) => (
             <button
               key={type}
               type="button"
               onClick={() => selectCardType(type)}
               className={`rounded-md px-3 py-1.5 ${
                 cardType === type
-                  ? 'bg-neutral-100 text-neutral-900'
-                  : 'border border-neutral-700 text-neutral-400'
+                  ? "bg-neutral-100 text-neutral-900"
+                  : "border border-neutral-700 text-neutral-400"
               }`}
             >
-              {type === 'basic' ? 'Basic' : 'Cloze'}
+              {type === "basic" ? "Basic" : "Cloze"}
             </button>
           ))}
           {noteTypes?.map((nt) => (
@@ -259,8 +282,8 @@ export function CardForm({
               onClick={() => selectCardType(nt.id)}
               className={`rounded-md px-3 py-1.5 ${
                 cardType === nt.id
-                  ? 'bg-neutral-100 text-neutral-900'
-                  : 'border border-neutral-700 text-neutral-400'
+                  ? "bg-neutral-100 text-neutral-900"
+                  : "border border-neutral-700 text-neutral-400"
               }`}
             >
               {nt.name}
@@ -272,22 +295,26 @@ export function CardForm({
       {selectedNoteType ? (
         <>
           {selectedNoteType.questionFields.map((fieldId) => {
-            const fieldConfig = selectedNoteType.fieldTypes?.[fieldId] ?? 'richtext';
-            const isDynamic = fieldConfig === 'dynamic';
-            const isAsset = fieldConfig === 'asset';
+            const fieldConfig =
+              selectedNoteType.fieldTypes?.[fieldId] ?? "richtext";
+            const isDynamic = fieldConfig === "dynamic";
+            const isAsset = fieldConfig === "asset";
             const type = resolvedFieldType(fieldId);
             const label = selectedNoteType.fieldNames?.[fieldId] ?? fieldId;
             return (
-              <div key={fieldId + '-q'}>
+              <div key={fieldId + "-q"}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-neutral-500">
                     {label}
-                    <span className="text-neutral-600 font-medium"> (question)</span>
+                    <span className="text-neutral-600 font-medium">
+                      {" "}
+                      (question)
+                    </span>
                   </span>
                   {(isDynamic || isAsset) && (
                     <FieldTypeToggle
                       value={type}
-                      types={isAsset ? ['image', 'audio'] : undefined}
+                      types={isAsset ? ["image", "audio"] : undefined}
                       onChange={(t) => {
                         setDynamicFieldTypes((f) => ({
                           ...f,
@@ -295,7 +322,7 @@ export function CardForm({
                         }));
                         setFieldValues((f) => ({
                           ...f,
-                          [fieldId]: '',
+                          [fieldId]: "",
                         }));
                       }}
                     />
@@ -304,15 +331,19 @@ export function CardForm({
                 <div className="mt-0.5">
                   <FieldValueInput
                     type={type}
-                    value={fieldValues[fieldId] ?? ''}
+                    value={fieldValues[fieldId] ?? ""}
                     options={selectedNoteType.fieldChoices?.[fieldId]}
-                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldId] : undefined}
+                    templateFormat={
+                      mode === "create"
+                        ? selectedNoteType.fieldTemplates?.[fieldId]
+                        : undefined
+                    }
                     onChange={(html) => {
                       setFieldValues((f) => ({
                         ...f,
                         [fieldId]: html,
                       }));
-                      setError('');
+                      setError("");
                     }}
                   />
                 </div>
@@ -324,22 +355,26 @@ export function CardForm({
             <hr className="border-neutral-800 !my-3" />
           )}
           {selectedNoteType.answerFields.map((fieldId) => {
-            const fieldConfig = selectedNoteType.fieldTypes?.[fieldId] ?? 'richtext';
-            const isDynamic = fieldConfig === 'dynamic';
-            const isAsset = fieldConfig === 'asset';
+            const fieldConfig =
+              selectedNoteType.fieldTypes?.[fieldId] ?? "richtext";
+            const isDynamic = fieldConfig === "dynamic";
+            const isAsset = fieldConfig === "asset";
             const type = resolvedFieldType(fieldId);
             const label = selectedNoteType.fieldNames?.[fieldId] ?? fieldId;
             return (
-              <div key={fieldId + '-a'}>
+              <div key={fieldId + "-a"}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-neutral-500">
                     {label}
-                    <span className="text-neutral-600 font-medium"> (answer)</span>
+                    <span className="text-neutral-600 font-medium">
+                      {" "}
+                      (answer)
+                    </span>
                   </span>
                   {(isDynamic || isAsset) && (
                     <FieldTypeToggle
                       value={type}
-                      types={isAsset ? ['image', 'audio'] : undefined}
+                      types={isAsset ? ["image", "audio"] : undefined}
                       onChange={(t) => {
                         setDynamicFieldTypes((f) => ({
                           ...f,
@@ -347,7 +382,7 @@ export function CardForm({
                         }));
                         setFieldValues((f) => ({
                           ...f,
-                          [fieldId]: '',
+                          [fieldId]: "",
                         }));
                       }}
                     />
@@ -356,21 +391,29 @@ export function CardForm({
                 <div className="mt-0.5">
                   <FieldValueInput
                     type={type}
-                    value={fieldValues[fieldId] ?? ''}
+                    value={fieldValues[fieldId] ?? ""}
                     options={selectedNoteType.fieldChoices?.[fieldId]}
-                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldId] : undefined}
+                    templateFormat={
+                      mode === "create"
+                        ? selectedNoteType.fieldTemplates?.[fieldId]
+                        : undefined
+                    }
                     onChange={(html) => {
                       setFieldValues((f) => ({
                         ...f,
                         [fieldId]: html,
                       }));
-                      setError('');
+                      setError("");
                     }}
                   />
                 </div>
               </div>
             );
           })}
+          {(selectedNoteType.questionFields.length > 1 ||
+            selectedNoteType.answerFields.length > 1) && (
+            <hr className="border-neutral-800 !my-3" />
+          )}
           {selectedNoteType.reversed && (
             <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
               <Checkbox checked={editReversed} onChange={setEditReversed} />
@@ -378,7 +421,7 @@ export function CardForm({
             </label>
           )}
         </>
-      ) : cardType === 'cloze' ? (
+      ) : cardType === "cloze" ? (
         <ClozeEditor
           initialText={clozeText}
           initialAnswers={clozeAnswers}
@@ -387,7 +430,7 @@ export function CardForm({
             setClozeText(text);
             setClozeAnswers(answers);
             setClozeSeparateCards(separateCards);
-            setError('');
+            setError("");
           }}
         />
       ) : (
@@ -399,7 +442,7 @@ export function CardForm({
                 value={frontType}
                 onChange={(t) => {
                   setFrontType(t);
-                  setFront('');
+                  setFront("");
                 }}
               />
             </div>
@@ -409,7 +452,7 @@ export function CardForm({
                 value={front}
                 onChange={(html) => {
                   setFront(html);
-                  setError('');
+                  setError("");
                 }}
                 placeholder="e.g. 猫"
               />
@@ -422,7 +465,7 @@ export function CardForm({
                 value={backType}
                 onChange={(t) => {
                   setBackType(t);
-                  setBack('');
+                  setBack("");
                 }}
               />
             </div>
@@ -432,13 +475,13 @@ export function CardForm({
                 value={back}
                 onChange={(html) => {
                   setBack(html);
-                  setError('');
+                  setError("");
                 }}
                 placeholder="e.g. cat"
               />
             </div>
           </div>
-          {cardType === 'basic' && (
+          {cardType === "basic" && (
             <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
               <Checkbox checked={editReversed} onChange={setEditReversed} />
               Also add the reverse card (answer → question)
