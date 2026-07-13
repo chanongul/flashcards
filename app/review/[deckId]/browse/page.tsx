@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
-
-
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Search, Star } from 'lucide-react';
@@ -15,7 +13,7 @@ import { cardSearchText } from '@/lib/search';
 import { getDeckAndDescendantIds, deckDisplayName, deckParentName } from '@/lib/decks';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { useSmartBack } from '@/lib/useSmartBack';
-import { sync } from '@/lib/sync';
+import { useTitleSync } from '@/lib/useTitleSync';
 
 export default function DeckBrowsePage() {
   const params = useParams<{ deckId: string }>();
@@ -84,36 +82,14 @@ export default function DeckBrowsePage() {
     });
   }
 
-  // Title gesture timers
-  const REFRESH_HOLD_MS = 1_000;
-  const pressStartRef = useRef<number | null>(null);
-
-  function startPressHoldTimers() {
-    pressStartRef.current = Date.now();
-  }
-  
-  function cancelPressHoldTimers() {
-    pressStartRef.current = null;
-  }
-  
-  function endPressHoldTimers() {
-    const start = pressStartRef.current;
-    cancelPressHoldTimers();
-    if (start === null) return;
-    const heldMs = Date.now() - start;
-    if (heldMs >= REFRESH_HOLD_MS) {
-      window.location.reload();
-    }
-  }
-
-  async function handleTitleClick() {
-    if (!user) return;
-    try {
-      await sync(user.id);
-    } catch (err) {
-      console.error('Manual sync failed:', err);
-    }
-  }
+  const {
+    isOnline,
+    syncError,
+    startPressHoldTimers,
+    cancelPressHoldTimers,
+    endPressHoldTimers,
+    handleTitleClick,
+  } = useTitleSync({ userId: user?.id });
 
   async function handleToggleFlag(card: Card) {
     if (!user) return;
@@ -145,7 +121,7 @@ export default function DeckBrowsePage() {
           <ArrowLeft size={16} />
         </button>
         <h1
-          className="cursor-pointer text-lg font-semibold"
+          className={`text-lg font-semibold ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
           onMouseDown={startPressHoldTimers}
           onMouseUp={endPressHoldTimers}
           onTouchStart={startPressHoldTimers}
@@ -153,8 +129,8 @@ export default function DeckBrowsePage() {
           onTouchCancel={cancelPressHoldTimers}
           onClick={handleTitleClick}
           role="button"
-          aria-label="Sync now"
-          title="Sync now"
+          aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
+          title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
         >
           {isSubdeck ? 'Browse subdeck' : 'Browse deck'}
         </h1>
@@ -167,6 +143,8 @@ export default function DeckBrowsePage() {
           <Star size={20} fill="currentColor" />
         </button>
       </div>
+
+      {syncError && <p className="mb-4 -mt-2 text-xs text-red-400">{syncError}</p>}
 
       <div className="relative mb-4">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />

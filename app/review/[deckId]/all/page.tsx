@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
@@ -13,7 +13,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { sortQueue } from '@/lib/fsrs';
 import { useSmartBack } from '@/lib/useSmartBack';
-import { sync } from '@/lib/sync';
+import { useTitleSync } from '@/lib/useTitleSync';
 import { getDeckAndDescendantIds } from '@/lib/decks';
 
 export default function AllCardsPage() {
@@ -82,36 +82,14 @@ export default function AllCardsPage() {
     await cloneCard(user.id, cardId, deckId);
   }
 
-  // Title gesture timers
-  const REFRESH_HOLD_MS = 1_000;
-  const pressStartRef = useRef<number | null>(null);
-
-  function startPressHoldTimers() {
-    pressStartRef.current = Date.now();
-  }
-  
-  function cancelPressHoldTimers() {
-    pressStartRef.current = null;
-  }
-  
-  function endPressHoldTimers() {
-    const start = pressStartRef.current;
-    cancelPressHoldTimers();
-    if (start === null) return;
-    const heldMs = Date.now() - start;
-    if (heldMs >= REFRESH_HOLD_MS) {
-      window.location.reload();
-    }
-  }
-
-  async function handleTitleClick() {
-    if (!user) return;
-    try {
-      await sync(user.id);
-    } catch (err) {
-      console.error('Manual sync failed:', err);
-    }
-  }
+  const {
+    isOnline,
+    syncError,
+    startPressHoldTimers,
+    cancelPressHoldTimers,
+    endPressHoldTimers,
+    handleTitleClick,
+  } = useTitleSync({ userId: user?.id });
 
   if (userLoading || !user) {
     return null;
@@ -128,7 +106,7 @@ export default function AllCardsPage() {
           <ArrowLeft size={16} />
         </button>
         <h1
-          className="cursor-pointer text-lg font-semibold"
+          className={`text-lg font-semibold ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
           onMouseDown={startPressHoldTimers}
           onMouseUp={endPressHoldTimers}
           onTouchStart={startPressHoldTimers}
@@ -136,8 +114,8 @@ export default function AllCardsPage() {
           onTouchCancel={cancelPressHoldTimers}
           onClick={handleTitleClick}
           role="button"
-          aria-label="Sync now"
-          title="Sync now"
+          aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
+          title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
         >
           All cards
         </h1>
@@ -149,6 +127,8 @@ export default function AllCardsPage() {
           <FolderSearch size={16} />
         </Link>
       </div>
+
+      {syncError && <p className="mb-2 text-xs text-red-400">{syncError}</p>}
 
       <p className="mb-2 text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
 

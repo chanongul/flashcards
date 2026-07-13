@@ -1,6 +1,7 @@
 import { db, type Card } from './db';
 import { stateLabel, type Grade } from './fsrs';
 import { getDeckAndDescendantIds } from './decks';
+import { getResetCutoff } from './sync';
 
 async function getUndoneReviewIds(): Promise<Set<string>> {
   const undoEvents = await db.events.where('type').equals('card_review_undo').toArray();
@@ -56,14 +57,16 @@ export async function getTodayCounts(deckId: string): Promise<{
 }> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const [events, undone, cardIds] = await Promise.all([
+  const [events, undone, cardIds, resetCutoff] = await Promise.all([
     db.events.where('type').equals('card_review').toArray(),
     getUndoneReviewIds(),
     getCardIdsForDeck(deckId),
+    getResetCutoff(),
   ]);
   const todays = events.filter(
     (e) =>
       e.timestamp >= startOfDay.getTime() &&
+      (resetCutoff === null || e.timestamp > resetCutoff) &&
       !undone.has(e.id) &&
       (cardIds === null || cardIds.has(e.entityId))
   );
@@ -79,12 +82,13 @@ export interface ReviewHistoryEntry {
 }
 
 export async function getCardReviewHistory(cardId: string): Promise<ReviewHistoryEntry[]> {
-  const [events, undone] = await Promise.all([
+  const [events, undone, resetCutoff] = await Promise.all([
     db.events.where('entityId').equals(cardId).toArray(),
     getUndoneReviewIds(),
+    getResetCutoff(),
   ]);
   return events
-    .filter((e) => e.type === 'card_review')
+    .filter((e) => e.type === 'card_review' && (resetCutoff === null || e.timestamp > resetCutoff))
     .map((e) => ({
       id: e.id,
       timestamp: e.timestamp,
@@ -103,13 +107,15 @@ export function dateKey(d: Date): string {
 /** Review counts per local calendar day, for the heatmap. Excludes undone reviews. */
 export async function getDailyReviewCounts(daysBack: number): Promise<Map<string, number>> {
   const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
-  const [events, undone] = await Promise.all([
+  const [events, undone, resetCutoff] = await Promise.all([
     db.events.where('type').equals('card_review').toArray(),
     getUndoneReviewIds(),
+    getResetCutoff(),
   ]);
   const counts = new Map<string, number>();
   for (const e of events) {
     if (e.timestamp < cutoff || undone.has(e.id)) continue;
+    if (resetCutoff !== null && e.timestamp <= resetCutoff) continue;
     const key = dateKey(new Date(e.timestamp));
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }

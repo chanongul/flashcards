@@ -127,6 +127,20 @@ export async function resetAllData(userId: string) {
   await replayAllEvents();
 }
 
+/** Latest full_reset event's timestamp, or null if there's never been one —
+ * every event at or before this point is treated as if it never happened.
+ * replayAllEvents already applies this cutoff itself (it has the full event
+ * list loaded anyway); this is the same lookup for callers that don't —
+ * notably lib/stats.ts's review-history queries, which used to read
+ * card_review events straight out of db.events with no cutoff check at
+ * all, so a reset never actually hid old reviews from the heatmap/history
+ * on a device that only ever *pulled* the tombstone instead of creating it
+ * (see pullAndReplay below — it never pruned those rows out locally). */
+export async function getResetCutoff(): Promise<number | null> {
+  const resets = await db.events.where('type').equals('full_reset').toArray();
+  return resets.length > 0 ? Math.max(...resets.map((e) => e.timestamp)) : null;
+}
+
 /** Pull any remote events we don't have locally yet, then replay them. */
 export async function pullAndReplay(userId: string) {
   const localIds = new Set((await db.events.toArray()).map((e) => e.id));
@@ -159,6 +173,19 @@ export async function pullAndReplay(userId: string) {
   );
 
   await replayAllEvents();
+
+  // Mirrors resetAllData's own local cleanup, just on whichever device is
+  // pulling the tombstone instead of the one that created it — otherwise a
+  // device that only ever *pulls* a full_reset keeps every pre-reset event
+  // sitting in its local db.events forever (pullAndReplay only ever adds
+  // events a device is missing, never removes any), even though replay
+  // already correctly ignores them. Below, not at-or-below, so the
+  // tombstone event itself survives.
+  const resetCutoff = await getResetCutoff();
+  if (resetCutoff !== null) {
+    await db.events.where('timestamp').below(resetCutoff).delete();
+  }
+
   return { pulled: newEvents.length };
 }
 

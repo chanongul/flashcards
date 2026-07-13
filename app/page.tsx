@@ -51,8 +51,7 @@ import {
 import { useUser } from "@/lib/useUser";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { createClient } from "@/utils/supabase/client";
-import { sync } from "@/lib/sync";
-import { syncPendingMedia } from "@/lib/mediaSync";
+import { useTitleSync } from "@/lib/useTitleSync";
 import {
   countCardsByState,
   DECK_COUNT_TOOLTIPS,
@@ -113,6 +112,26 @@ export default function HomePage() {
   const justTouchedRef = useRef(false);
   const touchFlagTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Two hidden gestures layered on the same press, mutually exclusive by
+  // duration: held past REFRESH_HOLD_MS then released → hard resync (wipe
+  // local IndexedDB, rebuild fresh from Supabase — see lib/hardResync.ts).
+  // Held past LONG_HOLD_MS → reveal the reset-all-data button below
+  // instead (fires automatically while still held, not on release), and
+  // does NOT also resync — that would instantly wipe out the very state
+  // it just revealed. Both require being online; see useTitleSync.
+  const [showResetButton, setShowResetButton] = useState(false);
+  const {
+    isOnline,
+    syncError,
+    startPressHoldTimers,
+    cancelPressHoldTimers,
+    endPressHoldTimers,
+    handleTitleClick,
+  } = useTitleSync({
+    userId: user?.id,
+    onLongHold: () => setShowResetButton((v) => !v),
+  });
+
   const handleTitleHoverStart = () => {
     if (justTouchedRef.current) return;
     setTitleSkewed(true);
@@ -142,54 +161,6 @@ export default function HomePage() {
     endPressHoldTimers();
   };
 
-  // Two hidden gestures layered on the same press, mutually exclusive by
-  // duration: held 1–5s then released → reload the page. Held past 5s
-  // → toggle the reset-all-data button below (fires automatically while
-  // still held, not on release) and does NOT also reload — that would
-  // instantly wipe out the very state it just revealed. A plain elapsed-
-  // time check at release time (rather than two independent timers/flags)
-  // is what makes those mutually exclusive without extra bookkeeping.
-  const REFRESH_HOLD_MS = 1_000;
-  const RESET_HOLD_MS = 5_000;
-  const [showResetButton, setShowResetButton] = useState(false);
-  const resetHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pressStartRef = useRef<number | null>(null);
-
-  function startPressHoldTimers() {
-    pressStartRef.current = Date.now();
-    if (resetHoldTimeout.current) clearTimeout(resetHoldTimeout.current);
-    resetHoldTimeout.current = setTimeout(() => {
-      setShowResetButton((v) => !v);
-    }, RESET_HOLD_MS);
-  }
-
-  function cancelPressHoldTimers() {
-    if (resetHoldTimeout.current) clearTimeout(resetHoldTimeout.current);
-    resetHoldTimeout.current = null;
-    pressStartRef.current = null;
-  }
-
-  function endPressHoldTimers() {
-    const start = pressStartRef.current;
-    cancelPressHoldTimers();
-    if (start === null) return;
-    const heldMs = Date.now() - start;
-    if (heldMs >= REFRESH_HOLD_MS && heldMs < RESET_HOLD_MS) {
-      window.location.reload();
-    }
-  }
-
-  // The title doubles as a manual sync trigger — same push-then-pull the
-  // background SyncManager already does on its own interval/focus ticks,
-  // just on demand for "I want this to happen right now" (e.g. right after
-  // making a change on another device).
-  async function handleTitleClick() {
-    if (!user) return;
-    await withLoading(async () => {
-      await sync(user.id);
-      await syncPendingMedia(user.id);
-    });
-  }
   const [newDeckName, setNewDeckName] = useState("");
   const [createDeckError, setCreateDeckError] = useState("");
 
@@ -767,7 +738,7 @@ export default function HomePage() {
     <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
-          className={`relative inline-block cursor-pointer text-3xl font-black transition-all duration-200 ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
+          className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-80"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
           onMouseEnter={handleTitleHoverStart}
           onMouseLeave={handleTitleHoverEnd}
           onMouseDown={startPressHoldTimers}
@@ -777,8 +748,8 @@ export default function HomePage() {
           onTouchCancel={handleTitleTouchEnd}
           onClick={handleTitleClick}
           role="button"
-          aria-label="Sync now"
-          title="Sync now"
+          aria-label={isOnline ? "Sync now" : "Offline — sync unavailable"}
+          title={isOnline ? "Sync now" : "Offline — sync unavailable"}
         >
           Flashcards
           <span
@@ -793,6 +764,8 @@ export default function HomePage() {
           <LogOut size={16} />
         </button>
       </div>
+
+      {syncError && <p className="mb-4 -mt-4 text-xs text-red-400">{syncError}</p>}
 
       <div className="mb-6">
         <TodayStatusSummary />

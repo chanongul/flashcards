@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useTitleSync } from "@/lib/useTitleSync";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -23,7 +24,6 @@ import {
   createCard,
   editDeck,
 } from "@/lib/actions";
-import { sync } from "@/lib/sync";
 import { Rating, type Grade } from "@/lib/fsrs";
 import { db, type Card, type FieldType } from "@/lib/db";
 import { useUser } from "@/lib/useUser";
@@ -172,38 +172,14 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [clozeUserInputs, setClozeUserInputs] = useState<string[]>([]);
 
-  // Title gesture timers
-  const REFRESH_HOLD_MS = 1_000;
-  const pressStartRef = useRef<number | null>(null);
-
-  function startPressHoldTimers() {
-    pressStartRef.current = Date.now();
-  }
-  
-  function cancelPressHoldTimers() {
-    pressStartRef.current = null;
-  }
-  
-  function endPressHoldTimers() {
-    const start = pressStartRef.current;
-    cancelPressHoldTimers();
-    if (start === null) return;
-    const heldMs = Date.now() - start;
-    if (heldMs >= REFRESH_HOLD_MS) {
-      window.location.reload();
-    }
-  }
-
-  async function handleTitleClick() {
-    if (!user) return;
-    try {
-      await sync(user.id);
-    } catch (err) {
-      console.error('Manual sync failed:', err);
-    }
-  }
-
-
+  const {
+    isOnline,
+    syncError,
+    startPressHoldTimers,
+    cancelPressHoldTimers,
+    endPressHoldTimers,
+    handleTitleClick,
+  } = useTitleSync({ userId: user?.id });
 
   const [showJot, setShowJot] = useState(false);
   // Vertical position of the jot panel's *content* (below the handle), in
@@ -596,7 +572,7 @@ export default function ReviewPage() {
           {deck && (
             <div className="flex shrink-0 items-center justify-between px-1">
               <p
-                className="cursor-pointer text-sm text-neutral-500"
+                className={`text-sm text-neutral-500 ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
                 onMouseDown={startPressHoldTimers}
                 onMouseUp={endPressHoldTimers}
                 onTouchStart={startPressHoldTimers}
@@ -604,8 +580,8 @@ export default function ReviewPage() {
                 onTouchCancel={cancelPressHoldTimers}
                 onClick={handleTitleClick}
                 role="button"
-                aria-label="Sync now"
-                title="Sync now"
+                aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
+                title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
               >
                 {deckBreadcrumb(deck.name)}
               </p>
@@ -640,6 +616,9 @@ export default function ReviewPage() {
                 )}
               </div>
             </div>
+          )}
+          {syncError && (
+            <p className="px-1 text-xs text-red-400">{syncError}</p>
           )}
 
           {/* Always mounted (never conditional on showJot) so its own text/
