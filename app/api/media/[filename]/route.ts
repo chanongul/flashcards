@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getAuthenticatedUser } from '@/utils/supabase/server';
 import { getMedia } from '@/lib/r2';
 
 export const runtime = 'nodejs';
@@ -14,9 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ file
   if (!FILENAME_RE.test(filename)) return new Response('Not found', { status: 404 });
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
   if (!user) return new Response('Unauthorized', { status: 401 });
 
   const media = await getMedia(`media/${user.id}/${filename}`);

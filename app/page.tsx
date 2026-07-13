@@ -416,7 +416,12 @@ export default function HomePage() {
   }
 
   async function handleSignOut() {
-    await createClient().auth.signOut();
+    try {
+      await createClient().auth.signOut();
+    } catch {
+      // Offline/unreachable — nothing else to do here; the user just stays
+      // signed in locally until they retry with connectivity.
+    }
   }
 
   function startEditDeck(deck: Deck) {

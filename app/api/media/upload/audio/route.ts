@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import ffmpegPath from 'ffmpeg-static';
 import ffmpeg from 'fluent-ffmpeg';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getAuthenticatedUser } from '@/utils/supabase/server';
 import { putMedia } from '@/lib/r2';
 
 export const runtime = 'nodejs';
@@ -51,9 +51,7 @@ async function transcodeToAac(input: Buffer): Promise<Buffer> {
 
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
   if (!user) return new Response('Unauthorized', { status: 401 });
 
   const formData = await request.formData();

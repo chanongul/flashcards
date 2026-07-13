@@ -1,7 +1,12 @@
 // Minimal service worker: caches the app shell so the PWA opens offline.
 // This is intentionally simple for v1 — no runtime caching strategy tuning yet.
 
-const CACHE_NAME = 'flashcard-app-v6';
+// Bumped to v7: the generic fetch handler below now writes successful
+// responses through to this cache (previously only /api/media/ did), so a
+// cold offline launch can actually serve the JS/CSS it already fetched
+// once while online instead of failing outright — see that handler's own
+// comment.
+const CACHE_NAME = 'flashcard-app-v7';
 // Separate from CACHE_NAME so bumping the app-shell version above doesn't
 // also evict previously-downloaded images/audio (see the activate handler).
 // Bumped to v2 to purge any audio responses cached under the old
@@ -67,7 +72,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Cache-first, write-through on a successful fetch. Previously this only
+  // ever read from the cache — nothing populated it (APP_SHELL precaches
+  // just '/' and '/manifest.json' at install time), so Next's fingerprinted
+  // JS/CSS bundles (_next/static/...) were fetched live on literally every
+  // visit and never available offline, even after having been fetched
+  // successfully many times before. Safe to cache broadly the same way
+  // media is above: Next.js fingerprints these URLs per build (the hash is
+  // in the filename), so a given URL's content is immutable — a stale
+  // *previous* build's chunks just become dead weight once a new deploy's
+  // HTML stops referencing their (now different) hashed filenames, not a
+  // source of serving outdated code under a live URL.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(event.request).then(async (cached) => {
+      if (cached) return cached;
+      const response = await fetch(event.request);
+      if (response.ok && event.request.method === 'GET') {
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(event.request, response.clone());
+      }
+      return response;
+    })
   );
 });

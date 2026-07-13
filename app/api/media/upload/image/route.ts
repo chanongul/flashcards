@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getAuthenticatedUser } from '@/utils/supabase/server';
 import { putMedia } from '@/lib/r2';
 
 export const runtime = 'nodejs';
@@ -8,9 +8,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedUser(supabase);
   if (!user) return new Response('Unauthorized', { status: 401 });
 
   const formData = await request.formData();

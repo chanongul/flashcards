@@ -15,12 +15,23 @@ export default function LoginPage() {
     e.preventDefault();
     setStatus('sending');
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
+    // signInWithPassword can reject outright (offline, a timed-out
+    // request) rather than resolving with an `error` field — without this
+    // try/catch that left `status` stuck on 'sending' forever, since
+    // nothing after the throwing line ever ran: the submit button
+    // (disabled while 'sending') stayed disabled with no error shown and
+    // no way to retry short of a full page reload.
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+        setStatus('error');
+      } else {
+        router.replace('/');
+      }
+    } catch {
+      setError('Could not reach the server — check your connection and try again.');
       setStatus('error');
-    } else {
-      router.replace('/');
     }
   }
 
