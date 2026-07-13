@@ -144,7 +144,8 @@ export function CardForm({
         fieldNeedsLabel(fieldValues[f] ?? '', resolvedFieldType(f))
       );
       if (missingLabelField) {
-        setError(`Add a label for "${missingLabelField}" (used for search).`);
+        const label = selectedNoteType.fieldNames?.[missingLabelField] ?? missingLabelField;
+        setError(`Add a label for "${label}" (used for search).`);
         return;
       }
       if (!selectedNoteType.questionFields.some(isFilled)) {
@@ -270,16 +271,17 @@ export function CardForm({
 
       {selectedNoteType ? (
         <>
-          {selectedNoteType.questionFields.map((fieldName) => {
-            const fieldConfig = selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext';
+          {selectedNoteType.questionFields.map((fieldId) => {
+            const fieldConfig = selectedNoteType.fieldTypes?.[fieldId] ?? 'richtext';
             const isDynamic = fieldConfig === 'dynamic';
             const isAsset = fieldConfig === 'asset';
-            const type = resolvedFieldType(fieldName);
+            const type = resolvedFieldType(fieldId);
+            const label = selectedNoteType.fieldNames?.[fieldId] ?? fieldId;
             return (
-              <div key={fieldName + '-q'}>
+              <div key={fieldId + '-q'}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-neutral-500">
-                    {fieldName}
+                    {label}
                     <span className="text-neutral-600 font-medium"> (question)</span>
                   </span>
                   {(isDynamic || isAsset) && (
@@ -289,11 +291,11 @@ export function CardForm({
                       onChange={(t) => {
                         setDynamicFieldTypes((f) => ({
                           ...f,
-                          [fieldName]: t,
+                          [fieldId]: t,
                         }));
                         setFieldValues((f) => ({
                           ...f,
-                          [fieldName]: '',
+                          [fieldId]: '',
                         }));
                       }}
                     />
@@ -302,13 +304,13 @@ export function CardForm({
                 <div className="mt-0.5">
                   <FieldValueInput
                     type={type}
-                    value={fieldValues[fieldName] ?? ''}
-                    options={selectedNoteType.fieldChoices?.[fieldName]}
-                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldName] : undefined}
+                    value={fieldValues[fieldId] ?? ''}
+                    options={selectedNoteType.fieldChoices?.[fieldId]}
+                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldId] : undefined}
                     onChange={(html) => {
                       setFieldValues((f) => ({
                         ...f,
-                        [fieldName]: html,
+                        [fieldId]: html,
                       }));
                       setError('');
                     }}
@@ -319,18 +321,19 @@ export function CardForm({
           })}
           {(selectedNoteType.questionFields.length > 1 ||
             selectedNoteType.answerFields.length > 1) && (
-            <hr className="border-neutral-800 my-1" />
+            <hr className="border-neutral-800 !my-3" />
           )}
-          {selectedNoteType.answerFields.map((fieldName) => {
-            const fieldConfig = selectedNoteType.fieldTypes?.[fieldName] ?? 'richtext';
+          {selectedNoteType.answerFields.map((fieldId) => {
+            const fieldConfig = selectedNoteType.fieldTypes?.[fieldId] ?? 'richtext';
             const isDynamic = fieldConfig === 'dynamic';
             const isAsset = fieldConfig === 'asset';
-            const type = resolvedFieldType(fieldName);
+            const type = resolvedFieldType(fieldId);
+            const label = selectedNoteType.fieldNames?.[fieldId] ?? fieldId;
             return (
-              <div key={fieldName + '-a'}>
+              <div key={fieldId + '-a'}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-neutral-500">
-                    {fieldName}
+                    {label}
                     <span className="text-neutral-600 font-medium"> (answer)</span>
                   </span>
                   {(isDynamic || isAsset) && (
@@ -340,11 +343,11 @@ export function CardForm({
                       onChange={(t) => {
                         setDynamicFieldTypes((f) => ({
                           ...f,
-                          [fieldName]: t,
+                          [fieldId]: t,
                         }));
                         setFieldValues((f) => ({
                           ...f,
-                          [fieldName]: '',
+                          [fieldId]: '',
                         }));
                       }}
                     />
@@ -353,13 +356,13 @@ export function CardForm({
                 <div className="mt-0.5">
                   <FieldValueInput
                     type={type}
-                    value={fieldValues[fieldName] ?? ''}
-                    options={selectedNoteType.fieldChoices?.[fieldName]}
-                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldName] : undefined}
+                    value={fieldValues[fieldId] ?? ''}
+                    options={selectedNoteType.fieldChoices?.[fieldId]}
+                    templateFormat={mode === 'create' ? selectedNoteType.fieldTemplates?.[fieldId] : undefined}
                     onChange={(html) => {
                       setFieldValues((f) => ({
                         ...f,
-                        [fieldName]: html,
+                        [fieldId]: html,
                       }));
                       setError('');
                     }}

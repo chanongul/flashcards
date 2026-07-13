@@ -242,6 +242,12 @@ export async function replayAllEvents() {
           id: e.entityId,
           name: p.name ?? existing?.name ?? 'Untitled type',
           fields: p.fields ?? existing?.fields ?? [],
+          // Falls back to {} for a note type never re-saved since field ids
+          // were introduced — its `fields` entries are still its original
+          // display names verbatim (that's what "field id" used to mean),
+          // so every fieldNames?.[id] ?? id lookup elsewhere in the app
+          // already recovers the right label with no migration needed here.
+          fieldNames: p.fieldNames ?? existing?.fieldNames ?? {},
           questionFields: p.questionFields ?? existing?.questionFields ?? [],
           answerFields: p.answerFields ?? existing?.answerFields ?? [],
           fieldTypes: p.fieldTypes ?? existing?.fieldTypes ?? {},

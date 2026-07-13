@@ -61,7 +61,7 @@ export function TagsInput({ value, onChange, placeholder }: TagsInputProps) {
         onKeyDown={handleKeyDown}
         onBlur={commitDraft}
         placeholder={value.length === 0 ? placeholder : ''}
-        className="min-w-[80px] flex-1 bg-transparent text-xs outline-none placeholder:text-neutral-500"
+        className="min-w-[80px] flex-1 rounded-sm bg-transparent text-xs outline-none placeholder:text-neutral-500"
       />
     </div>
   );

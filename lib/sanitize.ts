@@ -109,6 +109,13 @@ function unwrap(node: Node, el: HTMLElement) {
   node.removeChild(el);
 }
 
+// Wraps `el`'s current children in a new `tagName` element, in place.
+function wrapChildren(el: HTMLElement, tagName: string) {
+  const wrapper = document.createElement(tagName);
+  while (el.firstChild) wrapper.appendChild(el.firstChild);
+  el.appendChild(wrapper);
+}
+
 function sanitizeNode(node: Node) {
   for (const child of Array.from(node.childNodes)) {
     if (child.nodeType === Node.TEXT_NODE) continue;
@@ -117,6 +124,32 @@ function sanitizeNode(node: Node) {
       continue;
     }
     const el = child as HTMLElement;
+    if (el.tagName === 'FONT') {
+      // Not in ALLOWED_TAGS, so this would otherwise hit the generic
+      // disallowed-tag branch below and get unwrapped, silently discarding
+      // the size. Some engines (Safari, toggling font size on a collapsed
+      // caret rather than an existing selection — see RichTextInput's
+      // seedInitialFormat/applyFontSize) leave typed text wrapped in a
+      // native <font size="N"> instead of the <span data-size="N"> that
+      // applyFontSize's own post-execCommand rewrite produces — that
+      // rewrite only catches a <font> element already in the DOM at the
+      // moment it runs, not one that only materializes later once real
+      // text is actually typed. Convert it here the same way, using the
+      // same size scale/attribute name applyFontSize itself writes.
+      const size = el.getAttribute('size');
+      const validSize = size && ALLOWED_SIZES.has(size) ? size : null;
+      if (!validSize) {
+        unwrap(node, el);
+        continue;
+      }
+      sanitizeNode(el);
+      const span = document.createElement('span');
+      span.setAttribute('data-size', validSize);
+      while (el.firstChild) span.appendChild(el.firstChild);
+      node.insertBefore(span, el);
+      node.removeChild(el);
+      continue;
+    }
     if (!ALLOWED_TAGS.has(el.tagName)) {
       unwrap(node, el);
       continue;
@@ -125,18 +158,45 @@ function sanitizeNode(node: Node) {
       // A span only exists here to carry a size and/or a dim flag — one with
       // neither is meaningless (e.g. pasted from elsewhere), so unwrap it
       // like any other disallowed content instead of leaving an empty
-      // wrapper.
+      // wrapper. EXCEPT: some engines (Safari, specifically when toggling
+      // bold/italic/underline on a collapsed caret rather than an existing
+      // selection — see RichTextInput's seedInitialFormat) implement
+      // execCommand by wrapping subsequently-typed text in a plain <span>
+      // with an inline style instead of the semantic <b>/<i>/<u> tag used
+      // everywhere else. Detecting that here and converting it to the
+      // semantic tag (rather than unwrapping, which would silently discard
+      // the formatting) mirrors how RichTextInput's own isNodeStyled
+      // already treats style-based formatting as equivalent to tag-based
+      // when reading state back.
       const size = el.getAttribute('data-size');
       const validSize = size && ALLOWED_SIZES.has(size) ? size : null;
       const dim = el.hasAttribute('data-dim');
-      if (!validSize && !dim) {
+      const fontWeight = el.style.fontWeight;
+      const isBoldStyle = fontWeight === 'bold' || fontWeight === 'bolder' || parseInt(fontWeight, 10) >= 600;
+      const fontStyle = el.style.fontStyle;
+      const isItalicStyle = fontStyle === 'italic' || fontStyle === 'oblique';
+      const textDecoration = el.style.textDecorationLine || el.style.textDecoration;
+      const isUnderlineStyle = textDecoration.includes('underline');
+      if (!validSize && !dim && !isBoldStyle && !isItalicStyle && !isUnderlineStyle) {
         unwrap(node, el);
+        continue;
+      }
+      sanitizeNode(el);
+      if (isUnderlineStyle) wrapChildren(el, 'u');
+      if (isItalicStyle) wrapChildren(el, 'i');
+      if (isBoldStyle) wrapChildren(el, 'b');
+      if (!validSize && !dim) {
+        // The span was purely a style-based formatting wrapper — now
+        // redundant since that formatting just moved into a real semantic
+        // tag above, so drop the empty span itself rather than leaving it
+        // around as dead wrapping.
+        while (el.firstChild) node.insertBefore(el.firstChild, el);
+        node.removeChild(el);
         continue;
       }
       for (const attr of Array.from(el.attributes)) el.removeAttribute(attr.name);
       if (validSize) el.setAttribute('data-size', validSize);
       if (dim) el.setAttribute('data-dim', '');
-      sanitizeNode(el);
       continue;
     }
     if (el.tagName === 'IMG' || el.tagName === 'AUDIO') {

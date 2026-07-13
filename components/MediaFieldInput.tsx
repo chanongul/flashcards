@@ -222,11 +222,15 @@ export function fieldNeedsLabel(html: string, type: FieldType): boolean {
  * after notes of that type already exist (fields renamed, or a fixed
  * field's declared type changed), and there's no migration of already-saved
  * note data when that happens. Rather than silently rendering stale/
- * mismatched content through the wrong widget:
- *  - a field name no longer in the note type (renamed or removed) is
- *    dropped entirely — its old value never carries forward;
- *  - a field name with no stored value yet (newly added, or the new side of
- *    a rename) starts empty, same as any new field;
+ * mismatched content through the wrong widget. Fields are keyed by their
+ * stable id (see NoteType's own doc comment), not by display name, so
+ * renaming a field carries its value forward same as any other edit —
+ * only actually *removing* a field, or changing its declared type
+ * incompatibly, discards anything:
+ *  - a field id no longer in the note type (removed) is dropped entirely
+ *    — its old value never carries forward;
+ *  - a field id with no stored value yet (newly added) starts empty, same
+ *    as any new field;
  *  - a *fixed*-type field whose stored content no longer matches its
  *    current declared type (e.g. was Image, the type is now Rich text) is
  *    cleared — the user has to re-enter it before saving. Dynamic and asset
@@ -243,18 +247,18 @@ export function reconcileFieldValues(
   }
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const fieldName of noteType.fields) {
-    const config = noteType.fieldTypes[fieldName] ?? 'richtext';
-    const stored = storedFields[fieldName];
+  for (const fieldId of noteType.fields) {
+    const config = noteType.fieldTypes[fieldId] ?? 'richtext';
+    const stored = storedFields[fieldId];
     if (stored === undefined) {
-      result[fieldName] = '';
+      result[fieldId] = '';
     } else if (config === 'dynamic' || config === 'asset') {
-      result[fieldName] = stored;
+      result[fieldId] = stored;
     } else if (config === 'choice') {
-      const options = noteType.fieldChoices?.[fieldName] ?? [];
-      result[fieldName] = options.includes(stripHtml(stored)) ? stored : '';
+      const options = noteType.fieldChoices?.[fieldId] ?? [];
+      result[fieldId] = options.includes(stripHtml(stored)) ? stored : '';
     } else {
-      result[fieldName] = inferFieldType(stored) === config ? stored : '';
+      result[fieldId] = inferFieldType(stored) === config ? stored : '';
     }
   }
   return result;

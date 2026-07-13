@@ -78,6 +78,14 @@ import { CardForm } from "@/components/CardForm";
 // `choices` only matters when type === 'choice': the shared option list
 // every note of this type picks from for this field.
 interface FieldRow {
+  // Stable identity for this field, independent of its (freely editable,
+  // possibly duplicate-across-groups) display name — carried through as
+  // the key for fieldTypes/fieldChoices/fieldTemplates and, ultimately,
+  // Note.fields/Card.fields. Generated once when the row is first created;
+  // preserved as-is when editing an existing note type (see openEditNoteType)
+  // so an already-saved field's stored data keeps resolving correctly no
+  // matter how its name changes.
+  id: string;
   name: string;
   type: FieldTypeConfig;
   choices: string[];
@@ -340,10 +348,10 @@ export default function HomePage() {
   const [noteTypeActionsDropUp, setNoteTypeActionsDropUp] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
   const [newQuestionFields, setNewQuestionFields] = useState<FieldRow[]>([
-    { name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+    { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
   ]);
   const [newAnswerFields, setNewAnswerFields] = useState<FieldRow[]>([
-    { name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+    { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
   ]);
   const [newTypeReversed, setNewTypeReversed] = useState(false);
   const [noteTypeError, setNoteTypeError] = useState("");
@@ -530,10 +538,10 @@ export default function HomePage() {
     setEditingNoteTypeId(null);
     setNewTypeName("");
     setNewQuestionFields([
-      { name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+      { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
     ]);
     setNewAnswerFields([
-      { name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+      { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
     ]);
     setNewTypeReversed(false);
     setNoteTypeError("");
@@ -543,17 +551,23 @@ export default function HomePage() {
   function openEditNoteType(nt: NoteType) {
     setEditingNoteTypeId(nt.id);
     setNewTypeName(nt.name);
-    const toRow = (name: string): FieldRow => ({
-      name,
-      type: nt.fieldTypes?.[name] ?? "richtext",
-      choices: nt.fieldChoices?.[name] ?? [],
-      format: nt.fieldTemplates?.[name] ?? NORMAL_TEXT_FORMAT,
+    // `fieldId` here is a NoteType.fields entry — its display name is a
+    // separate lookup via fieldNames, falling back to the id itself for a
+    // note type saved before field ids existed (where the id *is* the
+    // original name verbatim — see lib/sync.ts's fieldNames comment).
+    const toRow = (fieldId: string): FieldRow => ({
+      id: fieldId,
+      name: nt.fieldNames?.[fieldId] ?? fieldId,
+      type: nt.fieldTypes?.[fieldId] ?? "richtext",
+      choices: nt.fieldChoices?.[fieldId] ?? [],
+      format: nt.fieldTemplates?.[fieldId] ?? NORMAL_TEXT_FORMAT,
     });
     setNewQuestionFields(
       nt.questionFields.length
         ? nt.questionFields.map(toRow)
         : [
             {
+              id: crypto.randomUUID(),
               name: "",
               type: "richtext",
               choices: [],
@@ -566,6 +580,7 @@ export default function HomePage() {
         ? nt.answerFields.map(toRow)
         : [
             {
+              id: crypto.randomUUID(),
               name: "",
               type: "richtext",
               choices: [],
@@ -616,30 +631,41 @@ export default function HomePage() {
       );
       return;
     }
-    const questionFields = questionRows.map((f) => f.name);
-    const answerFields = answerRows.map((f) => f.name);
+    // Rows are keyed by their own stable id, not their (freely editable,
+    // freely reusable across question/answer) display name — so a name
+    // like "Media" appearing on both sides is fine, each still gets its
+    // own independent value slot in Note.fields/Card.fields.
+    const questionFields = questionRows.map((f) => f.id);
+    const answerFields = answerRows.map((f) => f.id);
     // `fields` (the full set a note of this type holds) is just the union of
     // question/answer fields — no separate input for it, so there's no way
     // for it to drift out of sync with what's actually shown on each side.
+    // A Set-based dedup is only a safety net here (ids are already unique
+    // by construction) rather than doing any real work, unlike when this
+    // used to dedup by name.
     const fields = Array.from(new Set([...questionFields, ...answerFields]));
+    const fieldNames = Object.fromEntries(
+      [...questionRows, ...answerRows].map((f) => [f.id, f.name]),
+    );
     const fieldTypes = Object.fromEntries(
-      [...questionRows, ...answerRows].map((f) => [f.name, f.type]),
+      [...questionRows, ...answerRows].map((f) => [f.id, f.type]),
     );
     const fieldChoices = Object.fromEntries(
       [...questionRows, ...answerRows]
         .filter((f) => f.type === "choice")
-        .map((f) => [f.name, f.choices.map((c) => c.trim()).filter(Boolean)]),
+        .map((f) => [f.id, f.choices.map((c) => c.trim()).filter(Boolean)]),
     );
     const fieldTemplates = Object.fromEntries(
       [...questionRows, ...answerRows]
         .filter((f) => f.type === "richtext" || f.type === "choice")
-        .map((f) => [f.name, f.format]),
+        .map((f) => [f.id, f.format]),
     );
     if (editingNoteTypeId) {
       await withLoading(() =>
         editNoteType(user.id, editingNoteTypeId, {
           name,
           fields,
+          fieldNames,
           questionFields,
           answerFields,
           fieldTypes,
@@ -660,6 +686,7 @@ export default function HomePage() {
           newTypeReversed,
           fieldChoices,
           fieldTemplates,
+          fieldNames,
         ),
       );
     }
@@ -1381,6 +1408,7 @@ export default function HomePage() {
                         setNewQuestionFields((fs) => [
                           ...fs,
                           {
+                            id: crypto.randomUUID(),
                             name: "",
                             type: "richtext",
                             choices: [],
@@ -1529,6 +1557,7 @@ export default function HomePage() {
                         setNewAnswerFields((fs) => [
                           ...fs,
                           {
+                            id: crypto.randomUUID(),
                             name: "",
                             type: "richtext",
                             choices: [],

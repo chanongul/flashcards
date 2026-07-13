@@ -186,6 +186,24 @@ export function RichTextInput({
       }
       node = node.parentNode;
     }
+    // The walk above only ever looks *upward* from a single point, so it
+    // never finds a [data-size] span nested *inside* whatever the range
+    // starts at rather than being one of its ancestors. That's exactly the
+    // shape formatEntireValue's withWholeSelection produces: it selects the
+    // *entire* field via selectNodeContents(el), so the one-level descend
+    // above lands on the outermost wrapper (e.g. a [data-dim] span with the
+    // actual [data-size] nested inside it, not the other way around) —
+    // walking up from there hits ref.current immediately and never sees
+    // the nested size. Without this fallback, every size-stepper click on
+    // a dimmed whole-field template read "normal" every time, so stepping
+    // could only ever land one level away and then appeared to do nothing
+    // on further clicks. Search the whole field directly as a fallback —
+    // safe because this only ever runs when the ancestor walk found
+    // nothing, i.e. either there's genuinely no size, or there's exactly
+    // this nested-inside-another-wrapper shape to search for.
+    const sizedSpan = ref.current?.querySelector('[data-size]');
+    const size = sizedSpan?.getAttribute('data-size');
+    if (size) return Number(size);
     return NORMAL_SIZE;
   }
 
@@ -245,35 +263,68 @@ export function RichTextInput({
       return;
     }
 
-    document.execCommand('fontSize', false, String(level));
+    // Treat a range holding nothing but the lone ZWSP marker of a pending
+    // size span (stepping the size again right after a previous step,
+    // before typing anything) the same as truly collapsed — the unwrap
+    // above turns that prior pending span into a loose ZWSP text node,
+    // which makes newRange technically non-collapsed even though there's
+    // still no real content to preserve.
+    const isPendingAnchorOnly = moved.length === 1 && moved[0].textContent === ZWSP;
+    if (newRange.collapsed || isPendingAnchorOnly) {
+      // No real text selected (just a caret, or only a pending marker) —
+      // build the [data-size] span directly via seedFontSize's technique
+      // instead of execCommand. execCommand('fontSize', ...) on a
+      // genuinely empty/collapsed selection turned out to be unreliable
+      // across engines: it can leave a raw <font size> in the DOM that
+      // this function's own rewrite pass below never catches (that pass
+      // only finds a <font> that already exists the instant it runs, not
+      // one that only materializes later once real text is typed), or it
+      // can apply no size at all — either way the size silently never
+      // sticks. seedFontSize sidesteps execCommand entirely, the same way
+      // toggleDim's collapsed-caret branch already does for dim.
+      if (isPendingAnchorOnly) {
+        // Collapsing newRange in place isn't guaranteed to update the live
+        // selection on every engine (some clone the Range when it's added
+        // via addRange rather than keeping a live reference) — explicitly
+        // re-add it so seedFontSize's own sel.getRangeAt(0) sees the
+        // collapsed state.
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+      seedFontSize(level);
+      ref.current?.focus();
+      handleInput();
+      return;
+    }
+
+    // Real text selected — wrap it directly in a [data-size] span via
+    // Range.extractContents()/insertNode(), the exact same technique
+    // toggleDim's own non-collapsed branch already uses for dim. This
+    // sidesteps execCommand('fontSize', ...) entirely (see seedFontSize's
+    // comment for why that's unreliable on a collapsed caret) — it was
+    // also the culprit behind a case where stepping the size on text
+    // already wrapped in a [data-dim] span got stuck after one step:
+    // execCommand's own DOM restructuring around the existing dim wrapper
+    // could leave the resulting <font> in a shape getCurrentLevel's
+    // ancestor walk didn't find on the next step, so it kept reading
+    // "normal" and re-applying the same one-step-away level instead of
+    // progressing further. Plain Range surgery has no such interaction —
+    // it only ever touches the size wrapper itself.
+    const span = document.createElement('span');
+    span.setAttribute('data-size', String(level));
+    span.appendChild(newRange.extractContents());
+    newRange.insertNode(span);
     ref.current?.focus();
 
-    const newSpans: HTMLElement[] = [];
-    ref.current?.querySelectorAll('font[size]').forEach((fontEl) => {
-      const parent = fontEl.parentNode;
-      if (!parent) return;
-      const span = document.createElement('span');
-      span.setAttribute('data-size', String(level));
-      while (fontEl.firstChild) span.appendChild(fontEl.firstChild);
-      parent.replaceChild(span, fontEl);
-      newSpans.push(span);
-    });
-
-    // The rewrite moves the font elements' children through a detached span,
-    // which collapses the live selection — rebuild it over the new spans so
-    // the text stays selected (the unwrap-to-normal path above already does
-    // the equivalent with its `moved` nodes).
-    if (newSpans.length > 0) {
-      // Anchor INSIDE the spans (not before/after them) so getCurrentLevel's
-      // ancestor walk finds the size on the next step — anchoring outside
-      // made a second size step read "normal" and re-apply the same level.
-      const range = document.createRange();
-      const last = newSpans[newSpans.length - 1];
-      range.setStart(newSpans[0], 0);
-      range.setEnd(last, last.childNodes.length);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
+    // Anchor the selection INSIDE the span (not before/after it) so
+    // getCurrentLevel's ancestor walk finds the size on the next step —
+    // anchoring outside made a second size step read "normal" and
+    // re-apply the same level.
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    sel.removeAllRanges();
+    sel.addRange(range);
 
     handleInput();
   }
@@ -588,12 +639,17 @@ export function RichTextInput({
     if (wasDimmed) {
       ref.current?.focus();
       handleInput();
-      // Rebuild the selection from the now-unwrapped nodes inside a timeout
-      // to ensure React updates have finished rendering.
-      setTimeout(() => {
-        const currentSel = window.getSelection();
-        if (!currentSel) return;
-        ref.current?.focus();
+      // Rebuild the selection from the now-unwrapped nodes synchronously —
+      // this DOM mutation (unwrapOverlappingDim above) doesn't depend on
+      // React re-rendering at all, so there's nothing to wait for. An
+      // earlier version deferred this one tick via setTimeout "to ensure
+      // React updates have finished rendering"; that was never actually
+      // necessary, and crossing a macrotask boundary left a real window
+      // where a fast follow-up action (e.g. immediately clicking the size
+      // stepper right after dim) would run against the stale pre-rebuild
+      // selection instead of waiting for this one.
+      const currentSel = window.getSelection();
+      if (currentSel) {
         currentSel.removeAllRanges();
         if (moved.length > 0) {
           const r = document.createRange();
@@ -604,7 +660,7 @@ export function RichTextInput({
           currentSel.addRange(originalRange);
         }
         updateActiveStates();
-      }, 0);
+      }
       return;
     }
 
@@ -619,18 +675,17 @@ export function RichTextInput({
     ref.current?.focus();
     handleInput();
 
-    // Select the newly dimmed contents inside a timeout to ensure React updates
-    // have finished rendering.
-    setTimeout(() => {
-      const currentSel = window.getSelection();
-      if (!currentSel) return;
-      ref.current?.focus();
+    // Select the newly dimmed contents synchronously — see the wasDimmed
+    // branch's comment above for why the earlier setTimeout deferral here
+    // was both unnecessary and actively harmful to a fast follow-up click.
+    const currentSel = window.getSelection();
+    if (currentSel) {
       const newRange = document.createRange();
       newRange.selectNodeContents(span);
       currentSel.removeAllRanges();
       currentSel.addRange(newRange);
       updateActiveStates();
-    }, 0);
+    }
   }
 
   // Applies initialFormat's effects to the (still-empty) collapsed caret,
@@ -640,14 +695,62 @@ export function RichTextInput({
   // something is actually typed), and dim reuses its existing pending-span
   // mechanism, whose blur-time cleanup already handles "opened but never
   // typed into" for free. Guarded so it only ever fires once per mount.
+  //
+  // Must run synchronously inside the triggering focus event (see the
+  // onFocus handler below) — document.execCommand only counts as
+  // originating from a user gesture while still on the same call stack as
+  // the event that started it. An earlier version deferred this one tick
+  // via setTimeout to let the browser finish placing its own collapsed
+  // selection first; that crossed a macrotask boundary, which silently
+  // strips execCommand's gesture privilege on iOS Safari — bold/italic/
+  // underline/size would appear to do nothing there (Safari didn't error,
+  // it just never applied). Placing the collapsed selection ourselves
+  // below removes the need to wait for the browser at all.
+  // Inserts a pending [data-size] span exactly the way toggleDim's own
+  // collapsed-caret branch inserts a [data-dim] one — a proven, DOM-only
+  // technique that never touches execCommand at all. applyFontSize (used
+  // by the size-stepper buttons) calls this directly for its own
+  // collapsed-selection case too — execCommand('fontSize', ...), which it
+  // used to rely on there, turned out to be genuinely unreliable
+  // specifically for a collapsed, empty selection: depending on engine it
+  // could leave a raw <font size> in the DOM that never got rewritten (the
+  // old rewrite pass only caught a <font> that already existed the instant
+  // it ran, not one that only materialized later once real text was
+  // typed), or applied no size at all.
+  function seedFontSize(level: number) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    const span = document.createElement('span');
+    span.setAttribute('data-size', String(level));
+    const textNode = document.createTextNode(ZWSP);
+    span.appendChild(textNode);
+    range.insertNode(span);
+    const newRange = document.createRange();
+    newRange.setStart(textNode, 1);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+
   function seedInitialFormat() {
     if (!initialFormat || seededTemplateRef.current) return;
+    const el = ref.current;
+    if (!el) return;
     seededTemplateRef.current = true;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
     if (initialFormat.bold) exec('bold');
     if (initialFormat.italic) exec('italic');
     if (initialFormat.underline) exec('underline');
     if (initialFormat.dim) toggleDim();
-    if (initialFormat.size !== NORMAL_SIZE) applyFontSize(initialFormat.size);
+    if (initialFormat.size !== NORMAL_SIZE) seedFontSize(initialFormat.size);
+    handleInput();
   }
 
   return (
@@ -737,13 +840,9 @@ export function RichTextInput({
         onInput={handleInput}
         onFocus={() => {
           updateActiveStates();
-          // Deferred one tick so the browser has finished placing its own
-          // collapsed selection in the newly-focused (empty) div first —
-          // seedInitialFormat's exec()/toggleDim()/applyFontSize calls all
-          // need window.getSelection() to already have a range to act on,
-          // same as when a toolbar button triggers them after a manual
-          // click (which always lands after focus is already established).
-          if (!value.trim()) setTimeout(() => seedInitialFormat(), 0);
+          // Called synchronously (no setTimeout) — see seedInitialFormat's
+          // own comment for why that matters on iOS Safari.
+          if (!value.trim()) seedInitialFormat();
         }}
         onBlur={() => {
           finalizePendingDim();
@@ -752,7 +851,7 @@ export function RichTextInput({
           handleInput();
         }}
         data-placeholder={placeholder}
-        className="rich-text-content min-h-[2.5rem] px-3 py-2 text-sm outline-none empty:before:text-neutral-500 empty:before:content-[attr(data-placeholder)]"
+        className="rich-text-content min-h-[2.5rem] rounded-b-md px-3 py-2 text-sm outline-none empty:before:text-neutral-500 empty:before:content-[attr(data-placeholder)]"
       />
     </div>
   );

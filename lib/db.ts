@@ -62,15 +62,28 @@ export interface TextFormat {
 // A custom note type: an ordered field list plus which fields render on the
 // question vs answer. One note type produces exactly one card template (not
 // Anki's full multi-template-per-type system — that's out of scope for now).
+//
+// Fields are identified by an opaque, stable id (crypto.randomUUID(), same
+// as every other entity in this app) — NOT by their display name. This is
+// deliberate: a name is just a label the user types and can freely change
+// or reuse (e.g. "Media" on both the question and answer side of the same
+// type), while `fields`/`questionFields`/`answerFields` and every
+// per-field Record below are keyed by id, including Note.fields/
+// Card.fields. Keying any of this by name instead (an earlier version of
+// this app did) meant two same-named fields silently collapsed onto one
+// shared value slot, and renaming a field silently discarded its data —
+// neither of those is possible once identity is a stable id independent of
+// the label.
 export interface NoteType {
   id: string; // uuid
   name: string; // e.g. "Vocabulary"
-  fields: string[]; // ordered, e.g. ["Word", "Reading", "Meaning", "Example"]
-  questionFields: string[]; // subset/order of `fields` shown on the question
-  answerFields: string[]; // subset/order of `fields` shown on the answer
-  fieldTypes: Record<string, FieldTypeConfig>; // per-field type; missing entries default to 'richtext'
+  fields: string[]; // ordered field ids, e.g. one per ["Word", "Reading", "Meaning", "Example"]
+  fieldNames: Record<string, string>; // field id -> display name (what the user types/sees)
+  questionFields: string[]; // subset/order of `fields` (ids) shown on the question
+  answerFields: string[]; // subset/order of `fields` (ids) shown on the answer
+  fieldTypes: Record<string, FieldTypeConfig>; // per-field type, keyed by field id; missing entries default to 'richtext'
   // Shared option list for a field whose fieldTypes entry is 'choice' — one
-  // list per field name, reused by every note of this type (not settable
+  // list per field id, reused by every note of this type (not settable
   // per-note the way 'dynamic' fields are, since the options themselves live
   // here on the type, not on any one note's content).
   fieldChoices: Record<string, string[]>;
@@ -78,7 +91,7 @@ export interface NoteType {
   // whatever effects were toggled on that field's name while defining the
   // type — applied (format only, never the name's own text) as the format
   // a brand-new card's blank field starts in. Not meaningful for other
-  // field types.
+  // field types. Keyed by field id.
   fieldTemplates: Record<string, TextFormat>;
   reversed: boolean; // whether notes of this type may opt into an answer->question sibling card
   deleted: boolean;
@@ -102,7 +115,7 @@ export interface Note {
   noteType: string; // 'basic' | 'cloze' | a NoteType.id
   front: string;
   back: string;
-  fields: Record<string, string>; // used when noteType references a custom NoteType
+  fields: Record<string, string>; // used when noteType references a custom NoteType; keyed by NoteType field id, not display name
   tags: string[];
   reversed: boolean; // opt-in per note: also generate a back->front sibling card (basic notes, or custom types with reversed enabled)
   deleted: boolean;
@@ -120,7 +133,7 @@ export interface Card {
   cardType: CardType;
   front: string; // for custom cards, pre-rendered from fields at replay time
   back: string;
-  fields: Record<string, string>; // raw field values, for editing custom cards
+  fields: Record<string, string>; // raw field values, for editing custom cards; keyed by NoteType field id, not display name
   tags: string[];
   fsrs: FsrsState;
   flagged: boolean;

@@ -202,12 +202,14 @@ export async function createNoteType(
   fieldTypes: Record<string, FieldTypeConfig> = {},
   reversed = false,
   fieldChoices: Record<string, string[]> = {},
-  fieldTemplates: Record<string, TextFormat> = {}
+  fieldTemplates: Record<string, TextFormat> = {},
+  fieldNames: Record<string, string> = {}
 ) {
   const id = crypto.randomUUID();
   await logEvent(userId, id, 'notetype_create', {
     name,
     fields,
+    fieldNames,
     questionFields,
     answerFields,
     fieldTypes,
@@ -226,6 +228,7 @@ export async function editNoteType(
   changes: Partial<{
     name: string;
     fields: string[];
+    fieldNames: Record<string, string>;
     questionFields: string[];
     answerFields: string[];
     fieldTypes: Record<string, FieldTypeConfig>;
@@ -270,7 +273,8 @@ export async function cloneNoteType(userId: string, noteTypeId: string) {
     nt.fieldTypes,
     nt.reversed,
     nt.fieldChoices,
-    nt.fieldTemplates
+    nt.fieldTemplates,
+    nt.fieldNames
   );
 }
 
