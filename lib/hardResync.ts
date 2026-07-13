@@ -31,11 +31,21 @@ export async function hardResync(userId: string): Promise<HardResyncResult> {
   await pushEvents();
   await syncPendingMedia(userId);
 
-  const [unsyncedCount, pendingMediaCount] = await Promise.all([
+  // Only `committed` rows represent media that's confirmed queued-and-
+  // retriable (see lib/mediaSync.ts) — a `committed: false` row is either
+  // still referenced by a genuinely open, unsaved editor elsewhere, or (far
+  // more likely here) an orphan left behind by attaching an image/audio to
+  // a card draft that was cancelled instead of submitted — there's no
+  // cleanup path for that anywhere, so such a row can sit forever.
+  // syncPendingMedia deliberately never retries it (retrying mid-edit would
+  // race the editor's own save), so it can never resolve on its own —
+  // counting it here would block every future resync permanently rather
+  // than just once. The wipe below clears it regardless of committed state.
+  const [unsyncedCount, committedPendingCount] = await Promise.all([
     db.events.filter((e) => !e.synced).count(),
-    db.pendingMedia.count(),
+    db.pendingMedia.filter((m) => m.committed).count(),
   ]);
-  if (unsyncedCount > 0 || pendingMediaCount > 0) {
+  if (unsyncedCount > 0 || committedPendingCount > 0) {
     return { ok: false, reason: 'unsynced' };
   }
 
