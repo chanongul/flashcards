@@ -35,7 +35,7 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
     <LoadingContext.Provider value={{ begin, end, withLoading }}>
       {children}
       {count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 top-auto z-[100] h-0.5 overflow-hidden bg-neutral-800 md:bottom-auto md:top-0">
+        <div className="fixed inset-x-0 bottom-0 top-auto z-[100] h-1.5 overflow-hidden bg-neutral-800 md:h-0.5 md:bottom-auto md:top-0">
           <div className="h-full w-1/3 bg-neutral-100 [animation:loading-bar-slide_1s_ease-in-out_infinite]" />
         </div>
       )}
