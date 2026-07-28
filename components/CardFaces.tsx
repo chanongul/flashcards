@@ -27,7 +27,7 @@ export function CardFaces({
   return (
     <>
       <ScrollFade>
-        <div className="flex min-h-full flex-col items-center justify-center">
+        <div className="flex min-h-full flex-col items-center justify-center py-4">
           <RichText html={front} className={frontClassName} />
         </div>
       </ScrollFade>
@@ -35,7 +35,7 @@ export function CardFaces({
         <>
           <hr className="shrink-0 border-neutral-800" />
           <ScrollFade>
-            <div className="flex min-h-full flex-col items-center justify-center">
+            <div className="flex min-h-full flex-col items-center justify-center py-4">
               <RichText html={back} className={backClassName} />
             </div>
           </ScrollFade>

@@ -515,7 +515,7 @@ export default function ReviewPage() {
             {current.cardType === "cloze" ? (
               <>
                 <ScrollFade>
-                  <div className="flex min-h-full flex-col items-center justify-center">
+                  <div className="flex min-h-full flex-col items-center justify-center py-4">
                     {revealed ? (
                       <ClozeRevealPart
                         text={current.front}
@@ -538,7 +538,7 @@ export default function ReviewPage() {
                   <>
                     <hr className="shrink-0 border-neutral-800" />
                     <ScrollFade>
-                      <div className="flex min-h-full flex-col items-center justify-center">
+                      <div className="flex min-h-full flex-col items-center justify-center py-4">
                         <ClozeRevealPart
                           text={current.front}
                           activeIndex={current.clozeIndex ?? 1}
