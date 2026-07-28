@@ -15,6 +15,7 @@ import {
   CalendarClock,
   FolderSearch,
   NotebookPen,
+  Gamepad2,
 } from "lucide-react";
 import {
   getDueCards,
@@ -473,6 +474,13 @@ export default function ReviewPage() {
           >
             <CalendarClock size={16} />
           </button>
+          <Link
+            href={`/review/${params.deckId}/game`}
+            aria-label="Game mode"
+            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+          >
+            <Gamepad2 size={16} />
+          </Link>
           <button
             onClick={openDeckOptions}
             aria-label="Deck options"

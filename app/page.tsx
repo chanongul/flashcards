@@ -22,6 +22,7 @@ import {
   ChevronDown,
   List,
   FolderSearch,
+  Gamepad2,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -1108,6 +1109,14 @@ export default function HomePage() {
                     >
                       <FilePlus size={16} />
                     </button>
+                    <Link
+                      href={`/review/${deck.id}/game`}
+                      onClick={() => setActionsDeck(null)}
+                      aria-label="Game mode"
+                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <Gamepad2 size={16} />
+                    </Link>
                     <Link
                       href={`/review/${deck.id}/all`}
                       onClick={() => setActionsDeck(null)}

@@ -5,7 +5,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Pencil, Trash2, Star, Ban, Info, X, Bug, MoreVertical, Copy, ChevronDown, ArrowLeft } from 'lucide-react';
 import { db, type Card, type FieldType } from '@/lib/db';
 import { stateLabel, ratingLabel, type StateLabel } from '@/lib/fsrs';
-import { clozeQuestion, clozeQuestionFor, clozeAnswer } from '@/lib/cloze';
+import { clozeQuestion, clozeQuestionFor } from '@/lib/cloze';
+import { cardFrontHtml, cardBackHtml } from '@/lib/cardContent';
 import { getCardReviewHistory, type ReviewHistoryEntry } from '@/lib/stats';
 import { flattenDeckTree, deckDisplayName } from '@/lib/decks';
 import { shouldDropUp } from '@/lib/dropdownMenu';
@@ -52,22 +53,6 @@ function previewText(html: string): string {
   if (type === 'image') return '[Image]';
   if (type === 'audio') return '[Audio]';
   return '';
-}
-
-// Mirrors questionText/answerText in app/review/[deckId]/page.tsx: front/back
-// swap on isReversed for basic/custom cards, while cloze cards ignore that
-// (a cloze note can't be reversed) and instead hide/reveal by cloze number —
-// same source card.front the review UI itself renders from.
-function frontHtml(card: Card): string {
-  if (card.cardType === 'cloze') {
-    return card.clozeIndex !== null ? clozeQuestionFor(card.front, card.clozeIndex) : clozeQuestion(card.front);
-  }
-  return card.isReversed ? card.back : card.front;
-}
-
-function backHtml(card: Card): string {
-  if (card.cardType === 'cloze') return clozeAnswer(card.front);
-  return card.isReversed ? card.front : card.back;
 }
 
 interface CardRowProps {
@@ -385,7 +370,7 @@ export function CardRow({
             </div>
 
             <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-center">
-              <CardFaces front={frontHtml(card)} back={backHtml(card)} showBack />
+              <CardFaces front={cardFrontHtml(card)} back={cardBackHtml(card)} showBack />
             </div>
           </div>
         </div>
