@@ -34,6 +34,18 @@ html, body {
 body {
   @apply bg-neutral-950 text-neutral-100;
   user-select: none;
+  /* iOS Safari's long-press callout (Copy/Look Up/Share) is a separate
+   * mechanism from text selection — user-select: none above stops
+   * selection, but doesn't stop the callout from still popping up on a
+   * ~0.5s+ hold and hijacking the touch sequence before our own
+   * touchend/touchcancel handlers see it. That silently broke every
+   * press-and-hold gesture in the app (hold-the-title-to-hard-resync, most
+   * notably) on real iOS devices: the callout would intercept the hold
+   * before our timer-based handlers ever got a chance to fire. Selection is
+   * already disabled everywhere via user-select above, so there's no
+   * legitimate copy/share use case being lost here.
+   */
+  -webkit-touch-callout: none;
 }
 
 /* Without an explicit color-scheme, browsers assume a light UI and pick a
