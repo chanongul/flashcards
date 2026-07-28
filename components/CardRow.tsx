@@ -59,6 +59,8 @@ function previewText(html: string): string {
 interface CardRowProps {
   card: Card;
   deckName?: string;
+  id?: string;
+  highlighted?: boolean;
   onSave: (
     cardId: string,
     changes: Partial<{
@@ -78,6 +80,8 @@ interface CardRowProps {
 export function CardRow({
   card,
   deckName,
+  id,
+  highlighted,
   onSave,
   onDelete,
   onToggleFlag,
@@ -133,10 +137,11 @@ export function CardRow({
 
   return (
     <li
+      id={id}
       onClick={() => setShowPreview(true)}
-      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm hover:bg-neutral-900/50 ${
-        card.suspended ? 'opacity-40' : ''
-      }`}
+      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm ring-orange-600 transition-shadow duration-500 hover:bg-neutral-900/50 ${
+        highlighted ? 'ring-2' : 'ring-0'
+      } ${card.suspended ? 'opacity-40' : ''}`}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span

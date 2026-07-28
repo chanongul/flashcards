@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
-import { ArrowLeft, FolderSearch } from 'lucide-react';
+import { ArrowLeft, FolderSearch, Plus } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
-import { editCard, deleteCard, cloneCard } from '@/lib/actions';
+import { editCard, deleteCard, cloneCard, createCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { CardRow } from '@/components/CardRow';
+import { CardForm } from '@/components/CardForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Modal } from '@/components/base/Modal';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { sortQueue } from '@/lib/fsrs';
 import { useSmartBack } from '@/lib/useSmartBack';
@@ -40,6 +42,37 @@ export default function AllCardsPage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  // Set to the just-created note's id on submit; once that note's card shows
+  // up in the (reactive) allCards list, we scroll it into view and briefly
+  // highlight it — the "New" cards a plain creation-order sort would put it
+  // at the bottom of an already-long list otherwise makes it easy to lose.
+  const [pendingScrollNoteId, setPendingScrollNoteId] = useState<string | null>(null);
+  const [highlightCardId, setHighlightCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingScrollNoteId || !allCards) return;
+    const match = allCards.find((c) => c.noteId === pendingScrollNoteId);
+    if (!match) return;
+    setPendingScrollNoteId(null);
+    setHighlightCardId(match.id);
+    document.getElementById(`card-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [allCards, pendingScrollNoteId]);
+
+  // Separate from the effect above on purpose: allCards is a useLiveQuery
+  // result, which gets a new array reference on every reactive update, not
+  // just the one that satisfies pendingScrollNoteId — a background sync
+  // pulling in unrelated changes mid-highlight would re-run that effect,
+  // whose cleanup would cancel this timer without anything left to
+  // reschedule it (pendingScrollNoteId is already null by then), leaving
+  // the highlight stuck on permanently. Keying this timer only on
+  // highlightCardId itself means unrelated allCards churn can't touch it.
+  useEffect(() => {
+    if (!highlightCardId) return;
+    const timeout = setTimeout(() => setHighlightCardId(null), 2000);
+    return () => clearTimeout(timeout);
+  }, [highlightCardId]);
 
   async function handleSaveEdit(
     cardId: string,
@@ -130,12 +163,23 @@ export default function AllCardsPage() {
 
       {syncError && <p className="mb-2 text-xs text-red-400">{syncError}</p>}
 
-      <p className="mb-2 text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
+        <button
+          onClick={() => setShowAddModal(true)}
+          aria-label="Add a card"
+          className="text-neutral-500 hover:text-neutral-200"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
 
       <ul className="space-y-2">
         {allCards?.map((card) => (
           <CardRow
             key={card.id}
+            id={`card-${card.id}`}
+            highlighted={highlightCardId === card.id}
             card={card}
             onSave={handleSaveEdit}
             onDelete={handleDelete}
@@ -148,6 +192,28 @@ export default function AllCardsPage() {
           <p className="text-sm text-neutral-500">No cards yet.</p>
         )}
       </ul>
+
+      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="New card">
+        <CardForm
+          mode="create"
+          onSubmit={async (data) => {
+            if (!user) return;
+            const noteId = await createCard(
+              user.id,
+              params.deckId,
+              data.cardType,
+              data.front,
+              data.back,
+              data.tags,
+              data.fields,
+              data.reversed
+            );
+            setShowAddModal(false);
+            setPendingScrollNoteId(noteId);
+          }}
+          onCancel={() => setShowAddModal(false)}
+        />
+      </Modal>
 
       <ConfirmDialog
         open={!!confirmState}
