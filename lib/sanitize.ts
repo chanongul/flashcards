@@ -4,6 +4,8 @@
 // element, which parses HTML without executing scripts or loading resources
 // (unlike setting .innerHTML on a live element), so this is safe to run on
 // untrusted strings.
+import { COLOR_PALETTE } from './richTextModel';
+
 const ALLOWED_TAGS = new Set(['B', 'I', 'U', 'BR', 'DIV', 'SPAN', 'IMG', 'AUDIO']);
 
 // Font size is deliberately NOT a free-form style attribute (arbitrary CSS
@@ -11,6 +13,12 @@ const ALLOWED_TAGS = new Set(['B', 'I', 'U', 'BR', 'DIV', 'SPAN', 'IMG', 'AUDIO'
 // Values render via CSS in globals.css targeting [data-size="N"].
 export const FONT_SIZE_VALUES = ['1', '2', '4', '5'] as const;
 const ALLOWED_SIZES = new Set<string>(FONT_SIZE_VALUES);
+
+// Same fixed-set reasoning as font size, for text color — see
+// lib/richTextModel.ts's COLOR_PALETTE (the single source of truth for the
+// actual key->hex mapping; this only needs the valid keys). Values render
+// via CSS in globals.css targeting [data-color="key"].
+const ALLOWED_COLORS = new Set(Object.keys(COLOR_PALETTE));
 
 // A media id is either an uploaded file (matching what the upload routes
 // produce) or a "pending:<uuid>" placeholder queued locally while offline
@@ -155,9 +163,9 @@ function sanitizeNode(node: Node) {
       continue;
     }
     if (el.tagName === 'SPAN') {
-      // A span only exists here to carry a size and/or a dim flag — one with
-      // neither is meaningless (e.g. pasted from elsewhere), so unwrap it
-      // like any other disallowed content instead of leaving an empty
+      // A span only exists here to carry a size, color, and/or dim flag —
+      // one with none of those is meaningless (e.g. pasted from elsewhere),
+      // so unwrap it like any other disallowed content instead of leaving an empty
       // wrapper. EXCEPT: some engines (Safari, specifically when toggling
       // bold/italic/underline on a collapsed caret rather than an existing
       // selection — see RichTextInput's seedInitialFormat) implement
@@ -170,6 +178,10 @@ function sanitizeNode(node: Node) {
       // when reading state back.
       const size = el.getAttribute('data-size');
       const validSize = size && ALLOWED_SIZES.has(size) ? size : null;
+      const color = el.getAttribute('data-color');
+      const validColor = color && ALLOWED_COLORS.has(color) ? color : null;
+      // data-dim is a separate opacity-based de-emphasis effect, independent
+      // of data-color — RichTextInput's toolbar has a dedicated toggle for it.
       const dim = el.hasAttribute('data-dim');
       const fontWeight = el.style.fontWeight;
       const isBoldStyle = fontWeight === 'bold' || fontWeight === 'bolder' || parseInt(fontWeight, 10) >= 600;
@@ -177,7 +189,7 @@ function sanitizeNode(node: Node) {
       const isItalicStyle = fontStyle === 'italic' || fontStyle === 'oblique';
       const textDecoration = el.style.textDecorationLine || el.style.textDecoration;
       const isUnderlineStyle = textDecoration.includes('underline');
-      if (!validSize && !dim && !isBoldStyle && !isItalicStyle && !isUnderlineStyle) {
+      if (!validSize && !validColor && !dim && !isBoldStyle && !isItalicStyle && !isUnderlineStyle) {
         unwrap(node, el);
         continue;
       }
@@ -185,7 +197,7 @@ function sanitizeNode(node: Node) {
       if (isUnderlineStyle) wrapChildren(el, 'u');
       if (isItalicStyle) wrapChildren(el, 'i');
       if (isBoldStyle) wrapChildren(el, 'b');
-      if (!validSize && !dim) {
+      if (!validSize && !validColor && !dim) {
         // The span was purely a style-based formatting wrapper — now
         // redundant since that formatting just moved into a real semantic
         // tag above, so drop the empty span itself rather than leaving it
@@ -196,6 +208,7 @@ function sanitizeNode(node: Node) {
       }
       for (const attr of Array.from(el.attributes)) el.removeAttribute(attr.name);
       if (validSize) el.setAttribute('data-size', validSize);
+      if (validColor) el.setAttribute('data-color', validColor);
       if (dim) el.setAttribute('data-dim', '');
       continue;
     }

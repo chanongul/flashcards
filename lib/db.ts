@@ -50,13 +50,16 @@ export type FieldTypeConfig = FieldType | 'dynamic' | 'asset';
 // once (a choice field's picked option, a note type's per-field starter
 // template) rather than to part of a live selection. size===3 means normal
 // (no wrapping span); see FONT_SIZE_VALUES in lib/sanitize.ts for the
-// allowed non-normal steps.
+// allowed non-normal steps. color==='' means no color override; see
+// COLOR_PALETTE in lib/richTextModel.ts for the allowed keys. dim is a
+// separate opacity-based de-emphasis effect, independent of color.
 export interface TextFormat {
   bold: boolean;
   italic: boolean;
   underline: boolean;
   dim: boolean;
   size: number;
+  color: string;
 }
 
 // A custom note type: an ordered field list plus which fields render on the

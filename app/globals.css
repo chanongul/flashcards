@@ -101,6 +101,18 @@ body {
 [data-size="5"] { font-size: 1.6em; }
 [data-dim] { opacity: 0.5; }
 
+/* Rich text color palette — keys/values must match lib/richTextModel.ts's
+ * COLOR_PALETTE exactly (CSS can't import a TS constant, so this is the one
+ * place that has to be kept in sync by hand). */
+[data-color="white"] { color: #ffffff; }
+[data-color="black"] { color: #000000; }
+[data-color="red"] { color: #f87171; }
+[data-color="orange"] { color: #fb923c; }
+[data-color="yellow"] { color: #facc15; }
+[data-color="green"] { color: #4ade80; }
+[data-color="blue"] { color: #60a5fa; }
+[data-color="purple"] { color: #c084fc; }
+
 /* Scoped instead of allowlisting a free-form `style` attribute in
  * lib/sanitize.ts, which would reopen a much bigger injection surface for
  * one rule's benefit. */

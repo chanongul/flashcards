@@ -12,6 +12,7 @@ import {
   Italic,
   Underline,
   EyeDashed,
+  Baseline,
   ChevronDown,
   Type,
   ListChecks,
@@ -20,8 +21,10 @@ import {
 import { db, type FieldType, type FieldTypeConfig, type TextFormat } from '@/lib/db';
 import { sanitizeRichText, stripHtml } from '@/lib/sanitize';
 import { shouldDropUp } from '@/lib/dropdownMenu';
+import { COLOR_PALETTE } from '@/lib/richTextModel';
 import { RichText } from './RichText';
 import { RichTextInput } from './RichTextInput';
+import { DropdownMenu } from './base/DropdownMenu';
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
@@ -718,6 +721,7 @@ export const NORMAL_TEXT_FORMAT: TextFormat = {
   italic: false,
   underline: false,
   dim: false,
+  color: '',
   size: TEXT_NORMAL_SIZE,
 };
 
@@ -735,11 +739,14 @@ export function readTextFormat(html: string): TextFormat {
   template.innerHTML = html;
   const sizeEl = template.content.querySelector('[data-size]');
   const size = sizeEl ? Number(sizeEl.getAttribute('data-size')) : TEXT_NORMAL_SIZE;
+  const colorEl = template.content.querySelector('[data-color]');
+  const color = colorEl?.getAttribute('data-color') ?? '';
   return {
     bold: !!template.content.querySelector('b'),
     italic: !!template.content.querySelector('i'),
     underline: !!template.content.querySelector('u'),
     dim: !!template.content.querySelector('[data-dim]'),
+    color: color in COLOR_PALETTE ? color : '',
     size: Number.isFinite(size) ? size : TEXT_NORMAL_SIZE,
   };
 }
@@ -758,6 +765,7 @@ export function buildFormattedText(text: string, format: TextFormat): string {
     node = el;
   }
   if (format.size !== TEXT_NORMAL_SIZE) wrap('span', { 'data-size': String(format.size) });
+  if (format.color) wrap('span', { 'data-color': format.color });
   if (format.dim) wrap('span', { 'data-dim': '' });
   if (format.underline) wrap('u');
   if (format.italic) wrap('i');
@@ -861,6 +869,46 @@ export function ChoiceFieldInput({
         >
           <EyeDashed size={14} />
         </button>
+        <DropdownMenu
+          trigger={({ onClick, open: colorOpen }) => (
+            <button
+              type="button"
+              onClick={onClick}
+              disabled={!hasSelection}
+              aria-label="Text color"
+              aria-pressed={colorOpen || !!format.color}
+              className={`rounded p-1 disabled:opacity-40 ${
+                format.color
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+              }`}
+              style={format.color ? { color: COLOR_PALETTE[format.color as keyof typeof COLOR_PALETTE] } : undefined}
+            >
+              <Baseline size={14} />
+            </button>
+          )}
+        >
+          {(close) => (
+            <div className="grid w-max grid-cols-4 gap-1 p-1">
+              {(Object.keys(COLOR_PALETTE) as (keyof typeof COLOR_PALETTE)[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    applyFormat({ color: format.color === key ? '' : key });
+                    close();
+                  }}
+                  aria-label={key}
+                  aria-pressed={format.color === key}
+                  className={`h-6 w-6 rounded-full border ${
+                    format.color === key ? 'border-neutral-100' : 'border-neutral-700'
+                  }`}
+                  style={{ backgroundColor: COLOR_PALETTE[key] }}
+                />
+              ))}
+            </div>
+          )}
+        </DropdownMenu>
         <div className="mx-1 w-px bg-neutral-700" />
         <button
           type="button"
