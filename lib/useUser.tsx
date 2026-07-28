@@ -1,11 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
-export function useUser() {
+interface UserContextValue {
+  user: User | null;
+  loading: boolean;
+}
+
+const UserContext = createContext<UserContextValue | null>(null);
+
+// Mounted once at the root layout — every page previously called useUser()
+// itself, which meant this whole auth check (including the network-bound
+// getUser() call below) re-ran from scratch on every single client-side
+// navigation, since a page component unmounts/remounts on route change
+// while a layout doesn't. That's what made navigating between pages feel
+// like it froze for a moment: every page's `if (loading || !user) return
+// null` gated its entire render behind a fresh round trip. Resolving it
+// once here and sharing the result via context means only the very first
+// load pays that cost — every navigation after that reads an already-
+// resolved value synchronously. Also fixes SyncManager (mounted at the
+// same root level) previously firing its own separate getUser() call on
+// top of whatever page was active, doubling the redundant network hit on
+// first load.
+export function UserProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,5 +81,11 @@ export function useUser() {
     return () => listener.subscription.unsubscribe();
   }, [router]);
 
-  return { user, loading };
+  return <UserContext.Provider value={{ user, loading }}>{children}</UserContext.Provider>;
+}
+
+export function useUser(): UserContextValue {
+  const ctx = useContext(UserContext);
+  if (!ctx) throw new Error('useUser must be used inside UserProvider');
+  return ctx;
 }

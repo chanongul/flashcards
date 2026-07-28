@@ -5,6 +5,7 @@ import { Smartphone } from 'lucide-react';
 import './globals.css';
 import { SyncManager } from '@/components/SyncManager';
 import { LoadingProvider } from '@/components/GlobalLoading';
+import { UserProvider } from '@/lib/useUser';
 
 // Self-hosted at build time by next/font — no runtime Google request, so it
 // still works offline in the installed PWA.
@@ -53,8 +54,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${geistMono.variable} ${sukhumvit.variable}`}>
       <body>
         <LoadingProvider>
-          <SyncManager />
-          {children}
+          <UserProvider>
+            <SyncManager />
+            {children}
+          </UserProvider>
         </LoadingProvider>
         {/* See globals.css's .landscape-lock rule — hidden by default,
             shown only on phones/tablets (coarse pointer) in landscape. */}
