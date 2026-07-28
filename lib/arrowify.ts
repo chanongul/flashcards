@@ -6,10 +6,11 @@
 // "-->" becomes "⟶" whole rather than leaving a stray "-" behind from a
 // "->" match eating just its last two characters.
 const ARROW_REPLACEMENTS: [RegExp, string][] = [
-  [/==>/g, '⟹'],
-  [/<==/g, '⟸'],
   [/=>/g, '⇒'],
-  [/<=/g, '⇐'],
+  [/==>/g, '⇒'],
+  [/<=/g, '≤'],
+  [/>=/g, '≥'],
+  [/<==/g, '⇐'],
   [/->/g, '→'],
   [/<-/g, '←'],
 ];
