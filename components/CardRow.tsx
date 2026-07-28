@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Pencil, Trash2, Star, Ban, Info, X, Bug, MoreVertical, Copy, ChevronDown } from 'lucide-react';
+import { Pencil, Trash2, Star, Ban, Info, X, Bug, MoreVertical, Copy, ChevronDown, ArrowLeft } from 'lucide-react';
 import { db, type Card, type FieldType } from '@/lib/db';
 import { stateLabel, ratingLabel, type StateLabel } from '@/lib/fsrs';
-import { clozeQuestion, clozeQuestionFor } from '@/lib/cloze';
+import { clozeQuestion, clozeQuestionFor, clozeAnswer } from '@/lib/cloze';
 import { getCardReviewHistory, type ReviewHistoryEntry } from '@/lib/stats';
 import { flattenDeckTree, deckDisplayName } from '@/lib/decks';
 import { shouldDropUp } from '@/lib/dropdownMenu';
@@ -14,6 +14,7 @@ import { inferFieldType } from './MediaFieldInput';
 import { useLoading, useLoadingWhen } from './GlobalLoading';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { CardForm } from './CardForm';
+import { CardFaces } from './CardFaces';
 
 
 const STATE_COLORS: Record<StateLabel, string> = {
@@ -53,6 +54,22 @@ function previewText(html: string): string {
   return '';
 }
 
+// Mirrors questionText/answerText in app/review/[deckId]/page.tsx: front/back
+// swap on isReversed for basic/custom cards, while cloze cards ignore that
+// (a cloze note can't be reversed) and instead hide/reveal by cloze number —
+// same source card.front the review UI itself renders from.
+function frontHtml(card: Card): string {
+  if (card.cardType === 'cloze') {
+    return card.clozeIndex !== null ? clozeQuestionFor(card.front, card.clozeIndex) : clozeQuestion(card.front);
+  }
+  return card.isReversed ? card.back : card.front;
+}
+
+function backHtml(card: Card): string {
+  if (card.cardType === 'cloze') return clozeAnswer(card.front);
+  return card.isReversed ? card.front : card.back;
+}
+
 interface CardRowProps {
   card: Card;
   deckName?: string;
@@ -87,11 +104,16 @@ export function CardRow({
   const [showClonePicker, setShowClonePicker] = useState(false);
   const [cloneTargetDeckId, setCloneTargetDeckId] = useState('');
   const [showInfo, setShowInfo] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  // Only the preview modal's own Edit button sets this — it's what decides
+  // whether the edit modal shows a "back to preview" button or not (opening
+  // edit straight from the "..." menu has no preview to go back to).
+  const [editedFromPreview, setEditedFromPreview] = useState(false);
   const [history, setHistory] = useState<ReviewHistoryEntry[] | null>(null);
   const { withLoading } = useLoading();
   useLoadingWhen(showInfo && !history);
 
-  useBodyScrollLock(showInfo || showClonePicker);
+  useBodyScrollLock(showInfo || showClonePicker || showPreview || editing);
 
   const hasReversedSibling = useLiveQuery(
     async () => {
@@ -121,39 +143,14 @@ export function CardRow({
   }
 
   function startEdit() {
+    setEditedFromPreview(false);
     setEditing(true);
-  }
-
-  if (editing) {
-    return (
-      <li className="rounded-md border border-neutral-700 p-3 bg-neutral-950">
-        <CardForm
-          mode="edit"
-          initialCardType={card.cardType === 'custom' ? (card.noteTypeId ?? 'basic') : card.cardType}
-          initialFront={card.front}
-          initialBack={card.back}
-          initialFields={card.fields}
-          initialTags={card.tags}
-          initialReversed={hasReversedSibling}
-          onSubmit={async (data) => {
-            await onSave(card.noteId, {
-              front: data.front,
-              back: data.back,
-              fields: data.fields,
-              tags: data.tags,
-              reversed: data.reversed,
-            });
-            setEditing(false);
-          }}
-          onCancel={() => setEditing(false)}
-        />
-      </li>
-    );
   }
 
   return (
     <li
-      className={`flex items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm ${
+      onClick={() => setShowPreview(true)}
+      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm hover:bg-neutral-900/50 ${
         card.suspended ? 'opacity-40' : ''
       }`}
     >
@@ -191,7 +188,7 @@ export function CardRow({
         )}
         {card.suspended && <span className="shrink-0 text-xs text-neutral-500">(suspended)</span>}
       </span>
-      <div className="relative shrink-0">
+      <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={(e) => {
             const opening = !showActions;
@@ -206,7 +203,7 @@ export function CardRow({
 
         {showActions && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowActions(false)} />
+            <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowActions(false)} />
             <div
               className={`absolute right-0 z-50 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg ${
                 actionsDropUp ? 'bottom-full mb-1' : 'top-full mt-1'
@@ -283,10 +280,124 @@ export function CardRow({
         )}
       </div>
 
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditing(false);
+          }}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {editedFromPreview && (
+                  <button
+                    onClick={() => {
+                      setEditing(false);
+                      setEditedFromPreview(false);
+                      setShowPreview(true);
+                    }}
+                    aria-label="Back to preview"
+                    className="text-neutral-400 hover:text-neutral-200"
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                )}
+                <p className="text-sm font-medium">Edit card</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setEditedFromPreview(false);
+                }}
+                aria-label="Close"
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <CardForm
+              mode="edit"
+              initialCardType={card.cardType === 'custom' ? (card.noteTypeId ?? 'basic') : card.cardType}
+              initialFront={card.front}
+              initialBack={card.back}
+              initialFields={card.fields}
+              initialTags={card.tags}
+              initialReversed={hasReversedSibling}
+              onSubmit={async (data) => {
+                await onSave(card.noteId, {
+                  front: data.front,
+                  back: data.back,
+                  fields: data.fields,
+                  tags: data.tags,
+                  reversed: data.reversed,
+                });
+                setEditing(false);
+                setEditedFromPreview(false);
+              }}
+              onCancel={() => {
+                setEditing(false);
+                setEditedFromPreview(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {showPreview && (
+        <div
+          className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowPreview(false);
+          }}
+        >
+          <div
+            className="flex h-[70vh] w-full max-w-sm flex-col rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex shrink-0 items-center justify-between">
+              <p className="text-sm font-medium">Card preview</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setShowPreview(false);
+                    setEditedFromPreview(true);
+                    setEditing(true);
+                  }}
+                  aria-label="Edit card"
+                  className="text-neutral-400 hover:text-neutral-200"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  aria-label="Close"
+                  className="text-neutral-400 hover:text-neutral-200"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-center">
+              <CardFaces front={frontHtml(card)} back={backHtml(card)} showBack />
+            </div>
+          </div>
+        </div>
+      )}
+
       {showInfo && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowInfo(false)}
+          className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowInfo(false);
+          }}
         >
           <div
             className="max-h-[80vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
@@ -345,8 +456,11 @@ export function CardRow({
 
       {showClonePicker && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowClonePicker(false)}
+          className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowClonePicker(false);
+          }}
         >
           <div
             className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"

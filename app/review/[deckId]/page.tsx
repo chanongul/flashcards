@@ -30,7 +30,7 @@ import { useUser } from "@/lib/useUser";
 import { useSmartBack } from "@/lib/useSmartBack";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { clozeBlankLetters, buildClozeText, clozeSegments } from "@/lib/cloze";
-import { RichText } from "@/components/RichText";
+import { CardFaces } from "@/components/CardFaces";
 import {
   FieldTypeToggle,
   FieldValueInput,
@@ -543,29 +543,11 @@ export default function ReviewPage() {
                 )}
               </>
             ) : (
-              <>
-                <ScrollFade>
-                  <div className="flex min-h-full flex-col items-center justify-center">
-                    <RichText
-                      html={questionText(current)}
-                      className="text-lg"
-                    />
-                  </div>
-                </ScrollFade>
-                {revealed && (
-                  <>
-                    <hr className="shrink-0 border-neutral-800" />
-                    <ScrollFade>
-                      <div className="flex min-h-full flex-col items-center justify-center">
-                        <RichText
-                          html={answerText(current)}
-                          className="text-lg text-neutral-300"
-                        />
-                      </div>
-                    </ScrollFade>
-                  </>
-                )}
-              </>
+              <CardFaces
+                front={questionText(current)}
+                back={answerText(current)}
+                showBack={revealed}
+              />
             )}
           </div>
 
