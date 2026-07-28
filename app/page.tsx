@@ -335,10 +335,22 @@ export default function HomePage() {
   const [noteTypeActionsDropUp, setNoteTypeActionsDropUp] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
   const [newQuestionFields, setNewQuestionFields] = useState<FieldRow[]>([
-    { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+    {
+      id: crypto.randomUUID(),
+      name: "",
+      type: "richtext",
+      choices: [],
+      format: NORMAL_TEXT_FORMAT,
+    },
   ]);
   const [newAnswerFields, setNewAnswerFields] = useState<FieldRow[]>([
-    { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+    {
+      id: crypto.randomUUID(),
+      name: "",
+      type: "richtext",
+      choices: [],
+      format: NORMAL_TEXT_FORMAT,
+    },
   ]);
   const [newTypeReversed, setNewTypeReversed] = useState(false);
   const [noteTypeError, setNoteTypeError] = useState("");
@@ -406,7 +418,9 @@ export default function HomePage() {
     setImportSummary(null);
   }
 
-  async function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImportFileChange(
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -638,10 +652,22 @@ export default function HomePage() {
     setEditingNoteTypeId(null);
     setNewTypeName("");
     setNewQuestionFields([
-      { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+      {
+        id: crypto.randomUUID(),
+        name: "",
+        type: "richtext",
+        choices: [],
+        format: NORMAL_TEXT_FORMAT,
+      },
     ]);
     setNewAnswerFields([
-      { id: crypto.randomUUID(), name: "", type: "richtext", choices: [], format: NORMAL_TEXT_FORMAT },
+      {
+        id: crypto.randomUUID(),
+        name: "",
+        type: "richtext",
+        choices: [],
+        format: NORMAL_TEXT_FORMAT,
+      },
     ]);
     setNewTypeReversed(false);
     setNoteTypeError("");
@@ -894,7 +920,9 @@ export default function HomePage() {
         </button>
       </div>
 
-      {syncError && <p className="mb-4 -mt-4 text-xs text-red-400">{syncError}</p>}
+      {syncError && (
+        <p className="mb-4 -mt-4 text-xs text-red-400">{syncError}</p>
+      )}
 
       <div className="mb-6">
         <TodayStatusSummary />
@@ -1110,13 +1138,13 @@ export default function HomePage() {
                     )}
                     <button
                       onClick={() => {
-                        startEditDeck(deck);
+                        handleExportDeck(deck);
                         setActionsDeck(null);
                       }}
-                      aria-label="Rename deck"
+                      aria-label="Export deck"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Pencil size={16} />
+                      <Download size={16} />
                     </button>
                     {depth === 0 && (
                       <button
@@ -1132,13 +1160,13 @@ export default function HomePage() {
                     )}
                     <button
                       onClick={() => {
-                        handleExportDeck(deck);
+                        startEditDeck(deck);
                         setActionsDeck(null);
                       }}
-                      aria-label="Export deck"
+                      aria-label="Rename deck"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Download size={16} />
+                      <Pencil size={16} />
                     </button>
                     <button
                       onClick={() => {
@@ -1883,10 +1911,13 @@ export default function HomePage() {
                   ) : (
                     <>
                       {importSummary.decksCreated} deck
-                      {importSummary.decksCreated === 1 ? "" : "s"} created,{" "}
-                      {importSummary.noteTypesCreated} note type
-                      {importSummary.noteTypesCreated === 1 ? "" : "s"} created,{" "}
-                      {importSummary.notesCreated} card
+                      {importSummary.decksCreated === 1
+                        ? ""
+                        : "s"} created, {importSummary.noteTypesCreated} note
+                      type
+                      {importSummary.noteTypesCreated === 1
+                        ? ""
+                        : "s"} created, {importSummary.notesCreated} card
                       {importSummary.notesCreated === 1 ? "" : "s"} added,{" "}
                       {importSummary.notesEdited} card
                       {importSummary.notesEdited === 1 ? "" : "s"} updated.
@@ -1969,7 +2000,9 @@ export default function HomePage() {
                       <input
                         type="text"
                         value={importCsvNewDeckName}
-                        onChange={(e) => setImportCsvNewDeckName(e.target.value)}
+                        onChange={(e) =>
+                          setImportCsvNewDeckName(e.target.value)
+                        }
                         placeholder="New deck name"
                         className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                       />
