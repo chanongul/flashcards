@@ -1,27 +1,27 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Search, Star, CheckSquare, X } from 'lucide-react';
-import { db } from '@/lib/db';
-import { editCard, deleteCard, cloneCard } from '@/lib/actions';
-import { useUser } from '@/lib/useUser';
-import { CardRow } from '@/components/CardRow';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { BulkActionBar } from '@/components/BulkActionBar';
-import { DeckPickerModal } from '@/components/DeckPickerModal';
-import { cardSearchText } from '@/lib/search';
-import { useLoadingWhen } from '@/components/GlobalLoading';
-import { useSmartBack } from '@/lib/useSmartBack';
-import { useCardSelection } from '@/lib/useCardSelection';
-import { flattenDeckTree } from '@/lib/decks';
-import { sync } from '@/lib/sync';
+import { useState, useRef } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { ArrowLeft, Search, Star, CheckSquare, X } from "lucide-react";
+import { db } from "@/lib/db";
+import { editCard, deleteCard, cloneCard } from "@/lib/actions";
+import { useUser } from "@/lib/useUser";
+import { CardRow } from "@/components/CardRow";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { DeckPickerModal } from "@/components/DeckPickerModal";
+import { cardSearchText } from "@/lib/search";
+import { useLoadingWhen } from "@/components/GlobalLoading";
+import { useSmartBack } from "@/lib/useSmartBack";
+import { useCardSelection } from "@/lib/useCardSelection";
+import { flattenDeckTree } from "@/lib/decks";
+import { sync } from "@/lib/sync";
 
 export default function BrowsePage() {
-  const goBack = useSmartBack('/');
+  const goBack = useSmartBack("/");
   const { user, loading: userLoading } = useUser();
   useLoadingWhen(userLoading || !user);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [confirmState, setConfirmState] = useState<{
     title: string;
@@ -29,8 +29,14 @@ export default function BrowsePage() {
     onConfirm: () => void;
   } | null>(null);
 
-  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
-  const allCards = useLiveQuery(() => db.cards.filter((c) => !c.deleted).toArray(), []);
+  const decks = useLiveQuery(
+    () => db.decks.filter((d) => !d.deleted).toArray(),
+    [],
+  );
+  const allCards = useLiveQuery(
+    () => db.cards.filter((c) => !c.deleted).toArray(),
+    [],
+  );
 
   const deckNameById = new Map((decks ?? []).map((d) => [d.id, d.name]));
 
@@ -41,20 +47,20 @@ export default function BrowsePage() {
     // favorite — only plain search requires you to actually type something.
     if (!q) return favoritesOnly;
     const text = cardSearchText(card);
-    const deckName = deckNameById.get(card.deckId) ?? '';
-    const tags = card.tags.join(' ');
+    const deckName = deckNameById.get(card.deckId) ?? "";
+    const tags = card.tags.join(" ");
     return (
       text.toLowerCase().includes(q) ||
       deckName.toLowerCase().includes(q) ||
       tags.toLowerCase().includes(q)
     );
   });
-  const hasActiveFilter = query.trim() !== '' || favoritesOnly;
+  const hasActiveFilter = query.trim() !== "" || favoritesOnly;
 
   const selection = useCardSelection(filtered, user?.id);
-  const [bulkMoveTargetId, setBulkMoveTargetId] = useState('');
+  const [bulkMoveTargetId, setBulkMoveTargetId] = useState("");
   const [showBulkMove, setShowBulkMove] = useState(false);
-  const [bulkDuplicateTargetId, setBulkDuplicateTargetId] = useState('');
+  const [bulkDuplicateTargetId, setBulkDuplicateTargetId] = useState("");
   const [showBulkDuplicate, setShowBulkDuplicate] = useState(false);
   const deckRows = flattenDeckTree(decks ?? []);
 
@@ -66,7 +72,7 @@ export default function BrowsePage() {
       fields: Record<string, string>;
       tags: string[];
       reversed: boolean;
-    }>
+    }>,
   ) {
     if (!user) return;
     await editCard(user.id, cardId, changes);
@@ -74,8 +80,8 @@ export default function BrowsePage() {
 
   function handleDelete(cardId: string) {
     setConfirmState({
-      title: 'Delete card',
-      message: 'Delete this card? This cannot be undone.',
+      title: "Delete card",
+      message: "Delete this card? This cannot be undone.",
       onConfirm: async () => {
         if (!user) return;
         await deleteCard(user.id, cardId);
@@ -105,7 +111,7 @@ export default function BrowsePage() {
   }
 
   function openBulkMove() {
-    setBulkMoveTargetId('');
+    setBulkMoveTargetId("");
     setShowBulkMove(true);
   }
 
@@ -116,7 +122,7 @@ export default function BrowsePage() {
   }
 
   function openBulkDuplicate() {
-    setBulkDuplicateTargetId('');
+    setBulkDuplicateTargetId("");
     setShowBulkDuplicate(true);
   }
 
@@ -129,8 +135,8 @@ export default function BrowsePage() {
   function handleBulkDelete() {
     const n = selection.selectedCards.length;
     setConfirmState({
-      title: 'Delete cards',
-      message: `Delete ${n} card${n === 1 ? '' : 's'}? This cannot be undone.`,
+      title: "Delete cards",
+      message: `Delete ${n} card${n === 1 ? "" : "s"}? This cannot be undone.`,
       onConfirm: async () => {
         await selection.bulkDelete();
         setConfirmState(null);
@@ -145,11 +151,11 @@ export default function BrowsePage() {
   function startPressHoldTimers() {
     pressStartRef.current = Date.now();
   }
-  
+
   function cancelPressHoldTimers() {
     pressStartRef.current = null;
   }
-  
+
   function endPressHoldTimers() {
     const start = pressStartRef.current;
     cancelPressHoldTimers();
@@ -165,7 +171,7 @@ export default function BrowsePage() {
     try {
       await sync(user.id);
     } catch (err) {
-      console.error('Manual sync failed:', err);
+      console.error("Manual sync failed:", err);
     }
   }
 
@@ -174,7 +180,7 @@ export default function BrowsePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
+    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 md:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={goBack}
@@ -197,28 +203,21 @@ export default function BrowsePage() {
         >
           Browse
         </h1>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setFavoritesOnly((v) => !v)}
-            aria-label={favoritesOnly ? 'Show all cards' : 'Show favorites only'}
-            aria-pressed={favoritesOnly}
-            className={`text-yellow-400 ${favoritesOnly ? '' : 'opacity-40 hover:opacity-70'}`}
-          >
-            <Star size={20} fill="currentColor" />
-          </button>
-          <button
-            onClick={selection.toggleSelectMode}
-            aria-label={selection.selectMode ? 'Cancel selection' : 'Select cards'}
-            aria-pressed={selection.selectMode}
-            className={selection.selectMode ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-200'}
-          >
-            {selection.selectMode ? <X size={20} /> : <CheckSquare size={20} />}
-          </button>
-        </div>
+        <button
+          onClick={() => setFavoritesOnly((v) => !v)}
+          aria-label={favoritesOnly ? "Show all cards" : "Show favorites only"}
+          aria-pressed={favoritesOnly}
+          className={`text-yellow-400 ${favoritesOnly ? "" : "opacity-40 hover:opacity-70"}`}
+        >
+          <Star size={20} fill="currentColor" />
+        </button>
       </div>
 
       <div className="relative mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
+        />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -228,12 +227,28 @@ export default function BrowsePage() {
       </div>
 
       {hasActiveFilter && (
-        <p className="mb-2 text-xs text-neutral-500">
-          {filtered.length} card{filtered.length === 1 ? '' : 's'}
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs text-neutral-500">
+            {filtered.length} card{filtered.length === 1 ? "" : "s"}
+          </p>
+          <button
+            onClick={selection.toggleSelectMode}
+            aria-label={
+              selection.selectMode ? "Cancel selection" : "Select cards"
+            }
+            aria-pressed={selection.selectMode}
+            className={
+              selection.selectMode
+                ? "text-neutral-100"
+                : "text-neutral-500 hover:text-neutral-200"
+            }
+          >
+            {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+          </button>
+        </div>
       )}
 
-      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
+      <ul className={`space-y-2 ${selection.selectMode ? "pb-10" : ""}`}>
         {filtered.map((card) => (
           <CardRow
             key={card.id}
@@ -251,7 +266,9 @@ export default function BrowsePage() {
           />
         ))}
         {hasActiveFilter ? (
-          filtered.length === 0 && <p className="text-sm text-neutral-500">No cards match.</p>
+          filtered.length === 0 && (
+            <p className="text-sm text-neutral-500">No cards match.</p>
+          )
         ) : (
           <p className="text-sm text-neutral-500">Type to search your cards.</p>
         )}
@@ -275,7 +292,7 @@ export default function BrowsePage() {
       <DeckPickerModal
         open={showBulkMove}
         onClose={() => setShowBulkMove(false)}
-        title={`Move ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        title={`Move ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? "" : "s"}`}
         confirmLabel="Move"
         rows={deckRows}
         value={bulkMoveTargetId}
@@ -286,7 +303,7 @@ export default function BrowsePage() {
       <DeckPickerModal
         open={showBulkDuplicate}
         onClose={() => setShowBulkDuplicate(false)}
-        title={`Duplicate ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        title={`Duplicate ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? "" : "s"}`}
         confirmLabel="Duplicate"
         rows={deckRows}
         value={bulkDuplicateTargetId}
@@ -296,8 +313,8 @@ export default function BrowsePage() {
 
       <ConfirmDialog
         open={!!confirmState}
-        title={confirmState?.title ?? ''}
-        message={confirmState?.message ?? ''}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message ?? ""}
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}
       />

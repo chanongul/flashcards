@@ -996,7 +996,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
+    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 md:mb-0">
       <div className="mb-6 flex items-center justify-between">
         <h1
           className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-50"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
@@ -1259,7 +1259,17 @@ export default function HomePage() {
                         <FolderPlus size={14} />
                       </button>
                     )}
-                    {depth === 0 ? (
+                    <button
+                      onClick={() => {
+                        handleMoveDeck(deck);
+                        close();
+                      }}
+                      aria-label="Move deck"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <FolderInput size={14} />
+                    </button>
+                    {depth === 0 && (
                       <button
                         onClick={() => {
                           handleCloneDeck(deck.id);
@@ -1269,17 +1279,6 @@ export default function HomePage() {
                         className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                       >
                         <Copy size={14} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          handleMoveDeck(deck);
-                          close();
-                        }}
-                        aria-label="Move deck"
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                      >
-                        <FolderInput size={14} />
                       </button>
                     )}
                     <button

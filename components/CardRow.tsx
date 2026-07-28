@@ -1,35 +1,52 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { Pencil, Trash2, Star, Ban, Info, Bug, MoreVertical, Copy, ArrowLeft, FolderInput } from 'lucide-react';
-import { db, type Card, type FieldType } from '@/lib/db';
-import { stateLabel, ratingLabel, type StateLabel } from '@/lib/fsrs';
-import { clozeQuestion, clozeQuestionFor } from '@/lib/cloze';
-import { cardFrontHtml, cardBackHtml } from '@/lib/cardContent';
-import { getCardReviewHistory, type ReviewHistoryEntry } from '@/lib/stats';
-import { flattenDeckTree } from '@/lib/decks';
-import { extractSearchableText } from '@/lib/sanitize';
-import { inferFieldType } from './MediaFieldInput';
-import { useLoading, useLoadingWhen } from './GlobalLoading';
-import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
-import { CardForm } from './CardForm';
-import { CardFaces } from './CardFaces';
-import { Modal } from './base/Modal';
-import { DropdownMenu } from './base/DropdownMenu';
-import { DeckPickerModal } from './DeckPickerModal';
-import { Checkbox } from './Checkbox';
-
+import { useEffect, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import {
+  Pencil,
+  Trash2,
+  Star,
+  Ban,
+  Info,
+  Bug,
+  MoreVertical,
+  Copy,
+  ArrowLeft,
+  FolderInput,
+} from "lucide-react";
+import { db, type Card, type FieldType } from "@/lib/db";
+import { stateLabel, ratingLabel, type StateLabel } from "@/lib/fsrs";
+import { clozeQuestion, clozeQuestionFor } from "@/lib/cloze";
+import { cardFrontHtml, cardBackHtml } from "@/lib/cardContent";
+import { getCardReviewHistory, type ReviewHistoryEntry } from "@/lib/stats";
+import { flattenDeckTree } from "@/lib/decks";
+import { extractSearchableText } from "@/lib/sanitize";
+import { inferFieldType } from "./MediaFieldInput";
+import { useLoading, useLoadingWhen } from "./GlobalLoading";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { CardForm } from "./CardForm";
+import { CardFaces } from "./CardFaces";
+import { Modal } from "./base/Modal";
+import { DropdownMenu } from "./base/DropdownMenu";
+import { DeckPickerModal } from "./DeckPickerModal";
+import { Checkbox } from "./Checkbox";
 
 const STATE_COLORS: Record<StateLabel, string> = {
-  New: 'bg-sky-900/50 text-sky-300',
-  Learning: 'bg-orange-900/50 text-orange-300',
-  Review: 'bg-olive-900/50 text-olive-300',
-  Relearning: 'bg-red-900/50 text-red-300',
+  New: "bg-sky-900/50 text-sky-300",
+  Learning: "bg-orange-900/50 text-orange-300",
+  Review: "bg-olive-900/50 text-olive-300",
+  Relearning: "bg-red-900/50 text-red-300",
 };
 
 function parseTagList(s: string): string[] {
-  return Array.from(new Set(s.split(',').map((t) => t.trim()).filter(Boolean)));
+  return Array.from(
+    new Set(
+      s
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 // A reverse card (isReversed) and every non-first cloze blank card
@@ -42,7 +59,12 @@ function parseTagList(s: string): string[] {
 // unaffected — it already edits the shared note either way.
 function isDerivedCard(card: Card): boolean {
   if (card.isReversed) return true;
-  if (card.cardType === 'cloze' && card.clozeIndex !== null && card.clozeIndex > 1) return true;
+  if (
+    card.cardType === "cloze" &&
+    card.clozeIndex !== null &&
+    card.clozeIndex > 1
+  )
+    return true;
   return false;
 }
 
@@ -53,9 +75,9 @@ function previewText(html: string): string {
   const text = extractSearchableText(html).trim();
   if (text) return text;
   const type = inferFieldType(html);
-  if (type === 'image') return '[Image]';
-  if (type === 'audio') return '[Audio]';
-  return '';
+  if (type === "image") return "[Image]";
+  if (type === "audio") return "[Audio]";
+  return "";
 }
 
 interface CardRowProps {
@@ -79,7 +101,7 @@ interface CardRowProps {
       fields: Record<string, string>;
       tags: string[];
       reversed: boolean;
-    }>
+    }>,
   ) => void | Promise<void>;
   onDelete: (cardId: string) => void | Promise<void>;
   onToggleFlag: (card: Card) => void | Promise<void>;
@@ -105,9 +127,9 @@ export function CardRow({
 }: CardRowProps) {
   const [editing, setEditing] = useState(false);
   const [showClonePicker, setShowClonePicker] = useState(false);
-  const [cloneTargetDeckId, setCloneTargetDeckId] = useState('');
+  const [cloneTargetDeckId, setCloneTargetDeckId] = useState("");
   const [showMovePicker, setShowMovePicker] = useState(false);
-  const [moveTargetDeckId, setMoveTargetDeckId] = useState('');
+  const [moveTargetDeckId, setMoveTargetDeckId] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   // Only the preview modal's own Edit button sets this — it's what decides
@@ -118,17 +140,19 @@ export function CardRow({
   const { withLoading } = useLoading();
   useLoadingWhen(showInfo && !history);
 
-  useBodyScrollLock(showInfo || showClonePicker || showMovePicker || showPreview || editing);
-
-  const hasReversedSibling = useLiveQuery(
-    async () => {
-      const sib = await db.cards.get(`${card.noteId}::reversed`);
-      return !!(sib && !sib.deleted);
-    },
-    [card.noteId]
+  useBodyScrollLock(
+    showInfo || showClonePicker || showMovePicker || showPreview || editing,
   );
 
-  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
+  const hasReversedSibling = useLiveQuery(async () => {
+    const sib = await db.cards.get(`${card.noteId}::reversed`);
+    return !!(sib && !sib.deleted);
+  }, [card.noteId]);
+
+  const decks = useLiveQuery(
+    () => db.decks.filter((d) => !d.deleted).toArray(),
+    [],
+  );
   const deckRows = flattenDeckTree(decks ?? []);
 
   useEffect(() => {
@@ -174,15 +198,23 @@ export function CardRow({
   return (
     <li
       id={id}
-      onClick={() => (selectMode ? onToggleSelect?.(card) : setShowPreview(true))}
+      onClick={() =>
+        selectMode ? onToggleSelect?.(card) : setShowPreview(true)
+      }
       className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm ring-orange-600 transition-shadow duration-500 hover:bg-neutral-900/50 ${
-        highlighted ? 'ring-2' : 'ring-0'
-      } ${card.suspended ? 'opacity-40' : ''}`}
+        highlighted ? "ring-2" : "ring-0"
+      } ${card.suspended ? "opacity-40" : ""}`}
     >
       <span className="flex min-w-0 items-center gap-2">
         {selectMode && (
-          <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
-            <Checkbox checked={!!selected} onChange={() => onToggleSelect?.(card)} />
+          <span
+            className="flex items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={!!selected}
+              onChange={() => onToggleSelect?.(card)}
+            />
           </span>
         )}
         <span
@@ -191,14 +223,20 @@ export function CardRow({
           {stateLabel(card.fsrs.state)}
         </span>
         <span className="truncate text-neutral-300">
-          {card.cardType === 'cloze'
+          {card.cardType === "cloze"
             ? card.clozeIndex !== null
               ? clozeQuestionFor(card.front, card.clozeIndex)
               : clozeQuestion(card.front)
             : previewText(card.isReversed ? card.back : card.front)}
         </span>
-        {card.isReversed && <span className="shrink-0 text-xs text-neutral-500">(reversed)</span>}
-        {deckName && <span className="shrink-0 text-xs text-neutral-500">· {deckName}</span>}
+        {card.isReversed && (
+          <span className="shrink-0 text-xs text-neutral-500">(reversed)</span>
+        )}
+        {deckName && (
+          <span className="shrink-0 text-xs text-neutral-500">
+            · {deckName}
+          </span>
+        )}
         {card.tags.length > 0 && (
           <span className="flex shrink-0 gap-1">
             {card.tags.map((tag) => (
@@ -212,106 +250,112 @@ export function CardRow({
           </span>
         )}
         {card.isLeech && (
-          <span className="shrink-0 text-red-400" aria-label="Leech" title="Leech (too many lapses)">
+          <span
+            className="shrink-0 text-red-400"
+            aria-label="Leech"
+            title="Leech (too many lapses)"
+          >
             <Bug size={12} />
           </span>
         )}
-        {card.suspended && <span className="shrink-0 text-xs text-neutral-500">(suspended)</span>}
+        {card.suspended && (
+          <span className="shrink-0 text-xs text-neutral-500">(suspended)</span>
+        )}
       </span>
       {!selectMode && (
-      <DropdownMenu
-        stopClickPropagation
-        trigger={({ onClick }) => (
-          <button
-            onClick={onClick}
-            aria-label="Card actions"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
-          >
-            <MoreVertical size={16} />
-          </button>
-        )}
-      >
-        {(close) => (
-          <>
+        <DropdownMenu
+          stopClickPropagation
+          trigger={({ onClick }) => (
             <button
-              onClick={() => {
-                setShowInfo(true);
-                close();
-              }}
-              aria-label="Card info"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+              onClick={onClick}
+              aria-label="Card actions"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
             >
-              <Info size={14} />
+              <MoreVertical size={16} />
             </button>
-            <button
-              onClick={() => {
-                onToggleFlag(card);
-                close();
-              }}
-              aria-label={card.flagged ? 'Remove flag' : 'Flag card'}
-              className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-neutral-900 ${
-                card.flagged ? 'text-yellow-400' : 'text-neutral-300'
-              }`}
-            >
-              <Star size={14} fill={card.flagged ? 'currentColor' : 'none'} />
-            </button>
-            <button
-              onClick={() => {
-                onToggleSuspend(card);
-                close();
-              }}
-              aria-label={card.suspended ? 'Unsuspend card' : 'Suspend card'}
-              className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-neutral-900 ${
-                card.suspended ? 'text-orange-400' : 'text-neutral-300'
-              }`}
-            >
-              <Ban size={14} />
-            </button>
-            <button
-              onClick={() => {
-                openClonePicker();
-                close();
-              }}
-              aria-label="Duplicate card"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-            >
-              <Copy size={14} />
-            </button>
-            <button
-              onClick={() => {
-                openMovePicker();
-                close();
-              }}
-              aria-label="Move card"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-            >
-              <FolderInput size={14} />
-            </button>
-            <button
-              onClick={() => {
-                startEdit();
-                close();
-              }}
-              aria-label="Edit card"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-            >
-              <Pencil size={14} />
-            </button>
-            {!isDerivedCard(card) && (
+          )}
+        >
+          {(close) => (
+            <>
               <button
                 onClick={() => {
-                  onDelete(card.noteId);
+                  setShowInfo(true);
                   close();
                 }}
-                aria-label="Delete card"
-                className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                aria-label="Card info"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
               >
-                <Trash2 size={14} />
+                <Info size={14} />
               </button>
-            )}
-          </>
-        )}
-      </DropdownMenu>
+              <button
+                onClick={() => {
+                  onToggleFlag(card);
+                  close();
+                }}
+                aria-label={card.flagged ? "Remove flag" : "Flag card"}
+                className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-neutral-900 ${
+                  card.flagged ? "text-yellow-400" : "text-neutral-300"
+                }`}
+              >
+                <Star size={14} fill={card.flagged ? "currentColor" : "none"} />
+              </button>
+              <button
+                onClick={() => {
+                  onToggleSuspend(card);
+                  close();
+                }}
+                aria-label={card.suspended ? "Unsuspend card" : "Suspend card"}
+                className={`flex h-8 w-8 items-center justify-center rounded-md hover:bg-neutral-900 ${
+                  card.suspended ? "text-orange-400" : "text-neutral-300"
+                }`}
+              >
+                <Ban size={14} />
+              </button>
+              <button
+                onClick={() => {
+                  openMovePicker();
+                  close();
+                }}
+                aria-label="Move card"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+              >
+                <FolderInput size={14} />
+              </button>
+              <button
+                onClick={() => {
+                  openClonePicker();
+                  close();
+                }}
+                aria-label="Duplicate card"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+              >
+                <Copy size={14} />
+              </button>
+              <button
+                onClick={() => {
+                  startEdit();
+                  close();
+                }}
+                aria-label="Edit card"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+              >
+                <Pencil size={14} />
+              </button>
+              {!isDerivedCard(card) && (
+                <button
+                  onClick={() => {
+                    onDelete(card.noteId);
+                    close();
+                  }}
+                  aria-label="Delete card"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </>
+          )}
+        </DropdownMenu>
       )}
 
       <Modal
@@ -339,7 +383,11 @@ export function CardRow({
       >
         <CardForm
           mode="edit"
-          initialCardType={card.cardType === 'custom' ? (card.noteTypeId ?? 'basic') : card.cardType}
+          initialCardType={
+            card.cardType === "custom"
+              ? (card.noteTypeId ?? "basic")
+              : card.cardType
+          }
           initialFront={card.front}
           initialBack={card.back}
           initialFields={card.fields}
@@ -383,7 +431,11 @@ export function CardRow({
         }
       >
         <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-center">
-          <CardFaces front={cardFrontHtml(card)} back={cardBackHtml(card)} showBack />
+          <CardFaces
+            front={cardFrontHtml(card)}
+            back={cardBackHtml(card)}
+            showBack
+          />
         </div>
       </Modal>
 
@@ -395,14 +447,27 @@ export function CardRow({
       >
         <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
           <InfoStat label="State" value={stateLabel(card.fsrs.state)} />
-          <InfoStat label="Due" value={new Date(card.fsrs.due).toLocaleString()} />
-          <InfoStat label="Stability" value={`${card.fsrs.stability.toFixed(2)}d`} />
-          <InfoStat label="Difficulty" value={card.fsrs.difficulty.toFixed(2)} />
+          <InfoStat
+            label="Due"
+            value={new Date(card.fsrs.due).toLocaleString()}
+          />
+          <InfoStat
+            label="Stability"
+            value={`${card.fsrs.stability.toFixed(2)}d`}
+          />
+          <InfoStat
+            label="Difficulty"
+            value={card.fsrs.difficulty.toFixed(2)}
+          />
           <InfoStat label="Reps" value={String(card.fsrs.reps)} />
           <InfoStat label="Lapses" value={String(card.fsrs.lapses)} />
           <InfoStat
             label="Last reviewed"
-            value={card.fsrs.last_review ? new Date(card.fsrs.last_review).toLocaleString() : 'Never'}
+            value={
+              card.fsrs.last_review
+                ? new Date(card.fsrs.last_review).toLocaleString()
+                : "Never"
+            }
           />
         </div>
 
@@ -417,13 +482,15 @@ export function CardRow({
               <li
                 key={entry.id}
                 className={`flex items-center justify-between rounded px-2 py-1 text-xs ${
-                  entry.undone ? 'text-neutral-600 line-through' : 'text-neutral-300'
+                  entry.undone
+                    ? "text-neutral-600 line-through"
+                    : "text-neutral-300"
                 }`}
               >
                 <span>{new Date(entry.timestamp).toLocaleString()}</span>
                 <span>
                   {ratingLabel(entry.rating)}
-                  {entry.undone && ' (undone)'}
+                  {entry.undone && " (undone)"}
                 </span>
               </li>
             ))}

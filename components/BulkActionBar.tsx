@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { Star, Ban, Copy, FolderInput, Trash2 } from 'lucide-react';
-import { Checkbox } from './Checkbox';
+import { Star, Ban, Copy, FolderInput, Trash2 } from "lucide-react";
+import { Checkbox } from "./Checkbox";
 
 interface BulkActionBarProps {
   count: number;
   allSelected: boolean;
   onToggleSelectAll: () => void;
-  flagLabel: 'Flag' | 'Unflag';
+  flagLabel: "Flag" | "Unflag";
   onFlag: () => void;
-  suspendLabel: 'Suspend' | 'Unsuspend';
+  suspendLabel: "Suspend" | "Unsuspend";
   onSuspend: () => void;
   onDuplicate: () => void;
   onMove: () => void;
@@ -36,7 +36,7 @@ export function BulkActionBar({
 }: BulkActionBarProps) {
   const disabled = count === 0;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 px-8 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pb-4 md:pb-0">
       <div className="mx-auto flex max-w-md items-center justify-between gap-2">
         <button
           onClick={onToggleSelectAll}
@@ -65,15 +65,6 @@ export function BulkActionBar({
             <Ban size={16} />
           </button>
           <button
-            onClick={onDuplicate}
-            disabled={disabled}
-            aria-label="Duplicate selected"
-            title="Duplicate"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900 disabled:opacity-40"
-          >
-            <Copy size={16} />
-          </button>
-          <button
             onClick={onMove}
             disabled={disabled}
             aria-label="Move selected"
@@ -81,6 +72,15 @@ export function BulkActionBar({
             className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900 disabled:opacity-40"
           >
             <FolderInput size={16} />
+          </button>
+          <button
+            onClick={onDuplicate}
+            disabled={disabled}
+            aria-label="Duplicate selected"
+            title="Duplicate"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900 disabled:opacity-40"
+          >
+            <Copy size={16} />
           </button>
           <button
             onClick={onDelete}

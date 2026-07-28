@@ -160,7 +160,7 @@ export default function DeckBrowsePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 sm:mb-0">
+    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 md:mb-0">
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={goBack}
@@ -222,7 +222,7 @@ export default function DeckBrowsePage() {
         </p>
       )}
 
-      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
+      <ul className={`space-y-2 ${selection.selectMode ? 'pb-10' : ''}`}>
         {filtered.map((card) => (
           <CardRow
             key={card.id}
