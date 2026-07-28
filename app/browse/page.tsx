@@ -2,15 +2,19 @@
 
 import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Search, Star } from 'lucide-react';
+import { ArrowLeft, Search, Star, CheckSquare, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { editCard, deleteCard, cloneCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
 import { CardRow } from '@/components/CardRow';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { BulkActionBar } from '@/components/BulkActionBar';
+import { DeckPickerModal } from '@/components/DeckPickerModal';
 import { cardSearchText } from '@/lib/search';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { useSmartBack } from '@/lib/useSmartBack';
+import { useCardSelection } from '@/lib/useCardSelection';
+import { flattenDeckTree } from '@/lib/decks';
 import { sync } from '@/lib/sync';
 
 export default function BrowsePage() {
@@ -46,6 +50,13 @@ export default function BrowsePage() {
     );
   });
   const hasActiveFilter = query.trim() !== '' || favoritesOnly;
+
+  const selection = useCardSelection(filtered, user?.id);
+  const [bulkMoveTargetId, setBulkMoveTargetId] = useState('');
+  const [showBulkMove, setShowBulkMove] = useState(false);
+  const [bulkDuplicateTargetId, setBulkDuplicateTargetId] = useState('');
+  const [showBulkDuplicate, setShowBulkDuplicate] = useState(false);
+  const deckRows = flattenDeckTree(decks ?? []);
 
   async function handleSaveEdit(
     cardId: string,
@@ -86,6 +97,45 @@ export default function BrowsePage() {
   async function handleClone(cardId: string, deckId: string) {
     if (!user) return;
     await cloneCard(user.id, cardId, deckId);
+  }
+
+  async function handleMoveCard(noteId: string, deckId: string) {
+    if (!user) return;
+    await editCard(user.id, noteId, { deckId });
+  }
+
+  function openBulkMove() {
+    setBulkMoveTargetId('');
+    setShowBulkMove(true);
+  }
+
+  async function confirmBulkMove() {
+    if (!bulkMoveTargetId) return;
+    await selection.bulkMove(bulkMoveTargetId);
+    setShowBulkMove(false);
+  }
+
+  function openBulkDuplicate() {
+    setBulkDuplicateTargetId('');
+    setShowBulkDuplicate(true);
+  }
+
+  async function confirmBulkDuplicate() {
+    if (!bulkDuplicateTargetId) return;
+    await selection.bulkDuplicate(bulkDuplicateTargetId);
+    setShowBulkDuplicate(false);
+  }
+
+  function handleBulkDelete() {
+    const n = selection.selectedCards.length;
+    setConfirmState({
+      title: 'Delete cards',
+      message: `Delete ${n} card${n === 1 ? '' : 's'}? This cannot be undone.`,
+      onConfirm: async () => {
+        await selection.bulkDelete();
+        setConfirmState(null);
+      },
+    });
   }
 
   // Title gesture timers
@@ -147,14 +197,24 @@ export default function BrowsePage() {
         >
           Browse
         </h1>
-        <button
-          onClick={() => setFavoritesOnly((v) => !v)}
-          aria-label={favoritesOnly ? 'Show all cards' : 'Show favorites only'}
-          aria-pressed={favoritesOnly}
-          className={`text-yellow-400 ${favoritesOnly ? '' : 'opacity-40 hover:opacity-70'}`}
-        >
-          <Star size={20} fill="currentColor" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setFavoritesOnly((v) => !v)}
+            aria-label={favoritesOnly ? 'Show all cards' : 'Show favorites only'}
+            aria-pressed={favoritesOnly}
+            className={`text-yellow-400 ${favoritesOnly ? '' : 'opacity-40 hover:opacity-70'}`}
+          >
+            <Star size={20} fill="currentColor" />
+          </button>
+          <button
+            onClick={selection.toggleSelectMode}
+            aria-label={selection.selectMode ? 'Cancel selection' : 'Select cards'}
+            aria-pressed={selection.selectMode}
+            className={selection.selectMode ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-200'}
+          >
+            {selection.selectMode ? <X size={20} /> : <CheckSquare size={20} />}
+          </button>
+        </div>
       </div>
 
       <div className="relative mb-4">
@@ -173,17 +233,21 @@ export default function BrowsePage() {
         </p>
       )}
 
-      <ul className="space-y-2">
+      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
         {filtered.map((card) => (
           <CardRow
             key={card.id}
             card={card}
             deckName={deckNameById.get(card.deckId)}
+            selectMode={selection.selectMode}
+            selected={selection.selectedIds.has(card.id)}
+            onToggleSelect={selection.toggleSelect}
             onSave={handleSaveEdit}
             onDelete={handleDelete}
             onToggleFlag={handleToggleFlag}
             onToggleSuspend={handleToggleSuspend}
             onClone={handleClone}
+            onMoveCard={handleMoveCard}
           />
         ))}
         {hasActiveFilter ? (
@@ -192,6 +256,43 @@ export default function BrowsePage() {
           <p className="text-sm text-neutral-500">Type to search your cards.</p>
         )}
       </ul>
+
+      {selection.selectMode && (
+        <BulkActionBar
+          count={selection.selectedCards.length}
+          allSelected={selection.allSelected}
+          onToggleSelectAll={selection.toggleSelectAll}
+          flagLabel={selection.flagLabel}
+          onFlag={selection.bulkFlag}
+          suspendLabel={selection.suspendLabel}
+          onSuspend={selection.bulkSuspend}
+          onDuplicate={openBulkDuplicate}
+          onMove={openBulkMove}
+          onDelete={handleBulkDelete}
+        />
+      )}
+
+      <DeckPickerModal
+        open={showBulkMove}
+        onClose={() => setShowBulkMove(false)}
+        title={`Move ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        confirmLabel="Move"
+        rows={deckRows}
+        value={bulkMoveTargetId}
+        onChange={setBulkMoveTargetId}
+        onConfirm={confirmBulkMove}
+      />
+
+      <DeckPickerModal
+        open={showBulkDuplicate}
+        onClose={() => setShowBulkDuplicate(false)}
+        title={`Duplicate ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        confirmLabel="Duplicate"
+        rows={deckRows}
+        value={bulkDuplicateTargetId}
+        onChange={setBulkDuplicateTargetId}
+        onConfirm={confirmBulkDuplicate}
+      />
 
       <ConfirmDialog
         open={!!confirmState}

@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Pencil, Trash2, Star, Ban, Info, Bug, MoreVertical, Copy, ChevronDown, ArrowLeft } from 'lucide-react';
+import { Pencil, Trash2, Star, Ban, Info, Bug, MoreVertical, Copy, ArrowLeft, FolderInput } from 'lucide-react';
 import { db, type Card, type FieldType } from '@/lib/db';
 import { stateLabel, ratingLabel, type StateLabel } from '@/lib/fsrs';
 import { clozeQuestion, clozeQuestionFor } from '@/lib/cloze';
 import { cardFrontHtml, cardBackHtml } from '@/lib/cardContent';
 import { getCardReviewHistory, type ReviewHistoryEntry } from '@/lib/stats';
-import { flattenDeckTree, deckDisplayName } from '@/lib/decks';
+import { flattenDeckTree } from '@/lib/decks';
 import { extractSearchableText } from '@/lib/sanitize';
 import { inferFieldType } from './MediaFieldInput';
 import { useLoading, useLoadingWhen } from './GlobalLoading';
@@ -17,6 +17,8 @@ import { CardForm } from './CardForm';
 import { CardFaces } from './CardFaces';
 import { Modal } from './base/Modal';
 import { DropdownMenu } from './base/DropdownMenu';
+import { DeckPickerModal } from './DeckPickerModal';
+import { Checkbox } from './Checkbox';
 
 
 const STATE_COLORS: Record<StateLabel, string> = {
@@ -61,6 +63,14 @@ interface CardRowProps {
   deckName?: string;
   id?: string;
   highlighted?: boolean;
+  // While selectMode is on, the row's own actions dropdown (and the click-
+  // to-preview behavior) are replaced by a checkbox and a select toggle —
+  // per-card info/edit only make sense one at a time, so they're simply not
+  // part of what multi-select offers; the caller's bulk action bar covers
+  // everything else (flag, suspend, move, duplicate, delete).
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (card: Card) => void;
   onSave: (
     cardId: string,
     changes: Partial<{
@@ -75,6 +85,7 @@ interface CardRowProps {
   onToggleFlag: (card: Card) => void | Promise<void>;
   onToggleSuspend: (card: Card) => void | Promise<void>;
   onClone: (cardId: string, deckId: string) => void | Promise<void>;
+  onMoveCard: (noteId: string, deckId: string) => void | Promise<void>;
 }
 
 export function CardRow({
@@ -82,15 +93,21 @@ export function CardRow({
   deckName,
   id,
   highlighted,
+  selectMode,
+  selected,
+  onToggleSelect,
   onSave,
   onDelete,
   onToggleFlag,
   onToggleSuspend,
   onClone,
+  onMoveCard,
 }: CardRowProps) {
   const [editing, setEditing] = useState(false);
   const [showClonePicker, setShowClonePicker] = useState(false);
   const [cloneTargetDeckId, setCloneTargetDeckId] = useState('');
+  const [showMovePicker, setShowMovePicker] = useState(false);
+  const [moveTargetDeckId, setMoveTargetDeckId] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   // Only the preview modal's own Edit button sets this — it's what decides
@@ -101,7 +118,7 @@ export function CardRow({
   const { withLoading } = useLoading();
   useLoadingWhen(showInfo && !history);
 
-  useBodyScrollLock(showInfo || showClonePicker || showPreview || editing);
+  useBodyScrollLock(showInfo || showClonePicker || showMovePicker || showPreview || editing);
 
   const hasReversedSibling = useLiveQuery(
     async () => {
@@ -130,6 +147,25 @@ export function CardRow({
     setShowClonePicker(false);
   }
 
+  function openMovePicker() {
+    setMoveTargetDeckId(card.deckId);
+    setShowMovePicker(true);
+  }
+
+  // Targets card.noteId, not card.id — a reversed sibling or a non-first
+  // cloze blank has no note of its own (see isDerivedCard above), so moving
+  // any one of them has to move the shared note they're all derived from,
+  // carrying every sibling card along to the same deck rather than
+  // splitting them apart.
+  async function handleConfirmMove() {
+    if (!moveTargetDeckId || moveTargetDeckId === card.deckId) {
+      setShowMovePicker(false);
+      return;
+    }
+    await withLoading(() => onMoveCard(card.noteId, moveTargetDeckId));
+    setShowMovePicker(false);
+  }
+
   function startEdit() {
     setEditedFromPreview(false);
     setEditing(true);
@@ -138,12 +174,17 @@ export function CardRow({
   return (
     <li
       id={id}
-      onClick={() => setShowPreview(true)}
+      onClick={() => (selectMode ? onToggleSelect?.(card) : setShowPreview(true))}
       className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm ring-orange-600 transition-shadow duration-500 hover:bg-neutral-900/50 ${
         highlighted ? 'ring-2' : 'ring-0'
       } ${card.suspended ? 'opacity-40' : ''}`}
     >
       <span className="flex min-w-0 items-center gap-2">
+        {selectMode && (
+          <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
+            <Checkbox checked={!!selected} onChange={() => onToggleSelect?.(card)} />
+          </span>
+        )}
         <span
           className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${STATE_COLORS[stateLabel(card.fsrs.state)]}`}
         >
@@ -177,6 +218,7 @@ export function CardRow({
         )}
         {card.suspended && <span className="shrink-0 text-xs text-neutral-500">(suspended)</span>}
       </span>
+      {!selectMode && (
       <DropdownMenu
         stopClickPropagation
         trigger={({ onClick }) => (
@@ -237,6 +279,16 @@ export function CardRow({
             </button>
             <button
               onClick={() => {
+                openMovePicker();
+                close();
+              }}
+              aria-label="Move card"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+            >
+              <FolderInput size={14} />
+            </button>
+            <button
+              onClick={() => {
                 startEdit();
                 close();
               }}
@@ -260,6 +312,7 @@ export function CardRow({
           </>
         )}
       </DropdownMenu>
+      )}
 
       <Modal
         open={editing}
@@ -378,48 +431,27 @@ export function CardRow({
         )}
       </Modal>
 
-      <Modal
+      <DeckPickerModal
         open={showClonePicker}
         onClose={() => setShowClonePicker(false)}
         title="Duplicate card"
-        size="fit"
-      >
-        <label className="block">
-          <span className="text-xs text-neutral-500">Deck</span>
-          <div className="relative mt-0.5">
-            <select
-              value={cloneTargetDeckId}
-              onChange={(e) => setCloneTargetDeckId(e.target.value)}
-              className="w-full appearance-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 pr-8 text-sm"
-            >
-              {deckRows.map(({ deck, depth }) => (
-                <option key={deck.id} value={deck.id}>
-                  {'  '.repeat(depth)}
-                  {deckDisplayName(deck.name)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={14}
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
-            />
-          </div>
-        </label>
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={handleConfirmClone}
-            className="flex-1 rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-          >
-            Duplicate
-          </button>
-          <button
-            onClick={() => setShowClonePicker(false)}
-            className="flex-1 rounded-md border border-neutral-700 py-2 text-sm text-neutral-300"
-          >
-            Cancel
-          </button>
-        </div>
-      </Modal>
+        confirmLabel="Duplicate"
+        rows={deckRows}
+        value={cloneTargetDeckId}
+        onChange={setCloneTargetDeckId}
+        onConfirm={handleConfirmClone}
+      />
+
+      <DeckPickerModal
+        open={showMovePicker}
+        onClose={() => setShowMovePicker(false)}
+        title="Move card"
+        confirmLabel="Move"
+        rows={deckRows}
+        value={moveTargetDeckId}
+        onChange={setMoveTargetDeckId}
+        onConfirm={handleConfirmMove}
+      />
     </li>
   );
 }

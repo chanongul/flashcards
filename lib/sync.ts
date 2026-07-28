@@ -327,6 +327,10 @@ export async function replayAllEvents() {
           fields: p.fields ? { ...existing.fields, ...p.fields } : existing.fields,
           tags: p.tags ?? existing.tags,
           reversed: p.reversed ?? existing.reversed,
+          // Moving a card to another deck moves the whole note — every card
+          // derived from it (a reversed sibling, every cloze blank) carries
+          // the same deckId below, so they can't be split across decks.
+          deckId: p.deckId ?? existing.deckId,
           updatedAt: e.timestamp,
         });
         break;

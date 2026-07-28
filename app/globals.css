@@ -141,6 +141,39 @@ body {
   width: 100%;
 }
 
+/* Skeleton placeholder for an <img>/<audio> that's still fetching from R2 —
+ * see RichText.tsx's media-loading effect, which adds/removes this class
+ * around the same load/loadeddata/error listeners already used to drive the
+ * global loading bar. Only ever applied to a real /api/media/ src (a
+ * still-pending upload's local blob: preview loads instantly, per that
+ * effect's own comment, so it never gets this class). An <img> paints
+ * nothing at all until it loads, so without a reserved box it either
+ * collapses to zero height or flashes a broken-image icon; min-height gives
+ * the shimmer somewhere to show and stops the surrounding layout from
+ * jumping the instant the request starts. */
+@keyframes media-skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.rich-text-content img.media-loading,
+.rich-text-content audio.media-loading {
+  background-image: linear-gradient(
+    90deg,
+    theme('colors.neutral.800') 25%,
+    theme('colors.neutral.700') 37%,
+    theme('colors.neutral.800') 63%
+  );
+  background-size: 400% 100%;
+  animation: media-skeleton-pulse 1.4s ease infinite;
+  border-radius: 0.375rem;
+}
+.rich-text-content img.media-loading {
+  min-height: 120px;
+}
+.rich-text-content audio.media-loading {
+  min-height: 32px;
+}
+
 /* iOS Safari zooms the whole page in when a focused form control's
  * font-size is under 16px. Force 16px so it won't — this makes the text
  * in small inputs render a couple px larger than their Tailwind class

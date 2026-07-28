@@ -30,6 +30,7 @@ import { useUser } from "@/lib/useUser";
 import { useSmartBack } from "@/lib/useSmartBack";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { clozeBlankLetters, buildClozeText, clozeSegments } from "@/lib/cloze";
+import { arrowify } from "@/lib/arrowify";
 import { CardFaces } from "@/components/CardFaces";
 import {
   FieldTypeToggle,
@@ -89,9 +90,9 @@ function ClozeFillIn({
   return (
     <p className="text-lg">
       {clozeSegments(text).map((seg, i) => {
-        if (seg.type === "text") return <span key={i}>{seg.value}</span>;
+        if (seg.type === "text") return <span key={i}>{arrowify(seg.value)}</span>;
         if (seg.number !== activeIndex)
-          return <span key={i}>{seg.answer}</span>;
+          return <span key={i}>{arrowify(seg.answer)}</span>;
         const index = blankCount;
         blankCount += 1;
         return (
@@ -145,9 +146,9 @@ function ClozeRevealPart({
   return (
     <p className="text-lg">
       {clozeSegments(text).map((seg, i) => {
-        if (seg.type === "text") return <span key={i}>{seg.value}</span>;
+        if (seg.type === "text") return <span key={i}>{arrowify(seg.value)}</span>;
         if (seg.number !== activeIndex)
-          return <span key={i}>{seg.answer}</span>;
+          return <span key={i}>{arrowify(seg.answer)}</span>;
         const index = blankCount;
         blankCount += 1;
         const value =
@@ -155,7 +156,7 @@ function ClozeRevealPart({
         const color = CLOZE_COLORS[index % CLOZE_COLORS.length];
         return (
           <span key={i} className={`rounded px-1.5 ${color}`}>
-            {value}
+            {arrowify(value)}
           </span>
         );
       })}

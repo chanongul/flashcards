@@ -2,6 +2,7 @@
 
 import { RichText } from './RichText';
 import { ScrollFade } from './ScrollFade';
+import { arrowify } from '@/lib/arrowify';
 
 interface CardFacesProps {
   front: string;
@@ -28,7 +29,7 @@ export function CardFaces({
     <>
       <ScrollFade>
         <div className="flex min-h-full flex-col items-center justify-center py-4">
-          <RichText html={front} className={frontClassName} />
+          <RichText html={front} className={frontClassName} textTransform={arrowify} />
         </div>
       </ScrollFade>
       {showBack && (
@@ -36,7 +37,7 @@ export function CardFaces({
           <hr className="shrink-0 border-neutral-800" />
           <ScrollFade>
             <div className="flex min-h-full flex-col items-center justify-center py-4">
-              <RichText html={back} className={backClassName} />
+              <RichText html={back} className={backClassName} textTransform={arrowify} />
             </div>
           </ScrollFade>
         </>

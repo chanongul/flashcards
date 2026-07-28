@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
-import { ArrowLeft, FolderSearch, Plus } from 'lucide-react';
+import { ArrowLeft, FolderSearch, Plus, CheckSquare, X } from 'lucide-react';
 import { db, type Card } from '@/lib/db';
 import { editCard, deleteCard, cloneCard, createCard } from '@/lib/actions';
 import { useUser } from '@/lib/useUser';
@@ -12,11 +12,14 @@ import { CardRow } from '@/components/CardRow';
 import { CardForm } from '@/components/CardForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/base/Modal';
+import { BulkActionBar } from '@/components/BulkActionBar';
+import { DeckPickerModal } from '@/components/DeckPickerModal';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { sortQueue } from '@/lib/fsrs';
 import { useSmartBack } from '@/lib/useSmartBack';
 import { useTitleSync } from '@/lib/useTitleSync';
-import { getDeckAndDescendantIds } from '@/lib/decks';
+import { useCardSelection } from '@/lib/useCardSelection';
+import { getDeckAndDescendantIds, flattenDeckTree } from '@/lib/decks';
 
 export default function AllCardsPage() {
   const params = useParams<{ deckId: string }>();
@@ -42,6 +45,9 @@ export default function AllCardsPage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
+  const deckRows = flattenDeckTree(decks ?? []);
 
   const [showAddModal, setShowAddModal] = useState(false);
   // Set to the just-created note's id on submit; once that note's card shows
@@ -115,6 +121,51 @@ export default function AllCardsPage() {
     await cloneCard(user.id, cardId, deckId);
   }
 
+  async function handleMoveCard(noteId: string, deckId: string) {
+    if (!user) return;
+    await editCard(user.id, noteId, { deckId });
+  }
+
+  const selection = useCardSelection(allCards ?? [], user?.id);
+  const [bulkMoveTargetId, setBulkMoveTargetId] = useState('');
+  const [showBulkMove, setShowBulkMove] = useState(false);
+  const [bulkDuplicateTargetId, setBulkDuplicateTargetId] = useState('');
+  const [showBulkDuplicate, setShowBulkDuplicate] = useState(false);
+
+  function openBulkMove() {
+    setBulkMoveTargetId('');
+    setShowBulkMove(true);
+  }
+
+  async function confirmBulkMove() {
+    if (!bulkMoveTargetId) return;
+    await selection.bulkMove(bulkMoveTargetId);
+    setShowBulkMove(false);
+  }
+
+  function openBulkDuplicate() {
+    setBulkDuplicateTargetId('');
+    setShowBulkDuplicate(true);
+  }
+
+  async function confirmBulkDuplicate() {
+    if (!bulkDuplicateTargetId) return;
+    await selection.bulkDuplicate(bulkDuplicateTargetId);
+    setShowBulkDuplicate(false);
+  }
+
+  function handleBulkDelete() {
+    const n = selection.selectedCards.length;
+    setConfirmState({
+      title: 'Delete cards',
+      message: `Delete ${n} card${n === 1 ? '' : 's'}? This cannot be undone.`,
+      onConfirm: async () => {
+        await selection.bulkDelete();
+        setConfirmState(null);
+      },
+    });
+  }
+
   const {
     isOnline,
     syncError,
@@ -165,27 +216,41 @@ export default function AllCardsPage() {
 
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
-        <button
-          onClick={() => setShowAddModal(true)}
-          aria-label="Add a card"
-          className="text-neutral-500 hover:text-neutral-200"
-        >
-          <Plus size={16} />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={selection.toggleSelectMode}
+            aria-label={selection.selectMode ? 'Cancel selection' : 'Select cards'}
+            aria-pressed={selection.selectMode}
+            className={selection.selectMode ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-200'}
+          >
+            {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            aria-label="Add a card"
+            className="text-neutral-500 hover:text-neutral-200"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
 
-      <ul className="space-y-2">
+      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
         {allCards?.map((card) => (
           <CardRow
             key={card.id}
             id={`card-${card.id}`}
             highlighted={highlightCardId === card.id}
             card={card}
+            selectMode={selection.selectMode}
+            selected={selection.selectedIds.has(card.id)}
+            onToggleSelect={selection.toggleSelect}
             onSave={handleSaveEdit}
             onDelete={handleDelete}
             onToggleFlag={handleToggleFlag}
             onToggleSuspend={handleToggleSuspend}
             onClone={handleClone}
+            onMoveCard={handleMoveCard}
           />
         ))}
         {allCards && allCards.length === 0 && (
@@ -214,6 +279,43 @@ export default function AllCardsPage() {
           onCancel={() => setShowAddModal(false)}
         />
       </Modal>
+
+      {selection.selectMode && (
+        <BulkActionBar
+          count={selection.selectedCards.length}
+          allSelected={selection.allSelected}
+          onToggleSelectAll={selection.toggleSelectAll}
+          flagLabel={selection.flagLabel}
+          onFlag={selection.bulkFlag}
+          suspendLabel={selection.suspendLabel}
+          onSuspend={selection.bulkSuspend}
+          onDuplicate={openBulkDuplicate}
+          onMove={openBulkMove}
+          onDelete={handleBulkDelete}
+        />
+      )}
+
+      <DeckPickerModal
+        open={showBulkMove}
+        onClose={() => setShowBulkMove(false)}
+        title={`Move ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        confirmLabel="Move"
+        rows={deckRows}
+        value={bulkMoveTargetId}
+        onChange={setBulkMoveTargetId}
+        onConfirm={confirmBulkMove}
+      />
+
+      <DeckPickerModal
+        open={showBulkDuplicate}
+        onClose={() => setShowBulkDuplicate(false)}
+        title={`Duplicate ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        confirmLabel="Duplicate"
+        rows={deckRows}
+        value={bulkDuplicateTargetId}
+        onChange={setBulkDuplicateTargetId}
+        onConfirm={confirmBulkDuplicate}
+      />
 
       <ConfirmDialog
         open={!!confirmState}

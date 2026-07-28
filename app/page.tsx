@@ -19,10 +19,14 @@ import {
   GripVertical,
   Download,
   Upload,
-  ChevronDown,
   List,
   FolderSearch,
   Gamepad2,
+  ArrowUpAZ,
+  ArrowDownZA,
+  ClockArrowDown,
+  ClockArrowUp,
+  FolderInput,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -70,6 +74,9 @@ import {
   flattenDeckTree,
   deckDepth,
   MAX_DECK_DEPTH,
+  nextDeckSortMode,
+  DECK_SORT_LABELS,
+  type DeckSortMode,
 } from "@/lib/decks";
 import { ReviewHeatmap } from "@/components/ReviewHeatmap";
 import { TodayStatusSummary } from "@/components/TodayStatusSummary";
@@ -78,6 +85,7 @@ import { Checkbox } from "@/components/Checkbox";
 import { CardForm } from "@/components/CardForm";
 import { Modal } from "@/components/base/Modal";
 import { DropdownMenu } from "@/components/base/DropdownMenu";
+import { DeckSelect } from "@/components/DeckSelect";
 import {
   exportToJson,
   parseImportJson,
@@ -234,6 +242,12 @@ export default function HomePage() {
   const [subdeckError, setSubdeckError] = useState("");
   const [renameDeckError, setRenameDeckError] = useState("");
 
+  const [movingDeck, setMovingDeck] = useState<Deck | null>(null);
+  // '' means top-level (no parent) — same empty-string-as-sentinel
+  // convention as CardRow's clone-target picker.
+  const [moveDeckTargetId, setMoveDeckTargetId] = useState("");
+  const [moveDeckError, setMoveDeckError] = useState("");
+
   // Which decks are currently folded (their subdecks hidden) — press-and-hold
   // on the ellipsis button of a deck with children toggles it. Persisted to
   // localStorage so the fold state survives page refreshes.
@@ -246,6 +260,37 @@ export default function HomePage() {
     return new Set();
   });
   const FOLD_HOLD_MS = 500;
+
+  // Which axis (name/updated) and direction (asc/desc) the deck list is
+  // sorted by — one button cycles through all four combinations. Persisted
+  // the same way collapsedDeckIds is, so it survives a refresh.
+  const DECK_SORT_KEY = "flashcards:deck-sort";
+  const [deckSortMode, setDeckSortMode] = useState<DeckSortMode>(() => {
+    try {
+      const stored = localStorage.getItem(DECK_SORT_KEY);
+      if (
+        stored === "name-asc" ||
+        stored === "name-desc" ||
+        stored === "updated-desc" ||
+        stored === "updated-asc"
+      ) {
+        return stored;
+      }
+    } catch {}
+    return "name-asc";
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(DECK_SORT_KEY, deckSortMode);
+    } catch {}
+  }, [deckSortMode]);
+  const DECK_SORT_ICONS: Record<DeckSortMode, typeof ArrowUpAZ> = {
+    "name-asc": ArrowUpAZ,
+    "name-desc": ArrowDownZA,
+    "updated-desc": ClockArrowDown,
+    "updated-asc": ClockArrowUp,
+  };
+  const DeckSortIcon = DECK_SORT_ICONS[deckSortMode];
   const foldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set true the instant the hold timer fires, so the click that follows the
   // release (mouseup/touchend always synthesizes one) can be swallowed
@@ -499,6 +544,7 @@ export default function HomePage() {
   useBodyScrollLock(
     showCreateDeck ||
       !!subdeckParent ||
+      !!movingDeck ||
       showNoteTypes ||
       showResetConfirm ||
       !!actionsAddCardDeck ||
@@ -634,6 +680,71 @@ export default function HomePage() {
     }
     await withLoading(() => createDeck(user.id, fullName));
     closeSubdeckModal();
+  }
+
+  function handleMoveDeck(deck: Deck) {
+    setMovingDeck(deck);
+    // Pre-select the deck's current parent, so opening the picker shows
+    // where it already lives rather than defaulting to top-level.
+    const currentParentName = deckParentName(deck.name);
+    const currentParent = currentParentName
+      ? (decks ?? []).find((d) => d.name === currentParentName)
+      : null;
+    setMoveDeckTargetId(currentParent?.id ?? "");
+    setMoveDeckError("");
+  }
+
+  function closeMoveDeckModal() {
+    setMovingDeck(null);
+    setMoveDeckTargetId("");
+    setMoveDeckError("");
+  }
+
+  // Every deck a subdeck could validly move under — anywhere except itself
+  // or one of its own descendants (moving into your own subtree is a cycle).
+  function moveDeckTargetOptions(deck: Deck): Deck[] {
+    return (decks ?? []).filter(
+      (d) => d.id !== deck.id && !d.name.startsWith(`${deck.name}::`),
+    );
+  }
+
+  async function handleConfirmMoveDeck() {
+    if (!user || !movingDeck) return;
+    const target = moveDeckTargetId
+      ? (decks ?? []).find((d) => d.id === moveDeckTargetId)
+      : null;
+    const ownName = deckDisplayName(movingDeck.name);
+    const fullName = target ? `${target.name}::${ownName}` : ownName;
+
+    if (fullName === movingDeck.name) {
+      closeMoveDeckModal();
+      return;
+    }
+    if (decks?.some((d) => d.id !== movingDeck.id && d.name === fullName)) {
+      setMoveDeckError(`A deck named "${ownName}" already exists there.`);
+      return;
+    }
+    // The whole subtree moves together — check the deepest descendant
+    // (not just the deck itself) still fits within MAX_DECK_DEPTH at the
+    // new location.
+    const ownDepth = deckDepth(movingDeck.name);
+    const subtreeRelativeDepths = (decks ?? [])
+      .filter(
+        (d) =>
+          d.id === movingDeck.id || d.name.startsWith(`${movingDeck.name}::`),
+      )
+      .map((d) => deckDepth(d.name) - ownDepth);
+    const maxRelativeDepth = Math.max(0, ...subtreeRelativeDepths);
+    const newBaseDepth = target ? deckDepth(target.name) : 0;
+    if (newBaseDepth + 1 + maxRelativeDepth > MAX_DECK_DEPTH) {
+      setMoveDeckError(`Decks can only nest ${MAX_DECK_DEPTH} levels deep.`);
+      return;
+    }
+
+    await withLoading(() =>
+      editDeck(user.id, movingDeck.id, { name: fullName }),
+    );
+    closeMoveDeckModal();
   }
 
   function closeNoteTypesModal() {
@@ -838,7 +949,7 @@ export default function HomePage() {
     return null;
   }
 
-  const deckRows = flattenDeckTree(decks ?? []);
+  const deckRows = flattenDeckTree(decks ?? [], deckSortMode);
 
   // A deck "has children" if some other deck's name is "thisDeck::...".
   const deckNamesWithChildren = new Set(
@@ -928,18 +1039,28 @@ export default function HomePage() {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <h2
-          className="text-xl cursor-pointer font-bold"
-          onMouseDown={startAllFoldHold}
-          onMouseUp={cancelAllFoldHold}
-          onMouseLeave={cancelAllFoldHold}
-          onTouchStart={startAllFoldHold}
-          onTouchEnd={cancelAllFoldHold}
-          onTouchCancel={cancelAllFoldHold}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          Decks
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2
+            className="text-xl cursor-pointer font-bold"
+            onMouseDown={startAllFoldHold}
+            onMouseUp={cancelAllFoldHold}
+            onMouseLeave={cancelAllFoldHold}
+            onTouchStart={startAllFoldHold}
+            onTouchEnd={cancelAllFoldHold}
+            onTouchCancel={cancelAllFoldHold}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            Decks
+          </h2>
+          <button
+            onClick={() => setDeckSortMode((mode) => nextDeckSortMode(mode))}
+            aria-label={DECK_SORT_LABELS[deckSortMode]}
+            title={DECK_SORT_LABELS[deckSortMode]}
+            className="flex h-8 w-8 items-center justify-center text-neutral-400 hover:text-neutral-200"
+          >
+            <DeckSortIcon size={16} />
+          </button>
+        </div>
         <div className="flex items-center gap-2 text-neutral-400">
           <Link
             href="/browse"
@@ -1084,13 +1205,13 @@ export default function HomePage() {
                   <>
                     <button
                       onClick={() => {
-                        setActionsAddCardDeck(deck);
+                        handleExportDeck(deck);
                         close();
                       }}
-                      aria-label="Add card"
+                      aria-label="Export deck"
                       className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <FilePlus size={14} />
+                      <Download size={14} />
                     </button>
                     <Link
                       href={`/review/${deck.id}/game`}
@@ -1100,6 +1221,16 @@ export default function HomePage() {
                     >
                       <Gamepad2 size={14} />
                     </Link>
+                    <button
+                      onClick={() => {
+                        setActionsAddCardDeck(deck);
+                        close();
+                      }}
+                      aria-label="Add card"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <FilePlus size={14} />
+                    </button>
                     <Link
                       href={`/review/${deck.id}/all`}
                       onClick={close}
@@ -1128,17 +1259,7 @@ export default function HomePage() {
                         <FolderPlus size={14} />
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        handleExportDeck(deck);
-                        close();
-                      }}
-                      aria-label="Export deck"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <Download size={14} />
-                    </button>
-                    {depth === 0 && (
+                    {depth === 0 ? (
                       <button
                         onClick={() => {
                           handleCloneDeck(deck.id);
@@ -1148,6 +1269,17 @@ export default function HomePage() {
                         className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                       >
                         <Copy size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          handleMoveDeck(deck);
+                          close();
+                        }}
+                        aria-label="Move deck"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      >
+                        <FolderInput size={14} />
                       </button>
                     )}
                     <button
@@ -1267,6 +1399,49 @@ export default function HomePage() {
       </Modal>
 
       <Modal
+        open={!!movingDeck}
+        onClose={closeMoveDeckModal}
+        title={
+          movingDeck && (
+            <>Move &ldquo;{deckDisplayName(movingDeck.name)}&rdquo;</>
+          )
+        }
+        size="fit"
+      >
+        {movingDeck && (
+          <div className="space-y-2">
+            <DeckSelect
+              rows={flattenDeckTree(moveDeckTargetOptions(movingDeck))}
+              value={moveDeckTargetId}
+              onChange={(id) => {
+                setMoveDeckTargetId(id);
+                setMoveDeckError("");
+              }}
+              label="New parent"
+              emptyOption={{ value: "", label: "(Top level)" }}
+            />
+            {moveDeckError && (
+              <p className="text-sm text-red-400">{moveDeckError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmMoveDeck}
+                className="flex-1 rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+              >
+                Move
+              </button>
+              <button
+                onClick={closeMoveDeckModal}
+                className="flex-1 rounded-md border border-neutral-700 py-2 text-sm text-neutral-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
         open={showNoteTypes}
         onClose={closeNoteTypesModal}
         title={
@@ -1368,7 +1543,6 @@ export default function HomePage() {
           </>
         ) : (
           <>
-
             <form onSubmit={handleSubmitNoteType} className="space-y-2">
               <input
                 value={newTypeName}
@@ -1459,8 +1633,7 @@ export default function HomePage() {
                         </button>
                       )}
                     </div>
-                    {field.type === "richtext" ||
-                    field.type === "choice" ? (
+                    {field.type === "richtext" || field.type === "choice" ? (
                       <RichTextInput
                         value={buildFormattedText(field.name, field.format)}
                         onChange={(html) =>
@@ -1608,8 +1781,7 @@ export default function HomePage() {
                         </button>
                       )}
                     </div>
-                    {field.type === "richtext" ||
-                    field.type === "choice" ? (
+                    {field.type === "richtext" || field.type === "choice" ? (
                       <RichTextInput
                         value={buildFormattedText(field.name, field.format)}
                         onChange={(html) =>
@@ -1683,8 +1855,8 @@ export default function HomePage() {
                   checked={newTypeReversed}
                   onChange={setNewTypeReversed}
                 />
-                Allow reversed cards (lets you opt in per note when creating
-                a card)
+                Allow reversed cards (lets you opt in per note when creating a
+                card)
               </label>
 
               {noteTypeError && (
@@ -1717,9 +1889,9 @@ export default function HomePage() {
         size="fit"
       >
         <p className="mb-3 text-sm text-neutral-400">
-          This permanently deletes every deck, card, note type, and review
-          event — on this device, on the server, and on every other device
-          signed into this account once it next syncs. There is no undo.
+          This permanently deletes every deck, card, note type, and review event
+          — on this device, on the server, and on every other device signed into
+          this account once it next syncs. There is no undo.
         </p>
         <label className="block">
           <span className="text-xs text-neutral-500">
@@ -1796,10 +1968,8 @@ export default function HomePage() {
               ) : (
                 <>
                   {importSummary.decksCreated} deck
-                  {importSummary.decksCreated === 1
-                    ? ""
-                    : "s"} created, {importSummary.noteTypesCreated} note
-                  type
+                  {importSummary.decksCreated === 1 ? "" : "s"} created,{" "}
+                  {importSummary.noteTypesCreated} note type
                   {importSummary.noteTypesCreated === 1
                     ? ""
                     : "s"} created, {importSummary.notesCreated} card
@@ -1856,38 +2026,21 @@ export default function HomePage() {
                     ))}
                   </ul>
                 )}
-                <label className="block">
-                  <span className="text-xs text-neutral-500">Deck</span>
-                  <div className="relative mt-0.5">
-                    <select
-                      value={importCsvDeckId}
-                      onChange={(e) => {
-                        setImportCsvDeckId(e.target.value);
-                        if (e.target.value) setImportCsvNewDeckName("");
-                      }}
-                      className="w-full appearance-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 pr-8 text-sm"
-                    >
-                      <option value="">+ New deck</option>
-                      {deckRows.map(({ deck, depth }) => (
-                        <option key={deck.id} value={deck.id}>
-                          {"  ".repeat(depth)}
-                          {deckDisplayName(deck.name)}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
-                    />
-                  </div>
-                </label>
+                <DeckSelect
+                  rows={deckRows}
+                  value={importCsvDeckId}
+                  onChange={(id) => {
+                    setImportCsvDeckId(id);
+                    if (id) setImportCsvNewDeckName("");
+                  }}
+                  label="Deck"
+                  emptyOption={{ value: "", label: "+ New deck" }}
+                />
                 {!importCsvDeckId && (
                   <input
                     type="text"
                     value={importCsvNewDeckName}
-                    onChange={(e) =>
-                      setImportCsvNewDeckName(e.target.value)
-                    }
+                    onChange={(e) => setImportCsvNewDeckName(e.target.value)}
                     placeholder="New deck name"
                     className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
                   />

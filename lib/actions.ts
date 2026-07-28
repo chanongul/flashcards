@@ -183,6 +183,7 @@ export async function editCard(
     fields: Record<string, string>;
     tags: string[];
     reversed: boolean;
+    deckId: string;
     flagged: boolean;
     suspended: boolean;
     isLeech: boolean;
