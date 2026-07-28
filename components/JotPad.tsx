@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Type, PenTool, Eraser, Undo2, Grid2X2 } from "lucide-react";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 // How many strokes (or clears) back you can undo — capped so the snapshot
 // stack (one full-canvas ImageData per entry) can't grow unbounded.
@@ -300,36 +301,16 @@ export function JotPad({ sizeRatio, onSizeToggle, hasCard }: JotPadProps) {
       </div>
 
       {/* Confirmation modal: shown when the user clicks size toggle while a drawing exists */}
-      {confirmClearForSize && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setConfirmClearForSize(false)}
-        >
-          <div
-            className="w-full max-w-xs rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="mb-1 text-sm font-medium">Change pad size?</p>
-            <p className="mb-4 text-xs text-neutral-400">
-              Resizing will clear your current drawing. Your typed text will be kept.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleConfirmSizeChange}
-                className="flex-1 rounded-md bg-neutral-100 py-2 text-xs font-medium text-neutral-900"
-              >
-                Change size
-              </button>
-              <button
-                onClick={() => setConfirmClearForSize(false)}
-                className="flex-1 rounded-md border border-neutral-700 py-2 text-xs text-neutral-300"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmClearForSize}
+        title="Change pad size?"
+        message="Resizing will clear your current drawing. Your typed text will be kept."
+        confirmLabel="Change size"
+        confirmVariant="neutral"
+        closeOnBackdropClick
+        onConfirm={handleConfirmSizeChange}
+        onCancel={() => setConfirmClearForSize(false)}
+      />
     </div>
   );
 }

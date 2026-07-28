@@ -8,7 +8,6 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowLeft,
   Plus,
-  X,
   Undo2,
   List,
   Settings,
@@ -45,6 +44,7 @@ import { ScrollFade } from "@/components/ScrollFade";
 import { ClozeEditor } from "@/components/ClozeEditor";
 import { JotPad } from "@/components/JotPad";
 import { CardForm } from "@/components/CardForm";
+import { Modal } from "@/components/base/Modal";
 import { resolvePendingMediaInHtml } from "@/lib/mediaSync";
 import {
   countCardsByState,
@@ -687,198 +687,135 @@ export default function ReviewPage() {
         </p>
       )}
 
-      {showAddModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closeAddModal}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">New card</p>
-              <button
-                onClick={closeAddModal}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      <Modal open={showAddModal} onClose={closeAddModal} title="New card">
+        <CardForm
+          mode="create"
+          onSubmit={async (data) => {
+            if (!user) return;
+            await createCard(
+              user.id,
+              params.deckId,
+              data.cardType,
+              data.front,
+              data.back,
+              data.tags,
+              data.fields,
+              data.reversed
+            );
+            closeAddModal();
+            loadQueue();
+          }}
+          onCancel={closeAddModal}
+        />
+      </Modal>
 
-            <CardForm
-              mode="create"
-              onSubmit={async (data) => {
-                if (!user) return;
-                await createCard(
-                  user.id,
-                  params.deckId,
-                  data.cardType,
-                  data.front,
-                  data.back,
-                  data.tags,
-                  data.fields,
-                  data.reversed
-                );
-                closeAddModal();
-                loadQueue();
+      <Modal
+        open={showDeckOptions}
+        onClose={() => {
+          setShowDeckOptions(false);
+          setDeckOptionsError("");
+        }}
+        title={
+          deck && deckParentName(deck.name) ? "Subdeck options" : "Deck options"
+        }
+      >
+        <form onSubmit={handleSaveDeckOptions} className="space-y-3">
+          <label className="block">
+            <span className="text-xs text-neutral-400">Name</span>
+            <input
+              value={deckNameInput}
+              onChange={(e) => {
+                setDeckNameInput(e.target.value);
+                setDeckOptionsError("");
               }}
-              onCancel={closeAddModal}
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
             />
-          </div>
-        </div>
-      )}
-
-      {showDeckOptions && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => {
-            setShowDeckOptions(false);
-            setDeckOptionsError("");
-          }}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">
-                {deck && deckParentName(deck.name)
-                  ? "Subdeck options"
-                  : "Deck options"}
-              </p>
-              <button
-                onClick={() => {
-                  setShowDeckOptions(false);
-                  setDeckOptionsError("");
-                }}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveDeckOptions} className="space-y-3">
-              <label className="block">
-                <span className="text-xs text-neutral-400">Name</span>
-                <input
-                  value={deckNameInput}
-                  onChange={(e) => {
-                    setDeckNameInput(e.target.value);
-                    setDeckOptionsError("");
-                  }}
-                  className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs text-neutral-400">New cards/day</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={newCardsPerDay}
-                  onChange={(e) => {
-                    setNewCardsPerDay(Number(e.target.value));
-                    setDeckOptionsError("");
-                  }}
-                  className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs text-neutral-400">
-                  Max reviews/day
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={reviewsPerDay}
-                  onChange={(e) => {
-                    setReviewsPerDay(Number(e.target.value));
-                    setDeckOptionsError("");
-                  }}
-                  className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                />
-              </label>
-              {deckOptionsError && (
-                <p className="text-sm text-red-400">{deckOptionsError}</p>
-              )}
-              <button
-                type="submit"
-                className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-              >
-                Save
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showStudyAhead && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => {
-            setShowStudyAhead(false);
-            setStudyAheadError("");
-          }}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">Study ahead</p>
-              <button
-                onClick={() => {
-                  setShowStudyAhead(false);
-                  setStudyAheadError("");
-                }}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p className="mb-3 text-xs text-neutral-500">
-              Review cards ahead of schedule, bypassing today's limits. Cards
-              you rate get rescheduled from now, same as any other review. This
-              session isn't saved — refreshing the page ends it and goes back to
-              what's actually due today.
-            </p>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleStartStudyAhead();
+          </label>
+          <label className="block">
+            <span className="text-xs text-neutral-400">New cards/day</span>
+            <input
+              type="number"
+              min={0}
+              value={newCardsPerDay}
+              onChange={(e) => {
+                setNewCardsPerDay(Number(e.target.value));
+                setDeckOptionsError("");
               }}
-            >
-              <label className="block">
-                <span className="text-xs text-neutral-400">Days ahead</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={studyAheadDays}
-                  onChange={(e) => {
-                    setStudyAheadDays(Number(e.target.value));
-                    setStudyAheadError("");
-                  }}
-                  className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                />
-              </label>
-              {studyAheadError && (
-                <p className="mt-2 text-sm text-red-400">{studyAheadError}</p>
-              )}
-              <button
-                type="submit"
-                className="mt-3 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-              >
-                Start
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-neutral-400">
+              Max reviews/day
+            </span>
+            <input
+              type="number"
+              min={0}
+              value={reviewsPerDay}
+              onChange={(e) => {
+                setReviewsPerDay(Number(e.target.value));
+                setDeckOptionsError("");
+              }}
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+            />
+          </label>
+          {deckOptionsError && (
+            <p className="text-sm text-red-400">{deckOptionsError}</p>
+          )}
+          <button
+            type="submit"
+            className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+          >
+            Save
+          </button>
+        </form>
+      </Modal>
+
+      <Modal
+        open={showStudyAhead}
+        onClose={() => {
+          setShowStudyAhead(false);
+          setStudyAheadError("");
+        }}
+        title="Study ahead"
+      >
+        <p className="mb-3 text-xs text-neutral-500">
+          Review cards ahead of schedule, bypassing today's limits. Cards
+          you rate get rescheduled from now, same as any other review. This
+          session isn't saved — refreshing the page ends it and goes back to
+          what's actually due today.
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleStartStudyAhead();
+          }}
+        >
+          <label className="block">
+            <span className="text-xs text-neutral-400">Days ahead</span>
+            <input
+              type="number"
+              min={0}
+              value={studyAheadDays}
+              onChange={(e) => {
+                setStudyAheadDays(Number(e.target.value));
+                setStudyAheadError("");
+              }}
+              className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+            />
+          </label>
+          {studyAheadError && (
+            <p className="mt-2 text-sm text-red-400">{studyAheadError}</p>
+          )}
+          <button
+            type="submit"
+            className="mt-3 w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+          >
+            Start
+          </button>
+        </form>
+      </Modal>
     </main>
   );
 }

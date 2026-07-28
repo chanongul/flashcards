@@ -75,8 +75,9 @@ import { ReviewHeatmap } from "@/components/ReviewHeatmap";
 import { TodayStatusSummary } from "@/components/TodayStatusSummary";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Checkbox } from "@/components/Checkbox";
-import { shouldDropUp } from "@/lib/dropdownMenu";
 import { CardForm } from "@/components/CardForm";
+import { Modal } from "@/components/base/Modal";
+import { DropdownMenu } from "@/components/base/DropdownMenu";
 import {
   exportToJson,
   parseImportJson,
@@ -231,8 +232,6 @@ export default function HomePage() {
   const [subdeckParent, setSubdeckParent] = useState<Deck | null>(null);
   const [subdeckName, setSubdeckName] = useState("");
   const [subdeckError, setSubdeckError] = useState("");
-  const [actionsDeck, setActionsDeck] = useState<Deck | null>(null);
-  const [actionsDeckDropUp, setActionsDeckDropUp] = useState(false);
   const [renameDeckError, setRenameDeckError] = useState("");
 
   // Which decks are currently folded (their subdecks hidden) — press-and-hold
@@ -330,10 +329,6 @@ export default function HomePage() {
   const [editingNoteTypeId, setEditingNoteTypeId] = useState<string | null>(
     null,
   );
-  const [noteTypeActionsId, setNoteTypeActionsId] = useState<string | null>(
-    null,
-  );
-  const [noteTypeActionsDropUp, setNoteTypeActionsDropUp] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
   const [newQuestionFields, setNewQuestionFields] = useState<FieldRow[]>([
     {
@@ -645,7 +640,6 @@ export default function HomePage() {
     setShowNoteTypes(false);
     setNoteTypePage("list");
     setEditingNoteTypeId(null);
-    setNoteTypeActionsId(null);
     setNoteTypeError("");
   }
 
@@ -1059,137 +1053,126 @@ export default function HomePage() {
                   </span>
                 </span>
               </Link>
-              <button
-                onClick={(e) => {
-                  if (
-                    foldTriggeredRef.current ||
-                    Date.now() - lastFoldTimestampRef.current < 600
-                  ) {
-                    foldTriggeredRef.current = false;
-                    return;
-                  }
-                  const opening = actionsDeck?.id !== deck.id;
-                  setActionsDeck(opening ? deck : null);
-                  if (opening)
-                    setActionsDeckDropUp(
-                      shouldDropUp(e.currentTarget.getBoundingClientRect()),
-                    );
-                }}
-                onMouseDown={() => hasChildren && startFoldHold(deck.id)}
-                onMouseUp={cancelFoldHold}
-                onMouseLeave={cancelFoldHold}
-                onTouchStart={() => hasChildren && startFoldHold(deck.id)}
-                onTouchEnd={cancelFoldHold}
-                onTouchCancel={cancelFoldHold}
-                onContextMenu={(e) => e.preventDefault()}
-                aria-label="Deck actions"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-              >
-                <MoreVertical size={14} />
-              </button>
-
-              {actionsDeck?.id === deck.id && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setActionsDeck(null)}
-                  />
-                  <div
-                    className={`absolute right-0 z-50 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg ${
-                      actionsDeckDropUp ? "bottom-full mb-1" : "top-full mt-1"
-                    }`}
+              <DropdownMenu
+                trigger={({ onClick }) => (
+                  <button
+                    onClick={(e) => {
+                      if (
+                        foldTriggeredRef.current ||
+                        Date.now() - lastFoldTimestampRef.current < 600
+                      ) {
+                        foldTriggeredRef.current = false;
+                        return;
+                      }
+                      onClick(e);
+                    }}
+                    onMouseDown={() => hasChildren && startFoldHold(deck.id)}
+                    onMouseUp={cancelFoldHold}
+                    onMouseLeave={cancelFoldHold}
+                    onTouchStart={() => hasChildren && startFoldHold(deck.id)}
+                    onTouchEnd={cancelFoldHold}
+                    onTouchCancel={cancelFoldHold}
+                    onContextMenu={(e) => e.preventDefault()}
+                    aria-label="Deck actions"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                   >
+                    <MoreVertical size={14} />
+                  </button>
+                )}
+              >
+                {(close) => (
+                  <>
                     <button
                       onClick={() => {
                         setActionsAddCardDeck(deck);
-                        setActionsDeck(null);
+                        close();
                       }}
                       aria-label="Add card"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <FilePlus size={16} />
+                      <FilePlus size={14} />
                     </button>
                     <Link
                       href={`/review/${deck.id}/game`}
-                      onClick={() => setActionsDeck(null)}
+                      onClick={close}
                       aria-label="Game mode"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Gamepad2 size={16} />
+                      <Gamepad2 size={14} />
                     </Link>
                     <Link
                       href={`/review/${deck.id}/all`}
-                      onClick={() => setActionsDeck(null)}
+                      onClick={close}
                       aria-label="View all cards"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <List size={16} />
+                      <List size={14} />
                     </Link>
                     <Link
                       href={`/review/${deck.id}/browse`}
-                      onClick={() => setActionsDeck(null)}
+                      onClick={close}
                       aria-label="Browse this deck"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <FolderSearch size={16} />
+                      <FolderSearch size={14} />
                     </Link>
                     {deckDepth(deck.name) < MAX_DECK_DEPTH && (
                       <button
                         onClick={() => {
                           handleAddSubdeck(deck);
-                          setActionsDeck(null);
+                          close();
                         }}
                         aria-label="Add subdeck"
-                        className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                       >
-                        <FolderPlus size={16} />
+                        <FolderPlus size={14} />
                       </button>
                     )}
                     <button
                       onClick={() => {
                         handleExportDeck(deck);
-                        setActionsDeck(null);
+                        close();
                       }}
                       aria-label="Export deck"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Download size={16} />
+                      <Download size={14} />
                     </button>
                     {depth === 0 && (
                       <button
                         onClick={() => {
                           handleCloneDeck(deck.id);
-                          setActionsDeck(null);
+                          close();
                         }}
                         aria-label="Duplicate deck"
-                        className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                       >
-                        <Copy size={16} />
+                        <Copy size={14} />
                       </button>
                     )}
                     <button
                       onClick={() => {
                         startEditDeck(deck);
-                        setActionsDeck(null);
+                        close();
                       }}
                       aria-label="Rename deck"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Pencil size={16} />
+                      <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => {
                         handleDeleteDeck(deck);
-                        setActionsDeck(null);
+                        close();
                       }}
                       aria-label="Delete deck"
-                      className="flex h-9 w-9 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </DropdownMenu>
             </li>
           );
         })}
@@ -1224,560 +1207,500 @@ export default function HomePage() {
         </button>
       )}
 
-      {showCreateDeck && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closeCreateDeck}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
+      <Modal open={showCreateDeck} onClose={closeCreateDeck} title="New deck">
+        <form onSubmit={handleCreateDeck} className="space-y-2">
+          <input
+            value={newDeckName}
+            onChange={(e) => {
+              setNewDeckName(e.target.value);
+              setCreateDeckError("");
+            }}
+            placeholder="Deck name (or Parent>Child)"
+            autoFocus
+            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+          />
+          {createDeckError && (
+            <p className="text-sm text-red-400">{createDeckError}</p>
+          )}
+          <button
+            type="submit"
+            className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">New deck</p>
-              <button
-                onClick={closeCreateDeck}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateDeck} className="space-y-2">
-              <input
-                value={newDeckName}
-                onChange={(e) => {
-                  setNewDeckName(e.target.value);
-                  setCreateDeckError("");
-                }}
-                placeholder="Deck name (or Parent>Child)"
-                autoFocus
-                className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-              />
-              {createDeckError && (
-                <p className="text-sm text-red-400">{createDeckError}</p>
-              )}
-              <button
-                type="submit"
-                className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-              >
-                Create
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+            Create
+          </button>
+        </form>
+      </Modal>
 
-      {subdeckParent && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closeSubdeckModal}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
+      <Modal
+        open={!!subdeckParent}
+        onClose={closeSubdeckModal}
+        title={
+          subdeckParent && (
+            <>
+              New subdeck of &ldquo;{deckDisplayName(subdeckParent.name)}
+              &rdquo;
+            </>
+          )
+        }
+      >
+        <form onSubmit={handleCreateSubdeck} className="space-y-2">
+          <input
+            value={subdeckName}
+            onChange={(e) => {
+              setSubdeckName(e.target.value);
+              setSubdeckError("");
+            }}
+            placeholder="Subdeck name"
+            autoFocus
+            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+          />
+          {subdeckError && (
+            <p className="text-sm text-red-400">{subdeckError}</p>
+          )}
+          <button
+            type="submit"
+            className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">
-                New subdeck of &ldquo;{deckDisplayName(subdeckParent.name)}
-                &rdquo;
-              </p>
-              <button
-                onClick={closeSubdeckModal}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateSubdeck} className="space-y-2">
-              <input
-                value={subdeckName}
-                onChange={(e) => {
-                  setSubdeckName(e.target.value);
-                  setSubdeckError("");
-                }}
-                placeholder="Subdeck name"
-                autoFocus
-                className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-              />
-              {subdeckError && (
-                <p className="text-sm text-red-400">{subdeckError}</p>
-              )}
-              <button
-                type="submit"
-                className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-              >
-                Create
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+            Create
+          </button>
+        </form>
+      </Modal>
 
-      {showNoteTypes && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closeNoteTypesModal}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {noteTypePage === "list" ? (
-              <>
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-medium">Custom card types</p>
-                  <button
-                    onClick={closeNoteTypesModal}
-                    aria-label="Close"
-                    className="text-neutral-400 hover:text-neutral-200"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <ul className="space-y-2">
-                  {noteTypes?.map((nt) => (
-                    <li
-                      key={nt.id}
-                      className="relative flex h-10 items-center gap-2"
-                    >
-                      <div className="flex h-10 flex-1 items-center rounded-md border border-neutral-800 px-4 text-sm">
-                        <span className="truncate">{nt.name}</span>
-                      </div>
+      <Modal
+        open={showNoteTypes}
+        onClose={closeNoteTypesModal}
+        title={
+          noteTypePage === "list"
+            ? "Custom card types"
+            : editingNoteTypeId
+              ? "Edit card type"
+              : "New card type"
+        }
+        leading={
+          noteTypePage === "create" && (
+            <button
+              onClick={() => {
+                setNoteTypeError("");
+                setNoteTypePage("list");
+              }}
+              aria-label="Back"
+              className="text-neutral-400 hover:text-neutral-200"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )
+        }
+        showCloseButton={noteTypePage === "list"}
+      >
+        {noteTypePage === "list" ? (
+          <>
+            <ul className="space-y-2">
+              {noteTypes?.map((nt) => (
+                <li
+                  key={nt.id}
+                  className="relative flex h-10 items-center gap-2"
+                >
+                  <div className="flex h-10 flex-1 items-center rounded-md border border-neutral-800 px-4 text-sm">
+                    <span className="truncate">{nt.name}</span>
+                  </div>
+                  <DropdownMenu
+                    trigger={({ onClick }) => (
                       <button
-                        onClick={(e) => {
-                          const opening = noteTypeActionsId !== nt.id;
-                          setNoteTypeActionsId(opening ? nt.id : null);
-                          if (opening)
-                            setNoteTypeActionsDropUp(
-                              shouldDropUp(
-                                e.currentTarget.getBoundingClientRect(),
-                              ),
-                            );
-                        }}
+                        onClick={onClick}
                         aria-label="Custom card type actions"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
                       >
                         <MoreVertical size={14} />
                       </button>
+                    )}
+                  >
+                    {(close) => (
+                      <>
+                        <button
+                          onClick={() => {
+                            openEditNoteType(nt);
+                            close();
+                          }}
+                          aria-label="Edit custom card type"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleCloneNoteType(nt.id);
+                            close();
+                          }}
+                          aria-label="Duplicate custom card type"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <Copy size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDeleteNoteType(nt.id);
+                            close();
+                          }}
+                          aria-label="Delete custom card type"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </DropdownMenu>
+                </li>
+              ))}
+              {(!noteTypes || noteTypes.length === 0) && (
+                <p className="text-sm text-neutral-500">
+                  No custom card types yet.
+                </p>
+              )}
+            </ul>
 
-                      {noteTypeActionsId === nt.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setNoteTypeActionsId(null)}
-                          />
-                          <div
-                            className={`absolute right-0 z-50 flex gap-1 rounded-md border border-neutral-800 bg-neutral-950 p-1 shadow-lg ${
-                              noteTypeActionsDropUp
-                                ? "bottom-full mb-1"
-                                : "top-full mt-1"
-                            }`}
+            <button
+              onClick={openCreateNoteType}
+              aria-label="New custom card type"
+              className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+            >
+              <Plus size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+
+            <form onSubmit={handleSubmitNoteType} className="space-y-2">
+              <input
+                value={newTypeName}
+                onChange={(e) => {
+                  setNewTypeName(e.target.value);
+                  setNoteTypeError("");
+                }}
+                placeholder="Name (e.g. Vocabulary)"
+                autoFocus
+                className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+              />
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-neutral-400">
+                  Question fields
+                </p>
+                {newQuestionFields.map((field, i) => (
+                  <div
+                    key={i}
+                    draggable={newQuestionFields.length > 1}
+                    onDragStart={(e) => {
+                      if (!dragHandleActivatedQRef.current) {
+                        e.preventDefault();
+                        return;
+                      }
+                      dragHandleActivatedQRef.current = false;
+                      dragIndexQRef.current = i;
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverIndexQ(i);
+                    }}
+                    onDrop={() => {
+                      const from = dragIndexQRef.current;
+                      if (from !== null && dragOverIndexQ !== null)
+                        setNewQuestionFields((fs) =>
+                          swapItems(fs, from, dragOverIndexQ),
+                        );
+                      dragIndexQRef.current = null;
+                      setDragOverIndexQ(null);
+                    }}
+                    onDragEnd={() => {
+                      dragHandleActivatedQRef.current = false;
+                      dragIndexQRef.current = null;
+                      setDragOverIndexQ(null);
+                    }}
+                    className={`space-y-1 rounded-md border p-2 transition-colors ${
+                      dragOverIndexQ === i && dragIndexQRef.current !== i
+                        ? "border-neutral-400 bg-neutral-800/60"
+                        : "border-neutral-800"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {newQuestionFields.length > 1 && (
+                          <span
+                            onPointerDown={() => {
+                              dragHandleActivatedQRef.current = true;
+                            }}
+                            className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+                            title="Drag to reorder"
                           >
-                            <button
-                              onClick={() => {
-                                openEditNoteType(nt);
-                                setNoteTypeActionsId(null);
-                              }}
-                              aria-label="Edit custom card type"
-                              className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleCloneNoteType(nt.id);
-                                setNoteTypeActionsId(null);
-                              }}
-                              aria-label="Duplicate custom card type"
-                              className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                            >
-                              <Copy size={16} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDeleteNoteType(nt.id);
-                                setNoteTypeActionsId(null);
-                              }}
-                              aria-label="Delete custom card type"
-                              className="flex h-9 w-9 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                  {(!noteTypes || noteTypes.length === 0) && (
-                    <p className="text-sm text-neutral-500">
-                      No custom card types yet.
-                    </p>
-                  )}
-                </ul>
-
-                <button
-                  onClick={openCreateNoteType}
-                  aria-label="New custom card type"
-                  className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                >
-                  <Plus size={16} />
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="mb-3 flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setNoteTypeError("");
-                      setNoteTypePage("list");
-                    }}
-                    aria-label="Back"
-                    className="text-neutral-400 hover:text-neutral-200"
-                  >
-                    <ArrowLeft size={16} />
-                  </button>
-                  <p className="text-sm font-medium">
-                    {editingNoteTypeId ? "Edit card type" : "New card type"}
-                  </p>
-                </div>
-
-                <form onSubmit={handleSubmitNoteType} className="space-y-2">
-                  <input
-                    value={newTypeName}
-                    onChange={(e) => {
-                      setNewTypeName(e.target.value);
-                      setNoteTypeError("");
-                    }}
-                    placeholder="Name (e.g. Vocabulary)"
-                    autoFocus
-                    className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                  />
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-neutral-400">
-                      Question fields
-                    </p>
-                    {newQuestionFields.map((field, i) => (
-                      <div
-                        key={i}
-                        draggable={newQuestionFields.length > 1}
-                        onDragStart={(e) => {
-                          if (!dragHandleActivatedQRef.current) {
-                            e.preventDefault();
-                            return;
-                          }
-                          dragHandleActivatedQRef.current = false;
-                          dragIndexQRef.current = i;
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setDragOverIndexQ(i);
-                        }}
-                        onDrop={() => {
-                          const from = dragIndexQRef.current;
-                          if (from !== null && dragOverIndexQ !== null)
+                            <GripVertical size={14} />
+                          </span>
+                        )}
+                        <FieldTypeConfigToggle
+                          value={field.type}
+                          onChange={(type) =>
                             setNewQuestionFields((fs) =>
-                              swapItems(fs, from, dragOverIndexQ),
-                            );
-                          dragIndexQRef.current = null;
-                          setDragOverIndexQ(null);
-                        }}
-                        onDragEnd={() => {
-                          dragHandleActivatedQRef.current = false;
-                          dragIndexQRef.current = null;
-                          setDragOverIndexQ(null);
-                        }}
-                        className={`space-y-1 rounded-md border p-2 transition-colors ${
-                          dragOverIndexQ === i && dragIndexQRef.current !== i
-                            ? "border-neutral-400 bg-neutral-800/60"
-                            : "border-neutral-800"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            {newQuestionFields.length > 1 && (
-                              <span
-                                onPointerDown={() => {
-                                  dragHandleActivatedQRef.current = true;
-                                }}
-                                className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
-                                title="Drag to reorder"
-                              >
-                                <GripVertical size={14} />
-                              </span>
-                            )}
-                            <FieldTypeConfigToggle
-                              value={field.type}
-                              onChange={(type) =>
-                                setNewQuestionFields((fs) =>
-                                  fs.map((f, fi) =>
-                                    fi === i ? { ...f, type, choices: [] } : f,
-                                  ),
-                                )
-                              }
-                            />
-                          </div>
-                          {newQuestionFields.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setNewQuestionFields((fs) =>
-                                  fs.filter((_, fi) => fi !== i),
-                                )
-                              }
-                              aria-label="Remove field"
-                              className="shrink-0 text-neutral-500 hover:text-neutral-300"
-                            >
-                              <X size={16} />
-                            </button>
-                          )}
-                        </div>
-                        {field.type === "richtext" ||
-                        field.type === "choice" ? (
-                          <RichTextInput
-                            value={buildFormattedText(field.name, field.format)}
-                            onChange={(html) =>
-                              setNewQuestionFields((fs) =>
-                                fs.map((f, fi) =>
-                                  fi === i
-                                    ? {
-                                        ...f,
-                                        name: stripHtml(html).trim(),
-                                        format: readTextFormat(html),
-                                      }
-                                    : f,
-                                ),
-                              )
-                            }
-                            placeholder="Field name (e.g. Word)"
-                            formatEntireValue
-                          />
-                        ) : (
-                          <input
-                            value={field.name}
-                            onChange={(e) =>
-                              setNewQuestionFields((fs) =>
-                                fs.map((f, fi) =>
-                                  fi === i ? { ...f, name: e.target.value } : f,
-                                ),
-                              )
-                            }
-                            placeholder="Field name (e.g. Word)"
-                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                          />
-                        )}
-                        {field.type === "choice" && (
-                          <TagsInput
-                            value={field.choices}
-                            onChange={(choices) =>
-                              setNewQuestionFields((fs) =>
-                                fs.map((f, fi) =>
-                                  fi === i ? { ...f, choices } : f,
-                                ),
-                              )
-                            }
-                            placeholder="Type an option, press Enter…"
-                          />
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setNewQuestionFields((fs) => [
-                          ...fs,
-                          {
-                            id: crypto.randomUUID(),
-                            name: "",
-                            type: "richtext",
-                            choices: [],
-                            format: NORMAL_TEXT_FORMAT,
-                          },
-                        ])
-                      }
-                      aria-label="Add question field"
-                      className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-neutral-400">
-                      Answer fields
-                    </p>
-                    {newAnswerFields.map((field, i) => (
-                      <div
-                        key={i}
-                        draggable={newAnswerFields.length > 1}
-                        onDragStart={(e) => {
-                          if (!dragHandleActivatedARef.current) {
-                            e.preventDefault();
-                            return;
+                              fs.map((f, fi) =>
+                                fi === i ? { ...f, type, choices: [] } : f,
+                              ),
+                            )
                           }
-                          dragHandleActivatedARef.current = false;
-                          dragIndexARef.current = i;
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setDragOverIndexA(i);
-                        }}
-                        onDrop={() => {
-                          const from = dragIndexARef.current;
-                          if (from !== null && dragOverIndexA !== null)
-                            setNewAnswerFields((fs) =>
-                              swapItems(fs, from, dragOverIndexA),
-                            );
-                          dragIndexARef.current = null;
-                          setDragOverIndexA(null);
-                        }}
-                        onDragEnd={() => {
-                          dragHandleActivatedARef.current = false;
-                          dragIndexARef.current = null;
-                          setDragOverIndexA(null);
-                        }}
-                        className={`space-y-1 rounded-md border p-2 transition-colors ${
-                          dragOverIndexA === i && dragIndexARef.current !== i
-                            ? "border-neutral-400 bg-neutral-800/60"
-                            : "border-neutral-800"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            {newAnswerFields.length > 1 && (
-                              <span
-                                onPointerDown={() => {
-                                  dragHandleActivatedARef.current = true;
-                                }}
-                                className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
-                                title="Drag to reorder"
-                              >
-                                <GripVertical size={14} />
-                              </span>
-                            )}
-                            <FieldTypeConfigToggle
-                              value={field.type}
-                              onChange={(type) =>
-                                setNewAnswerFields((fs) =>
-                                  fs.map((f, fi) =>
-                                    fi === i ? { ...f, type, choices: [] } : f,
-                                  ),
-                                )
-                              }
-                            />
-                          </div>
-                          {newAnswerFields.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setNewAnswerFields((fs) =>
-                                  fs.filter((_, fi) => fi !== i),
-                                )
-                              }
-                              aria-label="Remove field"
-                              className="shrink-0 text-neutral-500 hover:text-neutral-300"
-                            >
-                              <X size={16} />
-                            </button>
-                          )}
-                        </div>
-                        {field.type === "richtext" ||
-                        field.type === "choice" ? (
-                          <RichTextInput
-                            value={buildFormattedText(field.name, field.format)}
-                            onChange={(html) =>
-                              setNewAnswerFields((fs) =>
-                                fs.map((f, fi) =>
-                                  fi === i
-                                    ? {
-                                        ...f,
-                                        name: stripHtml(html).trim(),
-                                        format: readTextFormat(html),
-                                      }
-                                    : f,
-                                ),
-                              )
-                            }
-                            placeholder="Field name (e.g. Meaning)"
-                            formatEntireValue
-                          />
-                        ) : (
-                          <input
-                            value={field.name}
-                            onChange={(e) =>
-                              setNewAnswerFields((fs) =>
-                                fs.map((f, fi) =>
-                                  fi === i ? { ...f, name: e.target.value } : f,
-                                ),
-                              )
-                            }
-                            placeholder="Field name (e.g. Meaning)"
-                            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                          />
-                        )}
-                        {field.type === "choice" && (
-                          <TagsInput
-                            value={field.choices}
-                            onChange={(choices) =>
-                              setNewAnswerFields((fs) =>
-                                fs.map((f, fi) =>
-                                  fi === i ? { ...f, choices } : f,
-                                ),
-                              )
-                            }
-                            placeholder="Type an option, press Enter…"
-                          />
-                        )}
+                        />
                       </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setNewAnswerFields((fs) => [
-                          ...fs,
-                          {
-                            id: crypto.randomUUID(),
-                            name: "",
-                            type: "richtext",
-                            choices: [],
-                            format: NORMAL_TEXT_FORMAT,
-                          },
-                        ])
-                      }
-                      aria-label="Add answer field"
-                      className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                    >
-                      <Plus size={14} />
-                    </button>
+                      {newQuestionFields.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewQuestionFields((fs) =>
+                              fs.filter((_, fi) => fi !== i),
+                            )
+                          }
+                          aria-label="Remove field"
+                          className="shrink-0 text-neutral-500 hover:text-neutral-300"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    {field.type === "richtext" ||
+                    field.type === "choice" ? (
+                      <RichTextInput
+                        value={buildFormattedText(field.name, field.format)}
+                        onChange={(html) =>
+                          setNewQuestionFields((fs) =>
+                            fs.map((f, fi) =>
+                              fi === i
+                                ? {
+                                    ...f,
+                                    name: stripHtml(html).trim(),
+                                    format: readTextFormat(html),
+                                  }
+                                : f,
+                            ),
+                          )
+                        }
+                        placeholder="Field name (e.g. Word)"
+                        formatEntireValue
+                      />
+                    ) : (
+                      <input
+                        value={field.name}
+                        onChange={(e) =>
+                          setNewQuestionFields((fs) =>
+                            fs.map((f, fi) =>
+                              fi === i ? { ...f, name: e.target.value } : f,
+                            ),
+                          )
+                        }
+                        placeholder="Field name (e.g. Word)"
+                        className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                      />
+                    )}
+                    {field.type === "choice" && (
+                      <TagsInput
+                        value={field.choices}
+                        onChange={(choices) =>
+                          setNewQuestionFields((fs) =>
+                            fs.map((f, fi) =>
+                              fi === i ? { ...f, choices } : f,
+                            ),
+                          )
+                        }
+                        placeholder="Type an option, press Enter…"
+                      />
+                    )}
                   </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNewQuestionFields((fs) => [
+                      ...fs,
+                      {
+                        id: crypto.randomUUID(),
+                        name: "",
+                        type: "richtext",
+                        choices: [],
+                        format: NORMAL_TEXT_FORMAT,
+                      },
+                    ])
+                  }
+                  aria-label="Add question field"
+                  className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
 
-                  <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
-                    <Checkbox
-                      checked={newTypeReversed}
-                      onChange={setNewTypeReversed}
-                    />
-                    Allow reversed cards (lets you opt in per note when creating
-                    a card)
-                  </label>
-
-                  {noteTypeError && (
-                    <p className="text-sm text-red-400">{noteTypeError}</p>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-neutral-400">
+                  Answer fields
+                </p>
+                {newAnswerFields.map((field, i) => (
+                  <div
+                    key={i}
+                    draggable={newAnswerFields.length > 1}
+                    onDragStart={(e) => {
+                      if (!dragHandleActivatedARef.current) {
+                        e.preventDefault();
+                        return;
+                      }
+                      dragHandleActivatedARef.current = false;
+                      dragIndexARef.current = i;
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverIndexA(i);
+                    }}
+                    onDrop={() => {
+                      const from = dragIndexARef.current;
+                      if (from !== null && dragOverIndexA !== null)
+                        setNewAnswerFields((fs) =>
+                          swapItems(fs, from, dragOverIndexA),
+                        );
+                      dragIndexARef.current = null;
+                      setDragOverIndexA(null);
+                    }}
+                    onDragEnd={() => {
+                      dragHandleActivatedARef.current = false;
+                      dragIndexARef.current = null;
+                      setDragOverIndexA(null);
+                    }}
+                    className={`space-y-1 rounded-md border p-2 transition-colors ${
+                      dragOverIndexA === i && dragIndexARef.current !== i
+                        ? "border-neutral-400 bg-neutral-800/60"
+                        : "border-neutral-800"
+                    }`}
                   >
-                    {editingNoteTypeId ? "Save" : "Create"}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {newAnswerFields.length > 1 && (
+                          <span
+                            onPointerDown={() => {
+                              dragHandleActivatedARef.current = true;
+                            }}
+                            className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+                            title="Drag to reorder"
+                          >
+                            <GripVertical size={14} />
+                          </span>
+                        )}
+                        <FieldTypeConfigToggle
+                          value={field.type}
+                          onChange={(type) =>
+                            setNewAnswerFields((fs) =>
+                              fs.map((f, fi) =>
+                                fi === i ? { ...f, type, choices: [] } : f,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                      {newAnswerFields.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewAnswerFields((fs) =>
+                              fs.filter((_, fi) => fi !== i),
+                            )
+                          }
+                          aria-label="Remove field"
+                          className="shrink-0 text-neutral-500 hover:text-neutral-300"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    {field.type === "richtext" ||
+                    field.type === "choice" ? (
+                      <RichTextInput
+                        value={buildFormattedText(field.name, field.format)}
+                        onChange={(html) =>
+                          setNewAnswerFields((fs) =>
+                            fs.map((f, fi) =>
+                              fi === i
+                                ? {
+                                    ...f,
+                                    name: stripHtml(html).trim(),
+                                    format: readTextFormat(html),
+                                  }
+                                : f,
+                            ),
+                          )
+                        }
+                        placeholder="Field name (e.g. Meaning)"
+                        formatEntireValue
+                      />
+                    ) : (
+                      <input
+                        value={field.name}
+                        onChange={(e) =>
+                          setNewAnswerFields((fs) =>
+                            fs.map((f, fi) =>
+                              fi === i ? { ...f, name: e.target.value } : f,
+                            ),
+                          )
+                        }
+                        placeholder="Field name (e.g. Meaning)"
+                        className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                      />
+                    )}
+                    {field.type === "choice" && (
+                      <TagsInput
+                        value={field.choices}
+                        onChange={(choices) =>
+                          setNewAnswerFields((fs) =>
+                            fs.map((f, fi) =>
+                              fi === i ? { ...f, choices } : f,
+                            ),
+                          )
+                        }
+                        placeholder="Type an option, press Enter…"
+                      />
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNewAnswerFields((fs) => [
+                      ...fs,
+                      {
+                        id: crypto.randomUUID(),
+                        name: "",
+                        type: "richtext",
+                        choices: [],
+                        format: NORMAL_TEXT_FORMAT,
+                      },
+                    ])
+                  }
+                  aria-label="Add answer field"
+                  className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
+                <Checkbox
+                  checked={newTypeReversed}
+                  onChange={setNewTypeReversed}
+                />
+                Allow reversed cards (lets you opt in per note when creating
+                a card)
+              </label>
+
+              {noteTypeError && (
+                <p className="text-sm text-red-400">{noteTypeError}</p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
+              >
+                {editingNoteTypeId ? "Save" : "Create"}
+              </button>
+            </form>
+          </>
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={!!confirmState}
@@ -1787,270 +1710,221 @@ export default function HomePage() {
         onCancel={() => setConfirmState(null)}
       />
 
-      {showResetConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowResetConfirm(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
+      <Modal
+        open={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        title={<span className="text-red-400">Reset all data</span>}
+        size="fit"
+      >
+        <p className="mb-3 text-sm text-neutral-400">
+          This permanently deletes every deck, card, note type, and review
+          event — on this device, on the server, and on every other device
+          signed into this account once it next syncs. There is no undo.
+        </p>
+        <label className="block">
+          <span className="text-xs text-neutral-500">
+            Type{" "}
+            <span className="font-mono font-semibold text-neutral-300">
+              RESET
+            </span>{" "}
+            to confirm
+          </span>
+          <input
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            autoFocus
+            className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+          />
+        </label>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={handleResetAllData}
+            disabled={resetConfirmText !== "RESET"}
+            className="flex-1 rounded-md bg-red-900/50 py-2 text-sm font-medium text-red-200 disabled:opacity-40"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium text-red-400">Reset all data</p>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <p className="mb-3 text-sm text-neutral-400">
-              This permanently deletes every deck, card, note type, and review
-              event — on this device, on the server, and on every other device
-              signed into this account once it next syncs. There is no undo.
-            </p>
-            <label className="block">
-              <span className="text-xs text-neutral-500">
-                Type{" "}
-                <span className="font-mono font-semibold text-neutral-300">
-                  RESET
-                </span>{" "}
-                to confirm
-              </span>
-              <input
-                value={resetConfirmText}
-                onChange={(e) => setResetConfirmText(e.target.value)}
-                autoFocus
-                className="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-              />
-            </label>
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={handleResetAllData}
-                disabled={resetConfirmText !== "RESET"}
-                className="flex-1 rounded-md bg-red-900/50 py-2 text-sm font-medium text-red-200 disabled:opacity-40"
-              >
-                Delete everything
-              </button>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="flex-1 rounded-md border border-neutral-700 py-2 text-sm text-neutral-300"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+            Delete everything
+          </button>
+          <button
+            onClick={() => setShowResetConfirm(false)}
+            className="flex-1 rounded-md border border-neutral-700 py-2 text-sm text-neutral-300"
+          >
+            Cancel
+          </button>
         </div>
-      )}
+      </Modal>
       {actionsAddCardDeck && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setActionsAddCardDeck(null)}
+        <Modal
+          open
+          onClose={() => setActionsAddCardDeck(null)}
+          title={
+            <>
+              New card in &ldquo;{deckDisplayName(actionsAddCardDeck.name)}
+              &rdquo;
+            </>
+          }
         >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">
-                New card in &ldquo;{deckDisplayName(actionsAddCardDeck.name)}
-                &rdquo;
-              </p>
-              <button
-                onClick={() => setActionsAddCardDeck(null)}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <CardForm
-              mode="create"
-              onSubmit={async (data) => {
-                if (!user) return;
-                await createCard(
-                  user.id,
-                  actionsAddCardDeck.id,
-                  data.cardType,
-                  data.front,
-                  data.back,
-                  data.tags,
-                  data.fields,
-                  data.reversed,
-                );
-                setActionsAddCardDeck(null);
-              }}
-              onCancel={() => setActionsAddCardDeck(null)}
-            />
-          </div>
-        </div>
+          <CardForm
+            mode="create"
+            onSubmit={async (data) => {
+              if (!user) return;
+              await createCard(
+                user.id,
+                actionsAddCardDeck.id,
+                data.cardType,
+                data.front,
+                data.back,
+                data.tags,
+                data.fields,
+                data.reversed,
+              );
+              setActionsAddCardDeck(null);
+            }}
+            onCancel={() => setActionsAddCardDeck(null)}
+          />
+        </Modal>
       )}
 
-      {showImport && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closeImportModal}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">Import</p>
-              <button
-                onClick={closeImportModal}
-                aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-200"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      <Modal open={showImport} onClose={closeImportModal} title="Import">
+        {importSummary ? (
+          <div className="space-y-3">
+            <p className="text-sm text-neutral-300">
+              {importKind === "csv" ? (
+                <>
+                  Added {importSummary.notesCreated} card
+                  {importSummary.notesCreated === 1 ? "" : "s"}.
+                </>
+              ) : (
+                <>
+                  {importSummary.decksCreated} deck
+                  {importSummary.decksCreated === 1
+                    ? ""
+                    : "s"} created, {importSummary.noteTypesCreated} note
+                  type
+                  {importSummary.noteTypesCreated === 1
+                    ? ""
+                    : "s"} created, {importSummary.notesCreated} card
+                  {importSummary.notesCreated === 1 ? "" : "s"} added,{" "}
+                  {importSummary.notesEdited} card
+                  {importSummary.notesEdited === 1 ? "" : "s"} updated.
+                </>
+              )}
+            </p>
+            {importSummary.skipped.length > 0 && (
+              <ul className="space-y-1 rounded-md border border-neutral-800 bg-neutral-900 p-2 text-xs text-neutral-400">
+                {importSummary.skipped.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            )}
+            <button
+              onClick={closeImportModal}
+              className="w-full rounded-md bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-900"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".json,.csv"
+              className="hidden"
+              onChange={handleImportFileChange}
+            />
+            <button
+              onClick={() => importFileInputRef.current?.click()}
+              className="w-full rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+            >
+              Choose file (.json or .csv)
+            </button>
 
-            {importSummary ? (
-              <div className="space-y-3">
-                <p className="text-sm text-neutral-300">
-                  {importKind === "csv" ? (
-                    <>
-                      Added {importSummary.notesCreated} card
-                      {importSummary.notesCreated === 1 ? "" : "s"}.
-                    </>
-                  ) : (
-                    <>
-                      {importSummary.decksCreated} deck
-                      {importSummary.decksCreated === 1
-                        ? ""
-                        : "s"} created, {importSummary.noteTypesCreated} note
-                      type
-                      {importSummary.noteTypesCreated === 1
-                        ? ""
-                        : "s"} created, {importSummary.notesCreated} card
-                      {importSummary.notesCreated === 1 ? "" : "s"} added,{" "}
-                      {importSummary.notesEdited} card
-                      {importSummary.notesEdited === 1 ? "" : "s"} updated.
-                    </>
-                  )}
+            {importError && (
+              <p className="text-xs text-red-400">{importError}</p>
+            )}
+
+            {importKind === "csv" && importCsvRows.length > 0 && (
+              <>
+                <p className="text-xs text-neutral-500">
+                  {importCsvRows.length} card
+                  {importCsvRows.length === 1 ? "" : "s"} found.
                 </p>
-                {importSummary.skipped.length > 0 && (
+                {importParseErrors.length > 0 && (
                   <ul className="space-y-1 rounded-md border border-neutral-800 bg-neutral-900 p-2 text-xs text-neutral-400">
-                    {importSummary.skipped.map((s, i) => (
-                      <li key={i}>{s}</li>
+                    {importParseErrors.map((e, i) => (
+                      <li key={i}>{e}</li>
                     ))}
                   </ul>
                 )}
+                <label className="block">
+                  <span className="text-xs text-neutral-500">Deck</span>
+                  <div className="relative mt-0.5">
+                    <select
+                      value={importCsvDeckId}
+                      onChange={(e) => {
+                        setImportCsvDeckId(e.target.value);
+                        if (e.target.value) setImportCsvNewDeckName("");
+                      }}
+                      className="w-full appearance-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 pr-8 text-sm"
+                    >
+                      <option value="">+ New deck</option>
+                      {deckRows.map(({ deck, depth }) => (
+                        <option key={deck.id} value={deck.id}>
+                          {"  ".repeat(depth)}
+                          {deckDisplayName(deck.name)}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
+                    />
+                  </div>
+                </label>
+                {!importCsvDeckId && (
+                  <input
+                    type="text"
+                    value={importCsvNewDeckName}
+                    onChange={(e) =>
+                      setImportCsvNewDeckName(e.target.value)
+                    }
+                    placeholder="New deck name"
+                    className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+                  />
+                )}
+              </>
+            )}
+
+            {importKind === "json" && importJsonData && (
+              <p className="text-xs text-neutral-500">
+                {importJsonData.notes.length} note
+                {importJsonData.notes.length === 1 ? "" : "s"},{" "}
+                {importJsonData.noteTypes.length} note type
+                {importJsonData.noteTypes.length === 1 ? "" : "s"},{" "}
+                {importJsonData.decks.length} deck
+                {importJsonData.decks.length === 1 ? "" : "s"} referenced.
+              </p>
+            )}
+
+            {(importJsonData || importCsvRows.length > 0) && (
+              <div className="flex gap-2">
                 <button
                   onClick={closeImportModal}
-                  className="w-full rounded-md bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-900"
+                  className="flex-1 rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
                 >
-                  Done
+                  Cancel
                 </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <input
-                  ref={importFileInputRef}
-                  type="file"
-                  accept=".json,.csv"
-                  className="hidden"
-                  onChange={handleImportFileChange}
-                />
                 <button
-                  onClick={() => importFileInputRef.current?.click()}
-                  className="w-full rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+                  onClick={handleConfirmImport}
+                  className="flex-1 rounded-md bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-900"
                 >
-                  Choose file (.json or .csv)
+                  Import
                 </button>
-
-                {importError && (
-                  <p className="text-xs text-red-400">{importError}</p>
-                )}
-
-                {importKind === "csv" && importCsvRows.length > 0 && (
-                  <>
-                    <p className="text-xs text-neutral-500">
-                      {importCsvRows.length} card
-                      {importCsvRows.length === 1 ? "" : "s"} found.
-                    </p>
-                    {importParseErrors.length > 0 && (
-                      <ul className="space-y-1 rounded-md border border-neutral-800 bg-neutral-900 p-2 text-xs text-neutral-400">
-                        {importParseErrors.map((e, i) => (
-                          <li key={i}>{e}</li>
-                        ))}
-                      </ul>
-                    )}
-                    <label className="block">
-                      <span className="text-xs text-neutral-500">Deck</span>
-                      <div className="relative mt-0.5">
-                        <select
-                          value={importCsvDeckId}
-                          onChange={(e) => {
-                            setImportCsvDeckId(e.target.value);
-                            if (e.target.value) setImportCsvNewDeckName("");
-                          }}
-                          className="w-full appearance-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 pr-8 text-sm"
-                        >
-                          <option value="">+ New deck</option>
-                          {deckRows.map(({ deck, depth }) => (
-                            <option key={deck.id} value={deck.id}>
-                              {"  ".repeat(depth)}
-                              {deckDisplayName(deck.name)}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown
-                          size={14}
-                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500"
-                        />
-                      </div>
-                    </label>
-                    {!importCsvDeckId && (
-                      <input
-                        type="text"
-                        value={importCsvNewDeckName}
-                        onChange={(e) =>
-                          setImportCsvNewDeckName(e.target.value)
-                        }
-                        placeholder="New deck name"
-                        className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                      />
-                    )}
-                  </>
-                )}
-
-                {importKind === "json" && importJsonData && (
-                  <p className="text-xs text-neutral-500">
-                    {importJsonData.notes.length} note
-                    {importJsonData.notes.length === 1 ? "" : "s"},{" "}
-                    {importJsonData.noteTypes.length} note type
-                    {importJsonData.noteTypes.length === 1 ? "" : "s"},{" "}
-                    {importJsonData.decks.length} deck
-                    {importJsonData.decks.length === 1 ? "" : "s"} referenced.
-                  </p>
-                )}
-
-                {(importJsonData || importCsvRows.length > 0) && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={closeImportModal}
-                      className="flex-1 rounded-md border border-neutral-700 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleConfirmImport}
-                      className="flex-1 rounded-md bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-900"
-                    >
-                      Import
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </main>
   );
 }
