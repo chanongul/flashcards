@@ -909,7 +909,7 @@ export function ChoiceFieldInput({
             </div>
           )}
         </DropdownMenu>
-        <div className="mx-1 w-px bg-neutral-700" />
+        <div className="w-px bg-neutral-700" />
         <button
           type="button"
           onClick={() => stepSize(-1)}

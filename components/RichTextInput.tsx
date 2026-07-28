@@ -606,7 +606,7 @@ export function RichTextInput({
             </div>
           )}
         </DropdownMenu>
-        <div className="mx-1 w-px bg-neutral-700" />
+        <div className="w-px bg-neutral-700" />
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -627,7 +627,7 @@ export function RichTextInput({
         >
           A
         </button>
-        <div className="mx-1 w-px bg-neutral-700" />
+        <div className="w-px bg-neutral-700" />
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}

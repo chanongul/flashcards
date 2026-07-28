@@ -235,7 +235,7 @@ export default function AllCardsPage() {
         </div>
       </div>
 
-      <ul className={`space-y-2 ${selection.selectMode ? 'pb-10' : ''}`}>
+      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
         {allCards?.map((card) => (
           <CardRow
             key={card.id}

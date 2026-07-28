@@ -222,7 +222,7 @@ export default function DeckBrowsePage() {
         </p>
       )}
 
-      <ul className={`space-y-2 ${selection.selectMode ? 'pb-10' : ''}`}>
+      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
         {filtered.map((card) => (
           <CardRow
             key={card.id}
