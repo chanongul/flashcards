@@ -20,6 +20,8 @@ import {
   Download,
   Upload,
   ChevronDown,
+  List,
+  FolderSearch,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -1078,16 +1080,22 @@ export default function HomePage() {
                     >
                       <FilePlus size={16} />
                     </button>
-                    <button
-                      onClick={() => {
-                        handleExportDeck(deck);
-                        setActionsDeck(null);
-                      }}
-                      aria-label="Export deck"
+                    <Link
+                      href={`/review/${deck.id}/all`}
+                      onClick={() => setActionsDeck(null)}
+                      aria-label="View all cards"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Download size={16} />
-                    </button>
+                      <List size={16} />
+                    </Link>
+                    <Link
+                      href={`/review/${deck.id}/browse`}
+                      onClick={() => setActionsDeck(null)}
+                      aria-label="Browse this deck"
+                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <FolderSearch size={16} />
+                    </Link>
                     {deckDepth(deck.name) < MAX_DECK_DEPTH && (
                       <button
                         onClick={() => {
@@ -1100,6 +1108,16 @@ export default function HomePage() {
                         <FolderPlus size={16} />
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        startEditDeck(deck);
+                        setActionsDeck(null);
+                      }}
+                      aria-label="Rename deck"
+                      className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                    >
+                      <Pencil size={16} />
+                    </button>
                     {depth === 0 && (
                       <button
                         onClick={() => {
@@ -1114,13 +1132,13 @@ export default function HomePage() {
                     )}
                     <button
                       onClick={() => {
-                        startEditDeck(deck);
+                        handleExportDeck(deck);
                         setActionsDeck(null);
                       }}
-                      aria-label="Rename deck"
+                      aria-label="Export deck"
                       className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
                     >
-                      <Pencil size={16} />
+                      <Download size={16} />
                     </button>
                     <button
                       onClick={() => {
