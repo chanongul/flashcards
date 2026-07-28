@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, EyeDashed } from 'lucide-react';
+import { Bold, Italic, Underline, EyeDashed, CaseUpper, CaseLower } from 'lucide-react';
 import { sanitizeRichText } from '@/lib/sanitize';
 import type { TextFormat } from '@/lib/db';
 
@@ -326,6 +326,43 @@ export function RichTextInput({
     sel.removeAllRanges();
     sel.addRange(range);
 
+    handleInput();
+  }
+
+  // Unlike bold/italic/underline/dim/size, case has no persistent "on/off"
+  // state to toggle or query — it just rewrites the selected text's
+  // characters in place via each intersecting text node's .data, leaving
+  // every surrounding element (bold/italic/dim/size spans) untouched. A
+  // no-op without a real (non-collapsed) selection: there's no sensible
+  // "typing state" equivalent the way bold/dim have one, since there's no
+  // future text yet to transform.
+  function transformCase(fn: (s: string) => string) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed || !ref.current) return;
+
+    const container = range.commonAncestorContainer;
+    const root = container.nodeType === Node.TEXT_NODE ? container.parentNode! : container;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let n = walker.nextNode();
+    while (n) {
+      if (range.intersectsNode(n)) textNodes.push(n as Text);
+      n = walker.nextNode();
+    }
+
+    for (const node of textNodes) {
+      // A node the range only partially covers (its start/end boundary
+      // falls inside this node) only has that overlapping slice
+      // transformed, not the whole node's text.
+      const start = node === range.startContainer ? range.startOffset : 0;
+      const end = node === range.endContainer ? range.endOffset : node.data.length;
+      if (start >= end) continue;
+      node.data = node.data.slice(0, start) + fn(node.data.slice(start, end)) + node.data.slice(end);
+    }
+
+    ref.current.focus();
     handleInput();
   }
 
@@ -797,6 +834,26 @@ export function RichTextInput({
           }`}
         >
           <Underline size={14} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => withWholeSelection(() => transformCase((s) => s.toUpperCase()))}
+          aria-label="Capitalize"
+          title="Capitalize"
+          className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+        >
+          <CaseUpper size={14} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => withWholeSelection(() => transformCase((s) => s.toLowerCase()))}
+          aria-label="Decapitalize"
+          title="Decapitalize"
+          className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+        >
+          <CaseLower size={14} />
         </button>
         <button
           type="button"
