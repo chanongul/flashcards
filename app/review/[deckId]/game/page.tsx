@@ -89,9 +89,9 @@ export default function GameModePage() {
         <button
           onClick={goBack}
           aria-label="Back to review"
-          className="rounded-md p-1.5 text-neutral-400 hover:text-neutral-200"
+          className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={20} />
         </button>
 
         {deck && (
