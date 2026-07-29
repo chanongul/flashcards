@@ -165,7 +165,7 @@ body {
   );
   background-size: 400% 100%;
   animation: media-skeleton-pulse 5s ease infinite;
-  border-radius: 0.15rem;
+  border-radius: 0.25rem;
 }
 .rich-text-content img.media-loading {
   min-height: 120px;
