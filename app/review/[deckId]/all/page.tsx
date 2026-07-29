@@ -264,9 +264,9 @@ export default function AllCardsPage() {
         </div>
       </div>
 
-      <ScrollFade fadeFrom="from-neutral-950" bleed={false}>
+      <ScrollFade fadeFrom="from-neutral-950" bleed={false} extraSide>
         <ul
-          className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}
+          className={`px-1 space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}
         >
           {allCards?.map((card) => (
             <CardRow

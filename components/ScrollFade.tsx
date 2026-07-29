@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ScrollFadeProps {
   children: React.ReactNode;
@@ -15,13 +15,19 @@ interface ScrollFadeProps {
   // The list pages have no such padded box to bleed through, so they pass
   // bleed={false} to just span this wrapper's own width (inset-x-0).
   bleed?: boolean;
+  extraSide?: boolean;
 }
 
 /** A vertical scroll region that shows a faded gradient at the top and/or
  * bottom edge whenever there's more content to scroll to in that direction —
  * a hint that the content is clipped. The fades sit outside the scroll area
  * (pinned, pointer-events-none) so they don't scroll or block interaction. */
-export function ScrollFade({ children, fadeFrom = 'from-neutral-900', bleed = true }: ScrollFadeProps) {
+export function ScrollFade({
+  children,
+  fadeFrom = "from-neutral-900",
+  bleed = true,
+  extraSide = false,
+}: ScrollFadeProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showTop, setShowTop] = useState(false);
   const [showBottom, setShowBottom] = useState(false);
@@ -47,19 +53,27 @@ export function ScrollFade({ children, fadeFrom = 'from-neutral-900', bleed = tr
 
   return (
     <div className="relative min-h-0 w-full flex-1">
-      <div ref={ref} onScroll={update} className="h-full overflow-y-auto overflow-x-hidden">
+      <div
+        ref={ref}
+        onScroll={update}
+        className={`h-full overflow-y-auto ${
+          extraSide
+            ? `w-[calc(100%+0.5rem)] -mx-1`
+            : ""
+        }`}
+      >
         {children}
       </div>
       <div
         aria-hidden
-        className={`pointer-events-none absolute ${bleed ? '-left-4 -right-4' : 'inset-x-0'} top-0 h-8 bg-gradient-to-b ${fadeFrom} to-transparent transition-opacity duration-150 ${
-          showTop ? 'opacity-100' : 'opacity-0'
+        className={`pointer-events-none absolute ${bleed ? "-left-4 -right-4" : "inset-x-0"} top-0 h-8 bg-gradient-to-b ${fadeFrom} to-transparent transition-opacity duration-150 ${
+          showTop ? "opacity-100" : "opacity-0"
         }`}
       />
       <div
         aria-hidden
-        className={`pointer-events-none absolute ${bleed ? '-left-4 -right-4' : 'inset-x-0'} bottom-0 h-8 bg-gradient-to-t ${fadeFrom} to-transparent transition-opacity duration-150 ${
-          showBottom ? 'opacity-100' : 'opacity-0'
+        className={`pointer-events-none absolute ${bleed ? "-left-4 -right-4" : "inset-x-0"} bottom-0 h-8 bg-gradient-to-t ${fadeFrom} to-transparent transition-opacity duration-150 ${
+          showBottom ? "opacity-100" : "opacity-0"
         }`}
       />
     </div>
