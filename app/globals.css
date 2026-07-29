@@ -159,13 +159,13 @@ body {
 .rich-text-content audio.media-loading {
   background-image: linear-gradient(
     90deg,
-    #000000 25%,
-    theme('colors.neutral.900') 37%,
-    #000000 63%
+    theme('colors.neutral.900') 25%,
+    theme('colors.neutral.800') 37%,
+    theme('colors.neutral.900') 63%
   );
   background-size: 400% 100%;
   animation: media-skeleton-pulse 1.4s ease infinite;
-  border-radius: 0.375rem;
+  border-radius: 0.125rem;
 }
 .rich-text-content img.media-loading {
   min-height: 120px;

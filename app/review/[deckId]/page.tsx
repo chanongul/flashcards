@@ -25,28 +25,18 @@ import {
   editDeck,
 } from "@/lib/actions";
 import { Rating, type Grade } from "@/lib/fsrs";
-import { db, type Card, type FieldType } from "@/lib/db";
+import { db, type Card } from "@/lib/db";
 import { useUser } from "@/lib/useUser";
 import { useSmartBack } from "@/lib/useSmartBack";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
-import { clozeBlankLetters, buildClozeText, clozeSegments } from "@/lib/cloze";
+import { clozeSegments } from "@/lib/cloze";
 import { arrowify } from "@/lib/arrowify";
 import { CardFaces } from "@/components/CardFaces";
-import {
-  FieldTypeToggle,
-  FieldValueInput,
-  fieldHasContent,
-  fieldNeedsLabel,
-} from "@/components/MediaFieldInput";
 import { useLoading, useLoadingWhen } from "@/components/GlobalLoading";
-import { Checkbox } from "@/components/Checkbox";
-import { TagsInput } from "@/components/TagsInput";
 import { ScrollFade } from "@/components/ScrollFade";
-import { ClozeEditor } from "@/components/ClozeEditor";
 import { JotPad } from "@/components/JotPad";
 import { CardForm } from "@/components/CardForm";
 import { Modal } from "@/components/base/Modal";
-import { resolvePendingMediaInHtml } from "@/lib/mediaSync";
 import {
   countCardsByState,
   DECK_COUNT_TOOLTIPS,
@@ -54,6 +44,7 @@ import {
 } from "@/lib/stats";
 import {
   deckBreadcrumb,
+  deckBreadcrumbCompact,
   deckDisplayName,
   deckParentName,
   getDeckAndDescendantIds,
@@ -90,7 +81,8 @@ function ClozeFillIn({
   return (
     <p className="text-lg">
       {clozeSegments(text).map((seg, i) => {
-        if (seg.type === "text") return <span key={i}>{arrowify(seg.value)}</span>;
+        if (seg.type === "text")
+          return <span key={i}>{arrowify(seg.value)}</span>;
         if (seg.number !== activeIndex)
           return <span key={i}>{arrowify(seg.answer)}</span>;
         const index = blankCount;
@@ -146,7 +138,8 @@ function ClozeRevealPart({
   return (
     <p className="text-lg">
       {clozeSegments(text).map((seg, i) => {
-        if (seg.type === "text") return <span key={i}>{arrowify(seg.value)}</span>;
+        if (seg.type === "text")
+          return <span key={i}>{arrowify(seg.value)}</span>;
         if (seg.number !== activeIndex)
           return <span key={i}>{arrowify(seg.answer)}</span>;
         const index = blankCount;
@@ -202,7 +195,7 @@ export default function ReviewPage() {
   const JOT_HANDLE_HEIGHT = 16;
   const SIZE_OPTIONS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
   const [jotSizeIndex, setJotSizeIndex] = useState(
-    SIZE_OPTIONS.indexOf(0.5) // default 50%
+    SIZE_OPTIONS.indexOf(0.5), // default 50%
   );
   const JOT_CONTENT_RATIO = SIZE_OPTIONS[jotSizeIndex];
 
@@ -367,7 +360,10 @@ export default function ReviewPage() {
 
   function closeAddModal() {
     setShowAddModal(false);
-    if (typeof window !== "undefined" && window.location.search.includes("add=true")) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.search.includes("add=true")
+    ) {
       const cleanUrl = window.location.pathname;
       window.history.replaceState(null, "", cleanUrl);
     }
@@ -499,8 +495,6 @@ export default function ReviewPage() {
         </div>
       </div>
 
-
-
       {!loading && current && (
         <div className="relative flex flex-1 flex-col gap-4">
           <div
@@ -561,9 +555,9 @@ export default function ReviewPage() {
           </div>
 
           {deck && (
-            <div className="flex shrink-0 items-center justify-between px-1">
+            <div className="flex shrink-0 items-center justify-between px-1 gap-4">
               <p
-                className={`text-sm text-neutral-500 ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+                className={`text-sm text-neutral-500 truncate ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-80"}`}
                 onMouseDown={startPressHoldTimers}
                 onMouseUp={endPressHoldTimers}
                 onTouchStart={startPressHoldTimers}
@@ -571,14 +565,19 @@ export default function ReviewPage() {
                 onTouchCancel={cancelPressHoldTimers}
                 onClick={handleTitleClick}
                 role="button"
-                aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
-                title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
+                aria-label={
+                  isOnline ? `${deckBreadcrumb(deck.name)} · Sync now` : `${deckBreadcrumb(deck.name)} · Offline — sync unavailable`
+                }
+                title={isOnline ? `${deckBreadcrumb(deck.name)} · Sync now` : `${deckBreadcrumb(deck.name)} · Offline — sync unavailable`}
               >
-                {deckBreadcrumb(deck.name)}
+                {deckBreadcrumbCompact(deck.name)}
               </p>
               <div className="flex items-center gap-4">
                 <span className="flex gap-2 text-xs font-medium">
-                  <span className="text-sky-400" title={DECK_COUNT_TOOLTIPS.new}>
+                  <span
+                    className="text-sky-400"
+                    title={DECK_COUNT_TOOLTIPS.new}
+                  >
                     {(aheadCounts ?? deckCounts)?.newCount ?? 0}
                   </span>
                   <span
@@ -587,7 +586,10 @@ export default function ReviewPage() {
                   >
                     {(aheadCounts ?? deckCounts)?.learningCount ?? 0}
                   </span>
-                  <span className="text-olive-300" title={DECK_COUNT_TOOLTIPS.due}>
+                  <span
+                    className="text-olive-300"
+                    title={DECK_COUNT_TOOLTIPS.due}
+                  >
                     {(aheadCounts ?? deckCounts)?.dueCount ?? 0}
                   </span>
                 </span>
@@ -640,7 +642,11 @@ export default function ReviewPage() {
               <div className="h-1 w-12 rounded-full bg-neutral-500" />
             </div>
             <div className="min-h-0 flex-1">
-              <JotPad sizeRatio={JOT_CONTENT_RATIO} onSizeToggle={cycleJotSize} hasCard={!!current} />
+              <JotPad
+                sizeRatio={JOT_CONTENT_RATIO}
+                onSizeToggle={cycleJotSize}
+                hasCard={!!current}
+              />
             </div>
           </div>
 
@@ -701,7 +707,7 @@ export default function ReviewPage() {
               data.back,
               data.tags,
               data.fields,
-              data.reversed
+              data.reversed,
             );
             closeAddModal();
             loadQueue();
@@ -746,9 +752,7 @@ export default function ReviewPage() {
             />
           </label>
           <label className="block">
-            <span className="text-xs text-neutral-400">
-              Max reviews/day
-            </span>
+            <span className="text-xs text-neutral-400">Max reviews/day</span>
             <input
               type="number"
               min={0}
@@ -781,10 +785,10 @@ export default function ReviewPage() {
         title="Study ahead"
       >
         <p className="mb-3 text-xs text-neutral-500">
-          Review cards ahead of schedule, bypassing today's limits. Cards
-          you rate get rescheduled from now, same as any other review. This
-          session isn't saved — refreshing the page ends it and goes back to
-          what's actually due today.
+          Review cards ahead of schedule, bypassing today's limits. Cards you
+          rate get rescheduled from now, same as any other review. This session
+          isn't saved — refreshing the page ends it and goes back to what's
+          actually due today.
         </p>
 
         <form

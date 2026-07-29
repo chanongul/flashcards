@@ -1,26 +1,30 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { useLiveQuery } from 'dexie-react-hooks';
-import Link from 'next/link';
-import { ArrowLeft, FolderSearch, Plus, CheckSquare, X } from 'lucide-react';
-import { db, type Card } from '@/lib/db';
-import { editCard, deleteCard, cloneCard, createCard } from '@/lib/actions';
-import { useUser } from '@/lib/useUser';
-import { CardRow } from '@/components/CardRow';
-import { CardForm } from '@/components/CardForm';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { Modal } from '@/components/base/Modal';
-import { ScrollFade } from '@/components/ScrollFade';
-import { BulkActionBar } from '@/components/BulkActionBar';
-import { DeckPickerModal } from '@/components/DeckPickerModal';
-import { useLoadingWhen } from '@/components/GlobalLoading';
-import { sortQueue } from '@/lib/fsrs';
-import { useSmartBack } from '@/lib/useSmartBack';
-import { useTitleSync } from '@/lib/useTitleSync';
-import { useCardSelection } from '@/lib/useCardSelection';
-import { getDeckAndDescendantIds, flattenDeckTree } from '@/lib/decks';
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useLiveQuery } from "dexie-react-hooks";
+import Link from "next/link";
+import { ArrowLeft, FolderSearch, Plus, CheckSquare, X } from "lucide-react";
+import { db, type Card } from "@/lib/db";
+import { editCard, deleteCard, cloneCard, createCard } from "@/lib/actions";
+import { useUser } from "@/lib/useUser";
+import { CardRow } from "@/components/CardRow";
+import { CardForm } from "@/components/CardForm";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Modal } from "@/components/base/Modal";
+import { ScrollFade } from "@/components/ScrollFade";
+import { BulkActionBar } from "@/components/BulkActionBar";
+import { DeckPickerModal } from "@/components/DeckPickerModal";
+import { useLoadingWhen } from "@/components/GlobalLoading";
+import { sortQueue } from "@/lib/fsrs";
+import { useSmartBack } from "@/lib/useSmartBack";
+import { useTitleSync } from "@/lib/useTitleSync";
+import { useCardSelection } from "@/lib/useCardSelection";
+import {
+  getDeckAndDescendantIds,
+  flattenDeckTree,
+  deckBreadcrumbCompact,
+} from "@/lib/decks";
 
 export default function AllCardsPage() {
   const params = useParams<{ deckId: string }>();
@@ -28,18 +32,15 @@ export default function AllCardsPage() {
   const { user, loading: userLoading } = useUser();
   useLoadingWhen(userLoading || !user);
 
-  const allCards = useLiveQuery(
-    async () => {
-      const deckIds = await getDeckAndDescendantIds(params.deckId);
-      return db.cards
-        .where('deckId')
-        .anyOf(deckIds)
-        .filter((c) => !c.deleted)
-        .toArray()
-        .then(sortQueue);
-    },
-    [params.deckId]
-  );
+  const allCards = useLiveQuery(async () => {
+    const deckIds = await getDeckAndDescendantIds(params.deckId);
+    return db.cards
+      .where("deckId")
+      .anyOf(deckIds)
+      .filter((c) => !c.deleted)
+      .toArray()
+      .then(sortQueue);
+  }, [params.deckId]);
 
   const [confirmState, setConfirmState] = useState<{
     title: string;
@@ -47,15 +48,21 @@ export default function AllCardsPage() {
     onConfirm: () => void;
   } | null>(null);
 
-  const decks = useLiveQuery(() => db.decks.filter((d) => !d.deleted).toArray(), []);
+  const decks = useLiveQuery(
+    () => db.decks.filter((d) => !d.deleted).toArray(),
+    [],
+  );
   const deckRows = flattenDeckTree(decks ?? []);
+  const deckName = decks?.find((d) => d.id === params.deckId)?.name ?? "";
 
   const [showAddModal, setShowAddModal] = useState(false);
   // Set to the just-created note's id on submit; once that note's card shows
   // up in the (reactive) allCards list, we scroll it into view and briefly
   // highlight it — the "New" cards a plain creation-order sort would put it
   // at the bottom of an already-long list otherwise makes it easy to lose.
-  const [pendingScrollNoteId, setPendingScrollNoteId] = useState<string | null>(null);
+  const [pendingScrollNoteId, setPendingScrollNoteId] = useState<string | null>(
+    null,
+  );
   const [highlightCardId, setHighlightCardId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,7 +71,9 @@ export default function AllCardsPage() {
     if (!match) return;
     setPendingScrollNoteId(null);
     setHighlightCardId(match.id);
-    document.getElementById(`card-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document
+      .getElementById(`card-${match.id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [allCards, pendingScrollNoteId]);
 
   // Separate from the effect above on purpose: allCards is a useLiveQuery
@@ -89,7 +98,7 @@ export default function AllCardsPage() {
       fields: Record<string, string>;
       tags: string[];
       reversed: boolean;
-    }>
+    }>,
   ) {
     if (!user) return;
     await editCard(user.id, cardId, changes);
@@ -97,8 +106,8 @@ export default function AllCardsPage() {
 
   function handleDelete(cardId: string) {
     setConfirmState({
-      title: 'Delete card',
-      message: 'Delete this card? This cannot be undone.',
+      title: "Delete card",
+      message: "Delete this card? This cannot be undone.",
       onConfirm: async () => {
         if (!user) return;
         await deleteCard(user.id, cardId);
@@ -128,13 +137,13 @@ export default function AllCardsPage() {
   }
 
   const selection = useCardSelection(allCards ?? [], user?.id);
-  const [bulkMoveTargetId, setBulkMoveTargetId] = useState('');
+  const [bulkMoveTargetId, setBulkMoveTargetId] = useState("");
   const [showBulkMove, setShowBulkMove] = useState(false);
-  const [bulkDuplicateTargetId, setBulkDuplicateTargetId] = useState('');
+  const [bulkDuplicateTargetId, setBulkDuplicateTargetId] = useState("");
   const [showBulkDuplicate, setShowBulkDuplicate] = useState(false);
 
   function openBulkMove() {
-    setBulkMoveTargetId('');
+    setBulkMoveTargetId("");
     setShowBulkMove(true);
   }
 
@@ -145,7 +154,7 @@ export default function AllCardsPage() {
   }
 
   function openBulkDuplicate() {
-    setBulkDuplicateTargetId('');
+    setBulkDuplicateTargetId("");
     setShowBulkDuplicate(true);
   }
 
@@ -158,8 +167,8 @@ export default function AllCardsPage() {
   function handleBulkDelete() {
     const n = selection.selectedCards.length;
     setConfirmState({
-      title: 'Delete cards',
-      message: `Delete ${n} card${n === 1 ? '' : 's'}? This cannot be undone.`,
+      title: "Delete cards",
+      message: `Delete ${n} card${n === 1 ? "" : "s"}? This cannot be undone.`,
       onConfirm: async () => {
         await selection.bulkDelete();
         setConfirmState(null);
@@ -192,7 +201,7 @@ export default function AllCardsPage() {
             <ArrowLeft size={20} />
           </button>
           <h1
-            className={`text-lg font-semibold ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+            className={`text-lg font-semibold ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-80"}`}
             onMouseDown={startPressHoldTimers}
             onMouseUp={endPressHoldTimers}
             onTouchStart={startPressHoldTimers}
@@ -200,8 +209,8 @@ export default function AllCardsPage() {
             onTouchCancel={cancelPressHoldTimers}
             onClick={handleTitleClick}
             role="button"
-            aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
-            title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
+            aria-label={isOnline ? "Sync now" : "Offline — sync unavailable"}
+            title={isOnline ? "Sync now" : "Offline — sync unavailable"}
           >
             All cards
           </h1>
@@ -216,9 +225,16 @@ export default function AllCardsPage() {
 
         {syncError && <p className="mb-2 text-xs text-red-400">{syncError}</p>}
 
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
-          <div className="flex items-center gap-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="w-max text-xs text-neutral-500 whitespace-nowrap">
+              {allCards?.length ?? 0} cards
+            </p>
+            <span className="truncate text-xs text-neutral-500">
+              · {deckBreadcrumbCompact(deckName)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAddModal(true)}
               aria-label="Add a card"
@@ -228,18 +244,30 @@ export default function AllCardsPage() {
             </button>
             <button
               onClick={selection.toggleSelectMode}
-              aria-label={selection.selectMode ? 'Cancel selection' : 'Select cards'}
+              aria-label={
+                selection.selectMode ? "Cancel selection" : "Select cards"
+              }
               aria-pressed={selection.selectMode}
-              className={selection.selectMode ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-200'}
+              className={
+                selection.selectMode
+                  ? "text-neutral-100"
+                  : "text-neutral-500 hover:text-neutral-200"
+              }
             >
-              {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+              {selection.selectMode ? (
+                <X size={16} />
+              ) : (
+                <CheckSquare size={16} />
+              )}
             </button>
           </div>
         </div>
       </div>
 
       <ScrollFade fadeFrom="from-neutral-950" bleed={false}>
-        <ul className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}>
+        <ul
+          className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}
+        >
           {allCards?.map((card) => (
             <CardRow
               key={card.id}
@@ -263,7 +291,11 @@ export default function AllCardsPage() {
         </ul>
       </ScrollFade>
 
-      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="New card">
+      <Modal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="New card"
+      >
         <CardForm
           mode="create"
           onSubmit={async (data) => {
@@ -276,7 +308,7 @@ export default function AllCardsPage() {
               data.back,
               data.tags,
               data.fields,
-              data.reversed
+              data.reversed,
             );
             setShowAddModal(false);
             setPendingScrollNoteId(noteId);
@@ -303,7 +335,7 @@ export default function AllCardsPage() {
       <DeckPickerModal
         open={showBulkMove}
         onClose={() => setShowBulkMove(false)}
-        title={`Move ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        title={`Move ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? "" : "s"}`}
         confirmLabel="Move"
         rows={deckRows}
         value={bulkMoveTargetId}
@@ -314,7 +346,7 @@ export default function AllCardsPage() {
       <DeckPickerModal
         open={showBulkDuplicate}
         onClose={() => setShowBulkDuplicate(false)}
-        title={`Duplicate ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? '' : 's'}`}
+        title={`Duplicate ${selection.selectedCards.length} card${selection.selectedCards.length === 1 ? "" : "s"}`}
         confirmLabel="Duplicate"
         rows={deckRows}
         value={bulkDuplicateTargetId}
@@ -324,8 +356,8 @@ export default function AllCardsPage() {
 
       <ConfirmDialog
         open={!!confirmState}
-        title={confirmState?.title ?? ''}
-        message={confirmState?.message ?? ''}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message ?? ""}
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}
       />

@@ -228,10 +228,15 @@ export default function DeckBrowsePage() {
         </div>
 
         {hasActiveFilter && (
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs text-neutral-500">
-              {filtered.length} card{filtered.length === 1 ? "" : "s"}
-            </p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="w-max text-xs text-neutral-500 whitespace-nowrap">
+                {filtered.length} card{filtered.length === 1 ? "" : "s"}
+              </p>
+              <span className="truncate text-xs text-neutral-500">
+                · {deckBreadcrumbCompact(currentDeckName)}
+              </span>
+            </div>
             <button
               onClick={selection.toggleSelectMode}
               aria-label={
@@ -255,7 +260,9 @@ export default function DeckBrowsePage() {
       </div>
 
       <ScrollFade fadeFrom="from-neutral-950" bleed={false}>
-        <ul className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}>
+        <ul
+          className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}
+        >
           {filtered.map((card) => (
             <CardRow
               key={card.id}
