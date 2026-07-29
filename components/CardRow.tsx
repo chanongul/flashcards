@@ -199,7 +199,7 @@ export function CardRow({
     <li
       id={id}
       onClick={() =>
-        selectMode ? onToggleSelect?.(card) : setShowPreview(true)
+        selectMode ? onToggleSelect?.(card) : !editing && setShowPreview(true)
       }
       className={`flex min-h-[3.125rem] cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 pl-3 py-2 text-sm ring-orange-600 transition-shadow duration-500 hover:bg-neutral-900/50 ${
         highlighted ? "ring-2" : "ring-0"
