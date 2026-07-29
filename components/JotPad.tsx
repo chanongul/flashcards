@@ -307,7 +307,6 @@ export function JotPad({ sizeRatio, onSizeToggle, hasCard }: JotPadProps) {
         message="Resizing will clear your current drawing. Your typed text will be kept."
         confirmLabel="Change size"
         confirmVariant="neutral"
-        closeOnBackdropClick
         onConfirm={handleConfirmSizeChange}
         onCancel={() => setConfirmClearForSize(false)}
       />

@@ -437,16 +437,16 @@ export default function ReviewPage() {
         <button
           onClick={goBack}
           aria-label="Back to decks"
-          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+          className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={20} />
         </button>
-        <div className="flex gap-2">
+        <div className="flex gap-4 items-center">
           {lastReview && (
             <button
               onClick={handleUndo}
               aria-label="Undo last review"
-              className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+              className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
             >
               <Undo2 size={16} />
             </button>
@@ -454,14 +454,14 @@ export default function ReviewPage() {
           <Link
             href={`/review/${params.deckId}/all`}
             aria-label="View all cards"
-            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
             <List size={16} />
           </Link>
           <Link
             href={`/review/${params.deckId}/browse`}
             aria-label="Browse this deck"
-            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
             <FolderSearch size={16} />
           </Link>
@@ -471,30 +471,30 @@ export default function ReviewPage() {
               setShowStudyAhead(true);
             }}
             aria-label="Study ahead"
-            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
             <CalendarClock size={16} />
           </button>
           <Link
             href={`/review/${params.deckId}/game`}
             aria-label="Game mode"
-            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
             <Gamepad2 size={16} />
           </Link>
           <button
             onClick={openDeckOptions}
             aria-label="Deck options"
-            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
             <Settings size={16} />
           </button>
           <button
             onClick={() => setShowAddModal(true)}
             aria-label="Add a card"
-            className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
-            <Plus size={16} />
+            <Plus size={20} />
           </button>
         </div>
       </div>

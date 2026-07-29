@@ -30,7 +30,7 @@ export function Modal({
   leading,
   trailing,
   showCloseButton = true,
-  closeOnBackdropClick = true,
+  closeOnBackdropClick = false,
   size = 'scroll',
   maxHeightClassName = 'max-h-[85vh]',
   heightClassName = 'h-[70vh]',

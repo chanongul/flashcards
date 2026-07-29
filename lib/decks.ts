@@ -10,9 +10,22 @@ export function deckDisplayName(fullName: string): string {
   return parts[parts.length - 1];
 }
 
-/** Human-friendly rendering of the full path, e.g. "Japanese › Verbs". */
+/** Human-friendly rendering of the full path, e.g. "Japanese > Verbs". */
 export function deckBreadcrumb(fullName: string): string {
-  return fullName.split('::').join(' › ');
+  return fullName.split('::').join(' > ');
+}
+
+/** Same as deckBreadcrumb, but collapses the middle of a deep path into a
+ * "...(N)..." placeholder (N = the number of hidden levels) once there's
+ * actually something to hide — more than 2 segments — keeping only the
+ * top-level ancestor and the deck's own name visible, e.g. 5 levels becomes
+ * "Grandparent > ...(3)... > Subdeck". Used for CardRow's deckName label,
+ * where a deeply-nested path would otherwise overflow/dominate the row. */
+export function deckBreadcrumbCompact(fullName: string): string {
+  const parts = fullName.split('::');
+  if (parts.length <= 2) return parts.join(' > ');
+  const hidden = parts.length - 2;
+  return `${parts[0]} > ..(${hidden}).. > ${parts[parts.length - 1]}`;
 }
 
 export function deckParentName(fullName: string): string | null {

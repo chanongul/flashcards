@@ -10,11 +10,12 @@ import { CardRow } from "@/components/CardRow";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BulkActionBar } from "@/components/BulkActionBar";
 import { DeckPickerModal } from "@/components/DeckPickerModal";
+import { ScrollFade } from "@/components/ScrollFade";
 import { cardSearchText } from "@/lib/search";
 import { useLoadingWhen } from "@/components/GlobalLoading";
 import { useSmartBack } from "@/lib/useSmartBack";
 import { useCardSelection } from "@/lib/useCardSelection";
-import { flattenDeckTree } from "@/lib/decks";
+import { flattenDeckTree, deckBreadcrumbCompact } from "@/lib/decks";
 import { sync } from "@/lib/sync";
 
 export default function BrowsePage() {
@@ -180,99 +181,107 @@ export default function BrowsePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 md:mb-0">
-      <div className="mb-4 flex items-center justify-between">
-        <button
-          onClick={goBack}
-          aria-label="Back to decks"
-          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <h1
-          className="cursor-pointer text-lg font-semibold"
-          onMouseDown={startPressHoldTimers}
-          onMouseUp={endPressHoldTimers}
-          onTouchStart={startPressHoldTimers}
-          onTouchEnd={endPressHoldTimers}
-          onTouchCancel={cancelPressHoldTimers}
-          onClick={handleTitleClick}
-          role="button"
-          aria-label="Sync now"
-          title="Sync now"
-        >
-          Browse
-        </h1>
-        <button
-          onClick={() => setFavoritesOnly((v) => !v)}
-          aria-label={favoritesOnly ? "Show all cards" : "Show favorites only"}
-          aria-pressed={favoritesOnly}
-          className={`text-yellow-400 ${favoritesOnly ? "" : "opacity-40 hover:opacity-70"}`}
-        >
-          <Star size={20} fill="currentColor" />
-        </button>
-      </div>
-
-      <div className="relative mb-4">
-        <Search
-          size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
-        />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search cards, tags, or deck names…"
-          className="w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 pl-9 pr-3 text-sm"
-        />
-      </div>
-
-      {hasActiveFilter && (
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs text-neutral-500">
-            {filtered.length} card{filtered.length === 1 ? "" : "s"}
-          </p>
+    <main className="mx-auto flex max-w-md flex-col px-6 h-dvh">
+      <div className="shrink-0 pt-2 md:pt-6 pb-2">
+        <div className="mb-4 flex items-center justify-between">
           <button
-            onClick={selection.toggleSelectMode}
-            aria-label={
-              selection.selectMode ? "Cancel selection" : "Select cards"
-            }
-            aria-pressed={selection.selectMode}
-            className={
-              selection.selectMode
-                ? "text-neutral-100"
-                : "text-neutral-500 hover:text-neutral-200"
-            }
+            onClick={goBack}
+            aria-label="Back to decks"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
-            {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+            <ArrowLeft size={20} />
+          </button>
+          <h1
+            className="cursor-pointer text-lg font-semibold"
+            onMouseDown={startPressHoldTimers}
+            onMouseUp={endPressHoldTimers}
+            onTouchStart={startPressHoldTimers}
+            onTouchEnd={endPressHoldTimers}
+            onTouchCancel={cancelPressHoldTimers}
+            onClick={handleTitleClick}
+            role="button"
+            aria-label="Sync now"
+            title="Sync now"
+          >
+            Browse
+          </h1>
+          <button
+            onClick={() => setFavoritesOnly((v) => !v)}
+            aria-label={favoritesOnly ? "Show all cards" : "Show favorites only"}
+            aria-pressed={favoritesOnly}
+            className={`text-yellow-400 ${favoritesOnly ? "" : "opacity-40 hover:opacity-70"}`}
+          >
+            <Star size={20} fill="currentColor" />
           </button>
         </div>
-      )}
 
-      <ul className={`space-y-2 ${selection.selectMode ? "pb-16" : ""}`}>
-        {filtered.map((card) => (
-          <CardRow
-            key={card.id}
-            card={card}
-            deckName={deckNameById.get(card.deckId)}
-            selectMode={selection.selectMode}
-            selected={selection.selectedIds.has(card.id)}
-            onToggleSelect={selection.toggleSelect}
-            onSave={handleSaveEdit}
-            onDelete={handleDelete}
-            onToggleFlag={handleToggleFlag}
-            onToggleSuspend={handleToggleSuspend}
-            onClone={handleClone}
-            onMoveCard={handleMoveCard}
+        <div className="relative mb-4">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
           />
-        ))}
-        {hasActiveFilter ? (
-          filtered.length === 0 && (
-            <p className="text-sm text-neutral-500">No cards match.</p>
-          )
-        ) : (
-          <p className="text-sm text-neutral-500">Type to search your cards.</p>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search cards, tags, or deck names…"
+            className="w-full rounded-md border border-neutral-700 bg-neutral-900 py-2 pl-9 pr-3 text-sm"
+          />
+        </div>
+
+        {hasActiveFilter && (
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs text-neutral-500">
+              {filtered.length} card{filtered.length === 1 ? "" : "s"}
+            </p>
+            <button
+              onClick={selection.toggleSelectMode}
+              aria-label={
+                selection.selectMode ? "Cancel selection" : "Select cards"
+              }
+              aria-pressed={selection.selectMode}
+              className={
+                selection.selectMode
+                  ? "text-neutral-100"
+                  : "text-neutral-500 hover:text-neutral-200"
+              }
+            >
+              {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+            </button>
+          </div>
         )}
-      </ul>
+      </div>
+
+      <ScrollFade fadeFrom="from-neutral-950" bleed={false}>
+        <ul className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}>
+          {filtered.map((card) => (
+            <CardRow
+              key={card.id}
+              card={card}
+              deckName={
+              deckNameById.get(card.deckId)
+                ? deckBreadcrumbCompact(deckNameById.get(card.deckId)!)
+                : undefined
+            }
+              selectMode={selection.selectMode}
+              selected={selection.selectedIds.has(card.id)}
+              onToggleSelect={selection.toggleSelect}
+              onSave={handleSaveEdit}
+              onDelete={handleDelete}
+              onToggleFlag={handleToggleFlag}
+              onToggleSuspend={handleToggleSuspend}
+              onClone={handleClone}
+              onMoveCard={handleMoveCard}
+            />
+          ))}
+          {hasActiveFilter ? (
+            filtered.length === 0 && (
+              <p className="text-sm text-neutral-500">No cards match.</p>
+            )
+          ) : (
+            <p className="text-sm text-neutral-500">Type to search your cards.</p>
+          )}
+        </ul>
+      </ScrollFade>
 
       {selection.selectMode && (
         <BulkActionBar

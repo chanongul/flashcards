@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   LogOut,
   Pencil,
@@ -121,6 +122,7 @@ interface FieldRow {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const { user, loading } = useUser();
   const { withLoading } = useLoading();
   const decks = useLiveQuery(
@@ -337,16 +339,6 @@ export default function HomePage() {
   function cancelFoldHold() {
     if (foldHoldTimeout.current) clearTimeout(foldHoldTimeout.current);
     foldHoldTimeout.current = null;
-  }
-
-  // Swallows the click a long-press's release always synthesizes — without
-  // this, holding a deck to fold it would also navigate into the deck the
-  // instant the finger/mouse lifts.
-  function handleDeckLinkClick(e: React.MouseEvent) {
-    if (foldTriggeredRef.current) {
-      e.preventDefault();
-      foldTriggeredRef.current = false;
-    }
   }
 
   // Holding the "Decks" heading (a much longer hold than a single deck row's,
@@ -1039,7 +1031,7 @@ export default function HomePage() {
       </div>
 
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <h2
             className="text-xl cursor-pointer font-bold"
             onMouseDown={startAllFoldHold}
@@ -1056,23 +1048,23 @@ export default function HomePage() {
             onClick={() => setDeckSortMode((mode) => nextDeckSortMode(mode))}
             aria-label={DECK_SORT_LABELS[deckSortMode]}
             title={DECK_SORT_LABELS[deckSortMode]}
-            className="flex h-8 w-8 items-center justify-center text-neutral-400 hover:text-neutral-200"
+            className="flex h-8 w-8 items-center justify-center hover:text-neutral-400"
           >
-            <DeckSortIcon size={16} />
+            <DeckSortIcon size={18} strokeWidth={3} />
           </button>
         </div>
-        <div className="flex items-center gap-2 text-neutral-400">
+        <div className="flex items-center gap-4 text-neutral-400">
           <Link
             href="/browse"
             aria-label="Browse cards"
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
+            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
           >
             <Search size={16} />
           </Link>
           <button
             onClick={() => setShowNoteTypes(true)}
             aria-label="Manage custom card types"
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
+            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
           >
             <LayoutTemplate size={16} />
           </button>
@@ -1080,7 +1072,7 @@ export default function HomePage() {
             onClick={handleExportAll}
             aria-label="Export all decks"
             title="Export all decks"
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
+            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
           >
             <Download size={16} />
           </button>
@@ -1088,7 +1080,7 @@ export default function HomePage() {
             onClick={() => setShowImport(true)}
             aria-label="Import"
             title="Import"
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-800 hover:text-neutral-200"
+            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
           >
             <Upload size={16} />
           </button>
@@ -1144,166 +1136,192 @@ export default function HomePage() {
               className="relative flex h-10 items-center gap-2"
               style={{ marginLeft: depth * 16 }}
             >
-              <Link
-                href={`/review/${deck.id}`}
-                onClick={handleDeckLinkClick}
+              <div
+                role="link"
+                tabIndex={0}
+                onClick={() => {
+                  if (foldTriggeredRef.current) {
+                    foldTriggeredRef.current = false;
+                    return;
+                  }
+                  router.push(`/review/${deck.id}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/review/${deck.id}`);
+                  }
+                }}
                 onContextMenu={(e) => e.preventDefault()}
-                className={`flex h-10 flex-1 items-center justify-between rounded-md border border-neutral-800 px-4 hover:bg-neutral-900 ${
+                className={`flex h-10 flex-1 cursor-pointer items-center justify-between rounded-md border border-neutral-800 pl-4 hover:bg-neutral-900 ${
                   isFolded ? "bg-white/[0.025]" : ""
                 }`}
               >
                 <span>{deckDisplayName(deck.name)}</span>
-                <span className="flex gap-2 text-xs font-medium">
-                  <span
-                    className="text-sky-400"
-                    title={DECK_COUNT_TOOLTIPS.new}
-                  >
-                    {deckCounts?.get(deck.id)?.newCount ?? 0}
+                <span className="flex items-center gap-2">
+                  <span className="flex gap-2 text-xs font-medium">
+                    <span
+                      className="text-sky-400"
+                      title={DECK_COUNT_TOOLTIPS.new}
+                    >
+                      {deckCounts?.get(deck.id)?.newCount ?? 0}
+                    </span>
+                    <span
+                      className="text-orange-600"
+                      title={DECK_COUNT_TOOLTIPS.learning}
+                    >
+                      {deckCounts?.get(deck.id)?.learningCount ?? 0}
+                    </span>
+                    <span
+                      className="text-olive-300"
+                      title={DECK_COUNT_TOOLTIPS.due}
+                    >
+                      {deckCounts?.get(deck.id)?.dueCount ?? 0}
+                    </span>
                   </span>
-                  <span
-                    className="text-orange-600"
-                    title={DECK_COUNT_TOOLTIPS.learning}
+                  <DropdownMenu
+                    stopClickPropagation
+                    trigger={({ onClick }) => (
+                      <button
+                        onClick={(e) => {
+                          if (
+                            foldTriggeredRef.current ||
+                            Date.now() - lastFoldTimestampRef.current < 600
+                          ) {
+                            foldTriggeredRef.current = false;
+                            return;
+                          }
+                          onClick(e);
+                        }}
+                        onMouseDown={() =>
+                          hasChildren && startFoldHold(deck.id)
+                        }
+                        onMouseUp={cancelFoldHold}
+                        onMouseLeave={cancelFoldHold}
+                        onTouchStart={() =>
+                          hasChildren && startFoldHold(deck.id)
+                        }
+                        onTouchEnd={cancelFoldHold}
+                        onTouchCancel={cancelFoldHold}
+                        onContextMenu={(e) => e.preventDefault()}
+                        aria-label="Deck actions"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                    )}
                   >
-                    {deckCounts?.get(deck.id)?.learningCount ?? 0}
-                  </span>
-                  <span
-                    className="text-olive-300"
-                    title={DECK_COUNT_TOOLTIPS.due}
-                  >
-                    {deckCounts?.get(deck.id)?.dueCount ?? 0}
-                  </span>
+                    {(close) => (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleExportDeck(deck);
+                            close();
+                          }}
+                          aria-label="Export deck"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            close();
+                            router.push(`/review/${deck.id}/game`);
+                          }}
+                          aria-label="Game mode"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <Gamepad2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActionsAddCardDeck(deck);
+                            close();
+                          }}
+                          aria-label="Add card"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <FilePlus size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            close();
+                            router.push(`/review/${deck.id}/all`);
+                          }}
+                          aria-label="View all cards"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <List size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            close();
+                            router.push(`/review/${deck.id}/browse`);
+                          }}
+                          aria-label="Browse this deck"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <FolderSearch size={14} />
+                        </button>
+                        {deckDepth(deck.name) < MAX_DECK_DEPTH && (
+                          <button
+                            onClick={() => {
+                              handleAddSubdeck(deck);
+                              close();
+                            }}
+                            aria-label="Add subdeck"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                          >
+                            <FolderPlus size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            handleMoveDeck(deck);
+                            close();
+                          }}
+                          aria-label="Move deck"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <FolderInput size={14} />
+                        </button>
+                        {depth === 0 && (
+                          <button
+                            onClick={() => {
+                              handleCloneDeck(deck.id);
+                              close();
+                            }}
+                            aria-label="Duplicate deck"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            startEditDeck(deck);
+                            close();
+                          }}
+                          aria-label="Rename deck"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDeleteDeck(deck);
+                            close();
+                          }}
+                          aria-label="Delete deck"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </DropdownMenu>
                 </span>
-              </Link>
-              <DropdownMenu
-                trigger={({ onClick }) => (
-                  <button
-                    onClick={(e) => {
-                      if (
-                        foldTriggeredRef.current ||
-                        Date.now() - lastFoldTimestampRef.current < 600
-                      ) {
-                        foldTriggeredRef.current = false;
-                        return;
-                      }
-                      onClick(e);
-                    }}
-                    onMouseDown={() => hasChildren && startFoldHold(deck.id)}
-                    onMouseUp={cancelFoldHold}
-                    onMouseLeave={cancelFoldHold}
-                    onTouchStart={() => hasChildren && startFoldHold(deck.id)}
-                    onTouchEnd={cancelFoldHold}
-                    onTouchCancel={cancelFoldHold}
-                    onContextMenu={(e) => e.preventDefault()}
-                    aria-label="Deck actions"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                  >
-                    <MoreVertical size={14} />
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <>
-                    <button
-                      onClick={() => {
-                        handleExportDeck(deck);
-                        close();
-                      }}
-                      aria-label="Export deck"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <Download size={14} />
-                    </button>
-                    <Link
-                      href={`/review/${deck.id}/game`}
-                      onClick={close}
-                      aria-label="Game mode"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <Gamepad2 size={14} />
-                    </Link>
-                    <button
-                      onClick={() => {
-                        setActionsAddCardDeck(deck);
-                        close();
-                      }}
-                      aria-label="Add card"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <FilePlus size={14} />
-                    </button>
-                    <Link
-                      href={`/review/${deck.id}/all`}
-                      onClick={close}
-                      aria-label="View all cards"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <List size={14} />
-                    </Link>
-                    <Link
-                      href={`/review/${deck.id}/browse`}
-                      onClick={close}
-                      aria-label="Browse this deck"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <FolderSearch size={14} />
-                    </Link>
-                    {deckDepth(deck.name) < MAX_DECK_DEPTH && (
-                      <button
-                        onClick={() => {
-                          handleAddSubdeck(deck);
-                          close();
-                        }}
-                        aria-label="Add subdeck"
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                      >
-                        <FolderPlus size={14} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        handleMoveDeck(deck);
-                        close();
-                      }}
-                      aria-label="Move deck"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <FolderInput size={14} />
-                    </button>
-                    {depth === 0 && (
-                      <button
-                        onClick={() => {
-                          handleCloneDeck(deck.id);
-                          close();
-                        }}
-                        aria-label="Duplicate deck"
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        startEditDeck(deck);
-                        close();
-                      }}
-                      aria-label="Rename deck"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleDeleteDeck(deck);
-                        close();
-                      }}
-                      aria-label="Delete deck"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </>
-                )}
-              </DropdownMenu>
+              </div>
             </li>
           );
         })}
@@ -1464,7 +1482,6 @@ export default function HomePage() {
             </button>
           )
         }
-        showCloseButton={noteTypePage === "list"}
       >
         {noteTypePage === "list" ? (
           <>
@@ -1474,55 +1491,55 @@ export default function HomePage() {
                   key={nt.id}
                   className="relative flex h-10 items-center gap-2"
                 >
-                  <div className="flex h-10 flex-1 items-center rounded-md border border-neutral-800 px-4 text-sm">
+                  <div className="flex h-10 flex-1 items-center justify-between rounded-md border border-neutral-800 pl-4 text-sm">
                     <span className="truncate">{nt.name}</span>
+                    <DropdownMenu
+                      trigger={({ onClick }) => (
+                        <button
+                          onClick={onClick}
+                          aria-label="Custom card type actions"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      )}
+                    >
+                      {(close) => (
+                        <>
+                          <button
+                            onClick={() => {
+                              openEditNoteType(nt);
+                              close();
+                            }}
+                            aria-label="Edit custom card type"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleCloneNoteType(nt.id);
+                              close();
+                            }}
+                            aria-label="Duplicate custom card type"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                          >
+                            <Copy size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleDeleteNoteType(nt.id);
+                              close();
+                            }}
+                            aria-label="Delete custom card type"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
+                    </DropdownMenu>
                   </div>
-                  <DropdownMenu
-                    trigger={({ onClick }) => (
-                      <button
-                        onClick={onClick}
-                        aria-label="Custom card type actions"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
-                    )}
-                  >
-                    {(close) => (
-                      <>
-                        <button
-                          onClick={() => {
-                            openEditNoteType(nt);
-                            close();
-                          }}
-                          aria-label="Edit custom card type"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleCloneNoteType(nt.id);
-                            close();
-                          }}
-                          aria-label="Duplicate custom card type"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <Copy size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleDeleteNoteType(nt.id);
-                            close();
-                          }}
-                          aria-label="Delete custom card type"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
-                  </DropdownMenu>
                 </li>
               ))}
               {(!noteTypes || noteTypes.length === 0) && (

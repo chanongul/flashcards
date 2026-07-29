@@ -79,7 +79,7 @@ export function FieldTypeToggle({
             className={`rounded p-1 ${
               value === type
                 ? 'bg-neutral-700 text-neutral-100'
-                : 'border border-neutral-700 text-neutral-400'
+                : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <Icon size={14} />
@@ -119,7 +119,7 @@ export function FieldTypeConfigToggle({
             className={`flex h-[22px] w-[22px] items-center justify-center rounded ${
               value === type
                 ? 'bg-neutral-700 text-neutral-100'
-                : 'border border-neutral-700 text-neutral-400'
+                : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <Icon size={14} />
@@ -429,12 +429,14 @@ function ImageCropModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onCancel}>
-      <div
-        className="flex w-full max-w-sm flex-col max-h-[90vh] rounded-lg border border-neutral-800 bg-neutral-950 p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="mb-2 shrink-0 text-sm font-medium">Crop image</p>
+    <div className="fixed inset-0 z-[60] flex cursor-default items-center justify-center bg-black/70 p-4">
+      <div className="flex w-full max-w-sm flex-col max-h-[90vh] rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div className="mb-2 flex shrink-0 items-center justify-between">
+          <p className="text-sm font-medium">Crop image</p>
+          <button type="button" onClick={onCancel} aria-label="Close" className="text-neutral-400 hover:text-neutral-200">
+            <X size={16} />
+          </button>
+        </div>
         <div
           ref={containerRef}
           className="relative touch-none overflow-hidden rounded-md mx-auto"

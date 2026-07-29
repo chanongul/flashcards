@@ -373,6 +373,53 @@ export function RichTextInput({
     }, TYPING_DEBOUNCE_MS);
   }
 
+  // Plain-text-only paste — images aren't a supported inline element here
+  // (they're their own field type, see MediaFieldInput), and pasted HTML
+  // could otherwise drag in foreign styles/tags along with them. Discarding
+  // every clipboard format except text/plain rules out an image landing in
+  // the field at all, not just images specifically — sanitizeRichText would
+  // eventually strip a raw pasted <img> anyway (no valid data-media-id), but
+  // only on the next save, after the browser's own default paste had
+  // already inserted it into the live DOM, which briefly showed the image
+  // before it vanished on top of confusing the model's offset math.
+  // Newlines become real <br>s (the model's own line-break unit) rather
+  // than being silently collapsed like a bare text node would render.
+  function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    if (!text) return;
+    const el = ref.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) return;
+
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const fragment = document.createDocumentFragment();
+    let lastNode: Node | null = null;
+    text.split('\n').forEach((line, i) => {
+      if (i > 0) {
+        const br = document.createElement('br');
+        fragment.appendChild(br);
+        lastNode = br;
+      }
+      if (line.length > 0) {
+        const textNode = document.createTextNode(line);
+        fragment.appendChild(textNode);
+        lastNode = textNode;
+      }
+    });
+    range.insertNode(fragment);
+    if (lastNode) {
+      const newRange = document.createRange();
+      newRange.setStartAfter(lastNode);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    }
+    handleInput();
+  }
+
   // ---- Undo / redo — fully replaces native browser undo (see the keydown
   // handler below), since the browser's own undo stack has no idea a
   // toolbar operation's direct innerHTML write ever happened and the two
@@ -655,6 +702,7 @@ export function RichTextInput({
         ref={ref}
         contentEditable
         onInput={handleInput}
+        onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         onFocus={() => {
           updateActiveStates();

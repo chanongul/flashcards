@@ -12,6 +12,7 @@ import { CardRow } from '@/components/CardRow';
 import { CardForm } from '@/components/CardForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Modal } from '@/components/base/Modal';
+import { ScrollFade } from '@/components/ScrollFade';
 import { BulkActionBar } from '@/components/BulkActionBar';
 import { DeckPickerModal } from '@/components/DeckPickerModal';
 import { useLoadingWhen } from '@/components/GlobalLoading';
@@ -180,83 +181,87 @@ export default function AllCardsPage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 md:mb-0">
-      <div className="mb-4 flex items-center justify-between">
-        <button
-          onClick={goBack}
-          aria-label="Back to review"
-          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <h1
-          className={`text-lg font-semibold ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
-          onMouseDown={startPressHoldTimers}
-          onMouseUp={endPressHoldTimers}
-          onTouchStart={startPressHoldTimers}
-          onTouchEnd={endPressHoldTimers}
-          onTouchCancel={cancelPressHoldTimers}
-          onClick={handleTitleClick}
-          role="button"
-          aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
-          title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
-        >
-          All cards
-        </h1>
-        <Link
-          href={`/review/${params.deckId}/browse`}
-          aria-label="Browse this deck"
-          className="rounded-md border border-neutral-700 p-2 text-neutral-400 hover:text-neutral-200"
-        >
-          <FolderSearch size={16} />
-        </Link>
-      </div>
-
-      {syncError && <p className="mb-2 text-xs text-red-400">{syncError}</p>}
-
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
-        <div className="flex items-center gap-3">
+    <main className="mx-auto flex max-w-md flex-col px-6 h-dvh">
+      <div className="shrink-0 pt-2 md:pt-6 pb-2">
+        <div className="mb-4 flex items-center justify-between">
           <button
-            onClick={selection.toggleSelectMode}
-            aria-label={selection.selectMode ? 'Cancel selection' : 'Select cards'}
-            aria-pressed={selection.selectMode}
-            className={selection.selectMode ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-200'}
+            onClick={goBack}
+            aria-label="Back to review"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
           >
-            {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+            <ArrowLeft size={20} />
           </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            aria-label="Add a card"
-            className="text-neutral-500 hover:text-neutral-200"
+          <h1
+            className={`text-lg font-semibold ${isOnline ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'}`}
+            onMouseDown={startPressHoldTimers}
+            onMouseUp={endPressHoldTimers}
+            onTouchStart={startPressHoldTimers}
+            onTouchEnd={endPressHoldTimers}
+            onTouchCancel={cancelPressHoldTimers}
+            onClick={handleTitleClick}
+            role="button"
+            aria-label={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
+            title={isOnline ? 'Sync now' : 'Offline — sync unavailable'}
           >
-            <Plus size={16} />
-          </button>
+            All cards
+          </h1>
+          <Link
+            href={`/review/${params.deckId}/browse`}
+            aria-label="Browse this deck"
+            className="rounded-md py-1.5 text-neutral-400 hover:text-neutral-200"
+          >
+            <FolderSearch size={20} />
+          </Link>
+        </div>
+
+        {syncError && <p className="mb-2 text-xs text-red-400">{syncError}</p>}
+
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs text-neutral-500">{allCards?.length ?? 0} cards</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAddModal(true)}
+              aria-label="Add a card"
+              className="text-neutral-500 hover:text-neutral-200"
+            >
+              <Plus size={16} />
+            </button>
+            <button
+              onClick={selection.toggleSelectMode}
+              aria-label={selection.selectMode ? 'Cancel selection' : 'Select cards'}
+              aria-pressed={selection.selectMode}
+              className={selection.selectMode ? 'text-neutral-100' : 'text-neutral-500 hover:text-neutral-200'}
+            >
+              {selection.selectMode ? <X size={16} /> : <CheckSquare size={16} />}
+            </button>
+          </div>
         </div>
       </div>
 
-      <ul className={`space-y-2 ${selection.selectMode ? 'pb-16' : ''}`}>
-        {allCards?.map((card) => (
-          <CardRow
-            key={card.id}
-            id={`card-${card.id}`}
-            highlighted={highlightCardId === card.id}
-            card={card}
-            selectMode={selection.selectMode}
-            selected={selection.selectedIds.has(card.id)}
-            onToggleSelect={selection.toggleSelect}
-            onSave={handleSaveEdit}
-            onDelete={handleDelete}
-            onToggleFlag={handleToggleFlag}
-            onToggleSuspend={handleToggleSuspend}
-            onClone={handleClone}
-            onMoveCard={handleMoveCard}
-          />
-        ))}
-        {allCards && allCards.length === 0 && (
-          <p className="text-sm text-neutral-500">No cards yet.</p>
-        )}
-      </ul>
+      <ScrollFade fadeFrom="from-neutral-950" bleed={false}>
+        <ul className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}>
+          {allCards?.map((card) => (
+            <CardRow
+              key={card.id}
+              id={`card-${card.id}`}
+              highlighted={highlightCardId === card.id}
+              card={card}
+              selectMode={selection.selectMode}
+              selected={selection.selectedIds.has(card.id)}
+              onToggleSelect={selection.toggleSelect}
+              onSave={handleSaveEdit}
+              onDelete={handleDelete}
+              onToggleFlag={handleToggleFlag}
+              onToggleSuspend={handleToggleSuspend}
+              onClone={handleClone}
+              onMoveCard={handleMoveCard}
+            />
+          ))}
+          {allCards && allCards.length === 0 && (
+            <p className="text-sm text-neutral-500">No cards yet.</p>
+          )}
+        </ul>
+      </ScrollFade>
 
       <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="New card">
         <CardForm

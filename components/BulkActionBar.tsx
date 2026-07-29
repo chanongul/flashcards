@@ -36,7 +36,7 @@ export function BulkActionBar({
 }: BulkActionBarProps) {
   const disabled = count === 0;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 px-[calc(2.25rem+1px)] pt-4 pb-8 md:pb-0">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 px-[calc(2.25rem+1px)] pt-4 pb-8 md:pb-4">
       <div className="mx-auto flex max-w-md items-center justify-between gap-2">
         <button
           onClick={onToggleSelectAll}

@@ -15,6 +15,12 @@ interface RichTextProps {
   // entity-encodes ">" in text content (a plain string replace on the raw
   // HTML would silently never match).
   textTransform?: (text: string) => string;
+  // Shows each image/audio's required label (alt/title — see
+  // MediaFieldInput's extractMediaLabel) as a small dimmed caption right
+  // below it — CardFaces passes this for review/preview display; the
+  // editing forms already show the same label as an editable input, so
+  // showing it again there would just be a redundant duplicate.
+  showMediaCaption?: boolean;
 }
 
 // useLayoutEffect does nothing (and warns) during SSR — fall back to
@@ -33,10 +39,22 @@ function applyTextTransform(root: HTMLElement, transform: (text: string) => stri
   }
 }
 
+function addMediaCaptions(root: HTMLElement) {
+  const media = root.querySelectorAll<HTMLImageElement | HTMLAudioElement>('img[alt], audio[title]');
+  media.forEach((el) => {
+    const label = el instanceof HTMLImageElement ? el.getAttribute('alt') : el.getAttribute('title');
+    if (!label || !label.trim()) return;
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    caption.className = 'mt-0.5 block text-xs text-neutral-500';
+    el.insertAdjacentElement('afterend', caption);
+  });
+}
+
 // Sanitizes again at render time (defense in depth) even though input is
 // already sanitized on save — cheap, and protects against any stored value
 // that bypassed that step (old data, a future different client, etc.).
-export function RichText({ html, className, textTransform }: RichTextProps) {
+export function RichText({ html, className, textTransform, showMediaCaption }: RichTextProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const sanitized = sanitizeRichText(html);
   const { begin, end } = useLoading();
@@ -53,8 +71,9 @@ export function RichText({ html, className, textTransform }: RichTextProps) {
     if (ref.current && ref.current.innerHTML !== sanitized) {
       ref.current.innerHTML = sanitized;
       if (textTransform) applyTextTransform(ref.current, textTransform);
+      if (showMediaCaption) addMediaCaptions(ref.current);
     }
-  }, [sanitized, textTransform]);
+  }, [sanitized, textTransform, showMediaCaption]);
 
   useIsomorphicLayoutEffect(() => {
     if (!ref.current) return;

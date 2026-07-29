@@ -201,9 +201,9 @@ export function CardRow({
       onClick={() =>
         selectMode ? onToggleSelect?.(card) : setShowPreview(true)
       }
-      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm ring-orange-600 transition-shadow duration-500 hover:bg-neutral-900/50 ${
+      className={`flex min-h-[3.125rem] cursor-pointer items-center justify-between gap-2 rounded-md border border-neutral-800 pl-3 py-2 text-sm ring-orange-600 transition-shadow duration-500 hover:bg-neutral-900/50 ${
         highlighted ? "ring-2" : "ring-0"
-      } ${card.suspended ? "opacity-40" : ""}`}
+      } ${card.suspended ? "opacity-40" : ""} ${selectMode ? "pr-3" : "pr-0 md:pr-0.5"}`}
     >
       <span className="flex min-w-0 items-center gap-2">
         {selectMode && (

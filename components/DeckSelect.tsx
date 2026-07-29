@@ -28,7 +28,7 @@ export function DeckSelect({ rows, value, onChange, label, emptyOption }: DeckSe
         {emptyOption && <option value={emptyOption.value}>{emptyOption.label}</option>}
         {rows.map(({ deck, depth }) => (
           <option key={deck.id} value={deck.id}>
-            {'​ ​ ​'.repeat(depth)}
+            {'  '.repeat(depth)}
             {deckDisplayName(deck.name)}
           </option>
         ))}
