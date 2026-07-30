@@ -80,6 +80,8 @@ import {
   type DeckSortMode,
 } from "@/lib/decks";
 import { ReviewHeatmap } from "@/components/ReviewHeatmap";
+import { ScrollFade } from "@/components/ScrollFade";
+import { ClickTooltip } from "@/components/base/ClickTooltip";
 import { TodayStatusSummary } from "@/components/TodayStatusSummary";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Checkbox } from "@/components/Checkbox";
@@ -307,6 +309,44 @@ export default function HomePage() {
   // can't suppress the menu. The timestamp check is immune to this.
   const lastFoldTimestampRef = useRef(0);
 
+  // Shows a deck row's full (possibly truncated) name in a tooltip — on
+  // desktop that's hover (see the row's onMouseEnter), on mobile (no
+  // hover to use instead) it's a double tap (see onClick/onDoubleClick
+  // below). null when no tooltip is open. No-ops when the name isn't
+  // actually truncated — the full text is already visible, nothing to add.
+  const [deckNameTooltip, setDeckNameTooltip] = useState<{
+    deckId: string;
+    text: string;
+    rect: { left: number; top: number; right: number; bottom: number };
+  } | null>(null);
+
+  function showDeckNameTooltip(deck: Deck, rowEl: HTMLElement) {
+    const nameEl = rowEl.querySelector<HTMLElement>("[data-deck-name]");
+    if (!nameEl || nameEl.scrollWidth <= nameEl.clientWidth) return;
+    const rect = nameEl.getBoundingClientRect();
+    setDeckNameTooltip((prev) =>
+      prev?.deckId === deck.id
+        ? null
+        : {
+            deckId: deck.id,
+            text: deckDisplayName(deck.name),
+            rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+          },
+    );
+  }
+
+  // On mobile, a single tap has to navigate (rule 1) *and* a double tap has
+  // to show the tooltip (rule 2, since there's no hover to use instead) —
+  // but a double-tap always fires two ordinary click events before the
+  // browser's own dblclick, so onClick can't just act immediately or the
+  // first tap of every double-tap would navigate away before the second
+  // one is ever seen. Only the touch path pays this delay; a real mouse
+  // click (see justTouchedRef) still navigates the instant it's clicked,
+  // since hover — not double-click — is desktop's tooltip trigger, so
+  // there's no competing gesture for a plain click to wait on there.
+  const DOUBLE_TAP_WINDOW_MS = 350;
+  const deckClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   function toggleDeckFold(deckId: string) {
     setCollapsedDeckIds((prev) => {
       const next = new Set(prev);
@@ -346,7 +386,7 @@ export default function HomePage() {
   // foldable deck at once — see toggleAllDeckFold below, defined after
   // `decks` is available; referencing it here works because function
   // declarations are hoisted for the whole component body.
-  const ALL_FOLD_HOLD_MS = 1000;
+  const ALL_FOLD_HOLD_MS = 500;
   const allFoldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function startAllFoldHold() {
@@ -988,7 +1028,8 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto mb-4 max-w-md p-6 pt-2 md:pt-6 md:mb-0">
+    <main className="mx-auto flex h-dvh max-w-md flex-col px-6 pb-6 pt-0 md:mb-0">
+      <div className="shrink-0 pt-2 md:pt-6">
       <div className="mb-6 flex items-center justify-between">
         <h1
           className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-50"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
@@ -1086,7 +1127,10 @@ export default function HomePage() {
           </button>
         </div>
       </div>
+      </div>
 
+      <ScrollFade fadeFrom="from-neutral-950" bleed={false} className="-mr-6">
+      <div className="pr-6">
       <ul className="space-y-2">
         {visibleDeckRows.map(({ deck, depth }) => {
           const hasChildren = deckNamesWithChildren.has(deck.name);
@@ -1144,8 +1188,47 @@ export default function HomePage() {
                     foldTriggeredRef.current = false;
                     return;
                   }
-                  router.push(`/review/${deck.id}`);
+                  if (!justTouchedRef.current) {
+                    // Real mouse click — navigate immediately; desktop's
+                    // tooltip trigger is hover, not double-click, so there's
+                    // no second click to wait for here.
+                    router.push(`/review/${deck.id}`);
+                    return;
+                  }
+                  // Touch: hold off navigating briefly in case a second tap
+                  // follows within the window — that's onDoubleClick below,
+                  // which cancels this and shows the tooltip instead.
+                  if (deckClickTimeoutRef.current) return;
+                  deckClickTimeoutRef.current = setTimeout(() => {
+                    deckClickTimeoutRef.current = null;
+                    router.push(`/review/${deck.id}`);
+                  }, DOUBLE_TAP_WINDOW_MS);
                 }}
+                onDoubleClick={(e) => {
+                  if (foldTriggeredRef.current) {
+                    foldTriggeredRef.current = false;
+                    return;
+                  }
+                  if (deckClickTimeoutRef.current) {
+                    clearTimeout(deckClickTimeoutRef.current);
+                    deckClickTimeoutRef.current = null;
+                  }
+                  showDeckNameTooltip(deck, e.currentTarget);
+                }}
+                onMouseEnter={(e) => {
+                  if (justTouchedRef.current) return;
+                  showDeckNameTooltip(deck, e.currentTarget);
+                }}
+                onMouseDown={() => hasChildren && startFoldHold(deck.id)}
+                onMouseUp={cancelFoldHold}
+                onMouseLeave={() => {
+                  cancelFoldHold();
+                  if (justTouchedRef.current) return;
+                  setDeckNameTooltip((prev) => (prev?.deckId === deck.id ? null : prev));
+                }}
+                onTouchStart={() => hasChildren && startFoldHold(deck.id)}
+                onTouchEnd={cancelFoldHold}
+                onTouchCancel={cancelFoldHold}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -1153,12 +1236,14 @@ export default function HomePage() {
                   }
                 }}
                 onContextMenu={(e) => e.preventDefault()}
-                className={`flex h-10 flex-1 cursor-pointer items-center justify-between rounded-md border border-neutral-800 pl-4 hover:bg-neutral-900 ${
+                className={`flex h-10 min-w-0 flex-1 gap-4 cursor-pointer items-center justify-between rounded-md border border-neutral-800 pl-4 hover:bg-neutral-900 ${
                   isFolded ? "bg-white/[0.025]" : ""
                 }`}
               >
-                <span>{deckDisplayName(deck.name)}</span>
-                <span className="flex items-center gap-2">
+                <span data-deck-name className="min-w-0 flex-1 truncate">
+                  {deckDisplayName(deck.name)}
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
                   <span className="flex gap-2 text-xs font-medium">
                     <span
                       className="text-sky-400"
@@ -1193,16 +1278,14 @@ export default function HomePage() {
                           }
                           onClick(e);
                         }}
-                        onMouseDown={() =>
-                          hasChildren && startFoldHold(deck.id)
-                        }
-                        onMouseUp={cancelFoldHold}
-                        onMouseLeave={cancelFoldHold}
-                        onTouchStart={() =>
-                          hasChildren && startFoldHold(deck.id)
-                        }
-                        onTouchEnd={cancelFoldHold}
-                        onTouchCancel={cancelFoldHold}
+                        // Not a fold-hold target itself (see the row's own
+                        // onMouseDown/onTouchStart) — just kept from
+                        // bubbling those events up into the row's gesture,
+                        // since mousedown/touchstart aren't covered by
+                        // DropdownMenu's own stopClickPropagation (click
+                        // only).
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                         onContextMenu={(e) => e.preventDefault()}
                         aria-label="Deck actions"
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
@@ -1331,6 +1414,16 @@ export default function HomePage() {
           </p>
         )}
       </ul>
+      </div>
+      </ScrollFade>
+
+      {deckNameTooltip && (
+        <ClickTooltip
+          text={deckNameTooltip.text}
+          anchorRect={deckNameTooltip.rect}
+          onDismiss={() => setDeckNameTooltip(null)}
+        />
+      )}
 
       <button
         onClick={() => {
@@ -1339,7 +1432,7 @@ export default function HomePage() {
           setShowCreateDeck(true);
         }}
         aria-label="Add deck"
-        className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+        className="mt-2 flex h-10 w-full shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
       >
         <Plus size={16} />
       </button>
@@ -1350,7 +1443,7 @@ export default function HomePage() {
             setResetConfirmText("");
             setShowResetConfirm(true);
           }}
-          className="mt-6 flex w-full justify-center text-xs text-neutral-600 hover:text-red-400"
+          className="mt-6 flex w-full shrink-0 justify-center text-xs text-neutral-600 hover:text-red-400"
         >
           Reset all data
         </button>

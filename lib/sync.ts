@@ -47,11 +47,42 @@ export async function logEvent(
   return event;
 }
 
-/** Push any local events that haven't been synced yet. Safe to call often.
- * Inserted one at a time (not batched) so a single rejected row — bad data,
- * a transient conflict, whatever — can't wedge every other event queued
- * behind it forever; each row is retried independently on the next call. */
+let pushEventsInFlight: Promise<void> | null = null;
+let pushEventsRerunRequested = false;
+
+/** Push any local events that haven't been synced yet. Safe to call often —
+ * every write action (see lib/actions.ts) fires this off unawaited after
+ * logging its own event, so a bulk operation (e.g. useCardSelection's
+ * bulkMove looping editCard over many cards) can easily have several calls
+ * in flight at once. Without coalescing, two overlapping calls both read
+ * the *same* not-yet-synced row (its local `synced` flag isn't set until
+ * a push of it actually succeeds) and both try to INSERT it — one wins,
+ * the other gets a duplicate-key 409 from Postgres and, since it never
+ * marks the row synced, retries and fails on that exact same row forever.
+ * Coalescing here means only one pass ever actually runs at a time; calls
+ * that arrive while a pass is running just flag a follow-up pass instead
+ * of starting a second one, so anything logged mid-pass still gets picked
+ * up once the current one finishes, without two passes ever racing. */
 export async function pushEvents() {
+  if (pushEventsInFlight) {
+    pushEventsRerunRequested = true;
+    return pushEventsInFlight;
+  }
+  pushEventsInFlight = (async () => {
+    do {
+      pushEventsRerunRequested = false;
+      await pushEventsOnce();
+    } while (pushEventsRerunRequested);
+    pushEventsInFlight = null;
+  })();
+  return pushEventsInFlight;
+}
+
+/** Inserted one at a time (not batched) so a single rejected row — bad
+ * data, a transient conflict, whatever — can't wedge every other event
+ * queued behind it forever; each row is retried independently on the next
+ * call. */
+async function pushEventsOnce() {
   const unsynced = await db.events.filter((e) => !e.synced).toArray();
   if (unsynced.length === 0) return { pushed: 0 };
 
@@ -70,6 +101,19 @@ export async function pushEvents() {
     });
 
     if (error) {
+      // Postgres unique_violation on this row's own id. Event ids are
+      // fresh crypto.randomUUID()s minted once per logEvent call, so the
+      // only way this exact id can already exist server-side is a prior
+      // push of this exact row that succeeded remotely but didn't get to
+      // mark it synced locally (the race this function now coalesces
+      // away, or an interrupted app close mid-update from before that
+      // existed) — safe to treat as already-synced rather than leaving it
+      // to fail on this same conflict every call from here on.
+      if (error.code === '23505') {
+        await db.events.update(e.id, { synced: true });
+        pushed++;
+        continue;
+      }
       console.error('pushEvents: failed to push event', e.id, e.type, error);
       lastError = error;
       continue;

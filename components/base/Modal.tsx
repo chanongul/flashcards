@@ -49,8 +49,16 @@ export function Modal({
     <div
       className="fixed inset-0 z-50 flex cursor-default items-center justify-center bg-black/60 p-4"
       onClick={(e) => {
-        if (!closeOnBackdropClick) return;
+        // Always swallow the click here, even when backdrop-click-to-close
+        // is off — this backdrop isn't portaled to document.body, it's
+        // rendered inline wherever the Modal is used (e.g. inside CardRow's
+        // own row), so without this a click that lands on the dimmed
+        // backdrop (visually "outside" the modal) would otherwise bubble
+        // straight through to whatever's underneath in the DOM tree, like
+        // the row's own onClick — which is exactly what was popping the
+        // Card preview modal open behind the Duplicate/Move modal.
         e.stopPropagation();
+        if (!closeOnBackdropClick) return;
         onClose();
       }}
     >

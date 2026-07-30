@@ -104,9 +104,10 @@ export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Review counts per local calendar day, for the heatmap. Excludes undone reviews. */
-export async function getDailyReviewCounts(daysBack: number): Promise<Map<string, number>> {
-  const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+/** Review counts per local calendar day within [rangeStart, rangeEnd) (ms
+ * timestamps), for the heatmap. Excludes undone reviews and anything at or
+ * before a full_reset tombstone. */
+export async function getDailyReviewCounts(rangeStart: number, rangeEnd: number): Promise<Map<string, number>> {
   const [events, undone, resetCutoff] = await Promise.all([
     db.events.where('type').equals('card_review').toArray(),
     getUndoneReviewIds(),
@@ -114,10 +115,31 @@ export async function getDailyReviewCounts(daysBack: number): Promise<Map<string
   ]);
   const counts = new Map<string, number>();
   for (const e of events) {
-    if (e.timestamp < cutoff || undone.has(e.id)) continue;
+    if (e.timestamp < rangeStart || e.timestamp >= rangeEnd || undone.has(e.id)) continue;
     if (resetCutoff !== null && e.timestamp <= resetCutoff) continue;
     const key = dateKey(new Date(e.timestamp));
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
+}
+
+/** Every calendar year that has at least one countable review (same
+ * undone/reset filtering as getDailyReviewCounts) — used to let the
+ * heatmap jump between years without landing on an empty one. The current
+ * year is deliberately NOT special-cased in here (it's always shown
+ * regardless of whether it has any reviews yet — see ReviewHeatmap, which
+ * unions this with the current year itself). */
+export async function getYearsWithReviews(): Promise<number[]> {
+  const [events, undone, resetCutoff] = await Promise.all([
+    db.events.where('type').equals('card_review').toArray(),
+    getUndoneReviewIds(),
+    getResetCutoff(),
+  ]);
+  const years = new Set<number>();
+  for (const e of events) {
+    if (undone.has(e.id)) continue;
+    if (resetCutoff !== null && e.timestamp <= resetCutoff) continue;
+    years.add(new Date(e.timestamp).getFullYear());
+  }
+  return Array.from(years).sort((a, b) => a - b);
 }

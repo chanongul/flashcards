@@ -939,7 +939,7 @@ export function ChoiceFieldInput({
           onClick={(e) => {
             const opening = !open;
             setOpen(opening);
-            if (opening) setDropUp(shouldDropUp(e.currentTarget.getBoundingClientRect()));
+            if (opening) setDropUp(shouldDropUp(e.currentTarget));
           }}
           aria-haspopup="listbox"
           aria-expanded={open}

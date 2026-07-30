@@ -16,6 +16,13 @@ interface ScrollFadeProps {
   // bleed={false} to just span this wrapper's own width (inset-x-0).
   bleed?: boolean;
   extraSide?: boolean;
+  // Merged onto the root wrapper (the flex-1 box, not the inner scroller) —
+  // e.g. a negative right margin to bleed this whole region out past an
+  // ancestor's own padding, so the browser's scrollbar renders flush with
+  // the page's true edge instead of inset inside that padding. Pair with
+  // padding on your own children to keep the actual content visually inset
+  // the way it was before (the scrollbar sits in the gap between).
+  className?: string;
 }
 
 /** A vertical scroll region that shows a faded gradient at the top and/or
@@ -27,6 +34,7 @@ export function ScrollFade({
   fadeFrom = "from-neutral-900",
   bleed = true,
   extraSide = false,
+  className = "",
 }: ScrollFadeProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showTop, setShowTop] = useState(false);
@@ -52,7 +60,14 @@ export function ScrollFade({
   }, [update]);
 
   return (
-    <div className="relative min-h-0 w-full flex-1">
+    // No w-full here on purpose — an explicit width:100% would win out over
+    // flexbox's own stretch sizing and stop a negative margin (passed via
+    // className, see the prop doc above) from actually widening the box;
+    // plain flex-1 stretch sizing (the default cross-axis behavior in a
+    // flex-col parent) already computes the same 100%-of-available-space
+    // width when no such margin is present, so this is a no-op change for
+    // every other existing usage.
+    <div className={`relative min-h-0 flex-1 ${className}`}>
       <div
         ref={ref}
         onScroll={update}

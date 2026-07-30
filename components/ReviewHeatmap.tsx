@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { getDailyReviewCounts, dateKey } from '@/lib/stats';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getDailyReviewCounts, getYearsWithReviews, dateKey } from '@/lib/stats';
 
 // Sun=0 .. Sat=6; only label every other row (GitHub's convention) to avoid
 // ambiguity between e.g. Tuesday/Thursday both starting with "T".
@@ -33,9 +34,11 @@ interface MonthLabel {
   label: string;
 }
 
-function buildGrid(counts: Map<string, number>, today: Date) {
-  const startDate = new Date(today.getFullYear(), 0, 1);
-  const totalDays = Math.round((today.getTime() - startDate.getTime()) / MS_PER_DAY) + 1;
+// rangeEnd is inclusive — the current year stops at today, a past year
+// stops at Dec 31.
+function buildGrid(counts: Map<string, number>, year: number, rangeEnd: Date) {
+  const startDate = new Date(year, 0, 1);
+  const totalDays = Math.round((rangeEnd.getTime() - startDate.getTime()) / MS_PER_DAY) + 1;
 
   const days: { date: Date; key: string; count: number }[] = [];
   for (let i = 0; i < totalDays; i++) {
@@ -135,6 +138,41 @@ export function ReviewHeatmap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  // Same "was the most recent interaction touch" trick used for the deck
+  // list's own name tooltip (app/page.tsx) — matchMedia's (hover: hover)/
+  // (pointer: fine) turned out unreliable for this in both directions, so
+  // instead just track whichever kind of event actually fired most
+  // recently. A touch always fires touchstart before the synthetic
+  // mouseenter/click a mobile browser adds for click compatibility, so this
+  // flag suppresses exactly those and only those.
+  const justTouchedRef = useRef(false);
+  const touchFlagTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleCellTouchStart() {
+    justTouchedRef.current = true;
+    if (touchFlagTimeoutRef.current) clearTimeout(touchFlagTimeoutRef.current);
+    touchFlagTimeoutRef.current = setTimeout(() => {
+      justTouchedRef.current = false;
+    }, 500);
+  }
+
+  function showTooltipForCell(cell: GridCell, targetEl: HTMLElement) {
+    if (cell.blank) return;
+    const rect = targetEl.getBoundingClientRect();
+    setTooltip((prev) =>
+      prev?.key === cell.key
+        ? null
+        : {
+            key: cell.key,
+            text: cell.title,
+            cellLeft: rect.left,
+            cellTop: rect.top,
+            cellRight: rect.right,
+            cellBottom: rect.bottom,
+          }
+    );
+  }
+
   // Position after the tooltip has rendered (and we know its real size), so
   // it can be clamped to stay fully on-screen instead of running off the
   // left/right/top edge near the grid's boundaries.
@@ -182,36 +220,85 @@ export function ReviewHeatmap() {
   }, [tooltip]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const hasAutoScrolledRef = useRef(false);
+  // Tracks which year we last auto-scrolled for, so switching years always
+  // jumps to that year's most recent edge once, but a routine live-query
+  // refresh within the *same* year (e.g. a review logged elsewhere) doesn't
+  // keep yanking a manually-scrolled-left view back to the right.
+  const lastAutoScrolledYearRef = useRef<number | null>(null);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
-  const daysSoFar = Math.round((today.getTime() - startOfYear.getTime()) / MS_PER_DAY) + 1;
+  const currentYear = today.getFullYear();
 
-  const counts = useLiveQuery(() => getDailyReviewCounts(daysSoFar), [daysSoFar]);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  // Once, on first real render (not on every later live-query update, which
-  // would otherwise yank a manually-scrolled-left view back to today),
-  // scroll to the far right so the most recent days are what's visible.
+  // Every year with at least one review, plus the current year itself even
+  // if it has none yet (so the default view is never treated as "empty and
+  // skippable" the moment a fresh year starts) — this is what prev/next
+  // step between, so an empty past year is never landed on.
+  const yearsWithReviews = useLiveQuery(() => getYearsWithReviews(), []);
+  const navigableYears = useMemo(() => {
+    const years = new Set(yearsWithReviews ?? []);
+    years.add(currentYear);
+    return Array.from(years).sort((a, b) => a - b);
+  }, [yearsWithReviews, currentYear]);
+  const selectedIndex = navigableYears.indexOf(selectedYear);
+  const prevYear = selectedIndex > 0 ? navigableYears[selectedIndex - 1] : null;
+  const nextYear =
+    selectedIndex >= 0 && selectedIndex < navigableYears.length - 1 ? navigableYears[selectedIndex + 1] : null;
+
+  const rangeEnd = selectedYear === currentYear ? today : new Date(selectedYear, 11, 31);
+  const rangeStartMs = new Date(selectedYear, 0, 1).getTime();
+  const rangeEndMs = rangeEnd.getTime() + MS_PER_DAY; // exclusive upper bound
+
+  const counts = useLiveQuery(
+    () => getDailyReviewCounts(rangeStartMs, rangeEndMs),
+    [rangeStartMs, rangeEndMs]
+  );
+
+  // Jumps to the far right (the year's most recent activity) once per
+  // year selection, not on every incidental live-query refresh.
   useLayoutEffect(() => {
-    if (hasAutoScrolledRef.current || !counts || !scrollRef.current) return;
+    if (!counts || !scrollRef.current) return;
+    if (lastAutoScrolledYearRef.current === selectedYear) return;
     scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    hasAutoScrolledRef.current = true;
-  }, [counts]);
+    lastAutoScrolledYearRef.current = selectedYear;
+  }, [counts, selectedYear]);
 
   if (!counts) return null;
 
-  const { cells, monthLabels, totalColumns } = buildGrid(counts, today);
+  const { cells, monthLabels, totalColumns } = buildGrid(counts, selectedYear, rangeEnd);
   const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
   const rowTemplate = '12px repeat(7, 10px)';
 
   return (
     <>
       <div ref={containerRef}>
-        <p className="mb-2 text-xs text-neutral-500">
-          {total} reviews in {today.getFullYear()}
-        </p>
+        <div className="mb-2 flex items-center justify-between gap-1 text-xs text-neutral-500">
+          <p>
+            {total} reviews in {selectedYear}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => prevYear !== null && setSelectedYear(prevYear)}
+              disabled={prevYear === null}
+              aria-label="Previous year with reviews"
+              className="text-neutral-500 hover:text-neutral-200 disabled:opacity-30 disabled:hover:text-neutral-500"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => nextYear !== null && setSelectedYear(nextYear)}
+              disabled={nextYear === null}
+              aria-label="Next year with reviews"
+              className="text-neutral-500 hover:text-neutral-200 disabled:opacity-30 disabled:hover:text-neutral-500"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
         <div className="flex gap-[3px]">
           <div className="grid gap-[3px]" style={{ gridTemplateRows: rowTemplate }}>
             <div />
@@ -239,21 +326,29 @@ export function ReviewHeatmap() {
                 <div
                   key={cell.key}
                   style={{ gridColumn: cell.col + 1, gridRow: cell.row + 2 }}
+                  onTouchStart={handleCellTouchStart}
                   onClick={(e) => {
-                    if (cell.blank) return;
+                    // Desktop click: hover (below) already handles it, so a
+                    // plain click does nothing there — only act when this
+                    // click was actually preceded by a touchstart.
+                    if (!justTouchedRef.current) return;
+                    showTooltipForCell(cell, e.currentTarget);
+                  }}
+                  onMouseEnter={(e) => {
+                    if (justTouchedRef.current || cell.blank) return;
                     const rect = e.currentTarget.getBoundingClientRect();
-                    setTooltip((prev) =>
-                      prev?.key === cell.key
-                        ? null
-                        : {
-                            key: cell.key,
-                            text: cell.title,
-                            cellLeft: rect.left,
-                            cellTop: rect.top,
-                            cellRight: rect.right,
-                            cellBottom: rect.bottom,
-                          }
-                    );
+                    setTooltip({
+                      key: cell.key,
+                      text: cell.title,
+                      cellLeft: rect.left,
+                      cellTop: rect.top,
+                      cellRight: rect.right,
+                      cellBottom: rect.bottom,
+                    });
+                  }}
+                  onMouseLeave={() => {
+                    if (justTouchedRef.current) return;
+                    setTooltip((prev) => (prev?.key === cell.key ? null : prev));
                   }}
                   aria-label={cell.title || undefined}
                   className={`h-[10px] w-[10px] rounded-sm ${cell.blank ? 'border border-neutral-900' : `${colorForCount(cell.count)} cursor-pointer`}`}
