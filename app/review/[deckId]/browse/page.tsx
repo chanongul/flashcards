@@ -174,7 +174,7 @@ export default function DeckBrowsePage() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col px-6 h-dvh">
-      <div className="shrink-0 pt-2 md:pt-6 pb-2">
+      <div className="shrink-0 pt-2 md:pt-6">
         <div className="mb-4 flex items-center justify-between">
           <button
             onClick={goBack}
@@ -261,7 +261,7 @@ export default function DeckBrowsePage() {
 
       <ScrollFade fadeFrom="from-neutral-950" bleed={false}>
         <ul
-          className={`space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}
+          className={`pt-2 space-y-2 ${selection.selectMode ? "pb-24 md:pb-20" : "pb-10 md:pb-6"}`}
         >
           {filtered.map((card) => (
             <CardRow
