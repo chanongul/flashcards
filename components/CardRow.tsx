@@ -416,6 +416,7 @@ export function CardRow({
         onClose={() => setShowPreview(false)}
         title="Card preview"
         size="bounded"
+        closeOnBackdropClick
         trailing={
           <button
             onClick={() => {
