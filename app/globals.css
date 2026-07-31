@@ -94,6 +94,17 @@ body {
   to { transform: translateX(400%); }
 }
 
+/* Deck row name reveal, held on the row's "..." button — see app/page.tsx's
+ * startMarqueeHold. --marquee-distance is set inline per row to exactly one
+ * copy's width plus the gap between the two side-by-side copies rendered
+ * there, so each `infinite` (no `alternate`) lap's reset back to 0 lines
+ * the second copy up exactly where the first started — a seamless,
+ * one-direction carousel loop for as long as the button stays held. */
+@keyframes deck-name-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--marquee-distance)); }
+}
+
 /* Rich text font-size steps — see lib/sanitize.ts's FONT_SIZE_VALUES. */
 [data-size="1"] { font-size: 0.7em; }
 [data-size="2"] { font-size: 0.85em; }

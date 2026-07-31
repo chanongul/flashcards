@@ -81,7 +81,6 @@ import {
 } from "@/lib/decks";
 import { ReviewHeatmap } from "@/components/ReviewHeatmap";
 import { ScrollFade } from "@/components/ScrollFade";
-import { ClickTooltip } from "@/components/base/ClickTooltip";
 import { TodayStatusSummary } from "@/components/TodayStatusSummary";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Checkbox } from "@/components/Checkbox";
@@ -309,43 +308,60 @@ export default function HomePage() {
   // can't suppress the menu. The timestamp check is immune to this.
   const lastFoldTimestampRef = useRef(0);
 
-  // Shows a deck row's full (possibly truncated) name in a tooltip — on
-  // desktop that's hover (see the row's onMouseEnter), on mobile (no
-  // hover to use instead) it's a double tap (see onClick/onDoubleClick
-  // below). null when no tooltip is open. No-ops when the name isn't
-  // actually truncated — the full text is already visible, nothing to add.
-  const [deckNameTooltip, setDeckNameTooltip] = useState<{
+  // Reveals a deck row's full (possibly truncated) name as a seamless,
+  // infinitely-looping carousel — triggered by holding the row's "..."
+  // actions button (see the button's onMouseDown/onTouchStart below), not
+  // hover/double-tap, so the same gesture works identically on desktop and
+  // mobile. Only one row's name can be mid-reveal at a time. Two copies of
+  // the name are rendered side by side (see the row's marqueeState render
+  // below), MARQUEE_GAP_PX apart; `distance` is exactly one copy's width
+  // plus that gap, so translating by `distance` leaves the second
+  // (identical) copy sitting exactly where the first one started —
+  // resetting the animation back to 0 at that instant is visually
+  // indistinguishable from continuing, no jump or reversal. `duration` is
+  // paced to a constant speed (MARQUEE_SPEED_PX_PER_SEC) rather than a
+  // fixed time, so a short and a long deck name both scroll at the same
+  // speed, it just takes the long one longer to complete one lap.
+  const [marqueeState, setMarqueeState] = useState<{
     deckId: string;
-    text: string;
-    rect: { left: number; top: number; right: number; bottom: number };
+    distance: number;
+    duration: number;
   } | null>(null);
+  const MARQUEE_HOLD_MS = 400;
+  const MARQUEE_SPEED_PX_PER_SEC = 100;
+  const MARQUEE_GAP_PX = 32; // matches the gap-8 on the two-copy row below
+  const marqueeHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set true the instant the hold timer fires, so the click that follows
+  // release (mouseup/touchend always synthesizes one) can be swallowed
+  // instead of opening the actions dropdown — same pattern as
+  // foldTriggeredRef above, just for this button's own hold gesture.
+  const marqueeTriggeredRef = useRef(false);
 
-  function showDeckNameTooltip(deck: Deck, rowEl: HTMLElement) {
-    const nameEl = rowEl.querySelector<HTMLElement>("[data-deck-name]");
-    if (!nameEl || nameEl.scrollWidth <= nameEl.clientWidth) return;
-    const rect = nameEl.getBoundingClientRect();
-    setDeckNameTooltip((prev) =>
-      prev?.deckId === deck.id
-        ? null
-        : {
-            deckId: deck.id,
-            text: deckDisplayName(deck.name),
-            rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
-          },
-    );
+  function startMarqueeHold(deck: Deck, buttonEl: HTMLElement) {
+    cancelMarqueeHold();
+    marqueeTriggeredRef.current = false;
+    const rowEl = buttonEl.closest("li");
+    marqueeHoldTimeout.current = setTimeout(() => {
+      const nameEl = rowEl?.querySelector<HTMLElement>("[data-deck-name]");
+      if (!nameEl) return;
+      const overflow = nameEl.scrollWidth - nameEl.clientWidth;
+      if (overflow <= 0) return; // not truncated — nothing to reveal
+      marqueeTriggeredRef.current = true;
+      const distance = nameEl.scrollWidth + MARQUEE_GAP_PX;
+      const duration = Math.max(300, (distance / MARQUEE_SPEED_PX_PER_SEC) * 1000);
+      setMarqueeState({ deckId: deck.id, distance, duration });
+    }, MARQUEE_HOLD_MS);
   }
 
-  // On mobile, a single tap has to navigate (rule 1) *and* a double tap has
-  // to show the tooltip (rule 2, since there's no hover to use instead) —
-  // but a double-tap always fires two ordinary click events before the
-  // browser's own dblclick, so onClick can't just act immediately or the
-  // first tap of every double-tap would navigate away before the second
-  // one is ever seen. Only the touch path pays this delay; a real mouse
-  // click (see justTouchedRef) still navigates the instant it's clicked,
-  // since hover — not double-click — is desktop's tooltip trigger, so
-  // there's no competing gesture for a plain click to wait on there.
-  const DOUBLE_TAP_WINDOW_MS = 350;
-  const deckClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelMarqueeHold() {
+    if (marqueeHoldTimeout.current) clearTimeout(marqueeHoldTimeout.current);
+    marqueeHoldTimeout.current = null;
+  }
+
+  function endMarqueeHold() {
+    cancelMarqueeHold();
+    setMarqueeState(null);
+  }
 
   function toggleDeckFold(deckId: string) {
     setCollapsedDeckIds((prev) => {
@@ -1198,47 +1214,11 @@ export default function HomePage() {
                     foldTriggeredRef.current = false;
                     return;
                   }
-                  if (!justTouchedRef.current) {
-                    // Real mouse click — navigate immediately; desktop's
-                    // tooltip trigger is hover, not double-click, so there's
-                    // no second click to wait for here.
-                    router.push(`/review/${deck.id}`);
-                    return;
-                  }
-                  // Touch: hold off navigating briefly in case a second tap
-                  // follows within the window — that's onDoubleClick below,
-                  // which cancels this and shows the tooltip instead.
-                  if (deckClickTimeoutRef.current) return;
-                  deckClickTimeoutRef.current = setTimeout(() => {
-                    deckClickTimeoutRef.current = null;
-                    router.push(`/review/${deck.id}`);
-                  }, DOUBLE_TAP_WINDOW_MS);
-                }}
-                onDoubleClick={(e) => {
-                  if (
-                    foldTriggeredRef.current ||
-                    Date.now() - lastFoldTimestampRef.current < 600
-                  ) {
-                    foldTriggeredRef.current = false;
-                    return;
-                  }
-                  if (deckClickTimeoutRef.current) {
-                    clearTimeout(deckClickTimeoutRef.current);
-                    deckClickTimeoutRef.current = null;
-                  }
-                  showDeckNameTooltip(deck, e.currentTarget);
-                }}
-                onMouseEnter={(e) => {
-                  if (justTouchedRef.current) return;
-                  showDeckNameTooltip(deck, e.currentTarget);
+                  router.push(`/review/${deck.id}`);
                 }}
                 onMouseDown={() => hasChildren && startFoldHold(deck.id)}
                 onMouseUp={cancelFoldHold}
-                onMouseLeave={() => {
-                  cancelFoldHold();
-                  if (justTouchedRef.current) return;
-                  setDeckNameTooltip((prev) => (prev?.deckId === deck.id ? null : prev));
-                }}
+                onMouseLeave={cancelFoldHold}
                 onTouchStart={() => hasChildren && startFoldHold(deck.id)}
                 onTouchEnd={cancelFoldHold}
                 onTouchCancel={cancelFoldHold}
@@ -1253,8 +1233,47 @@ export default function HomePage() {
                   isFolded ? "bg-white/[0.025]" : ""
                 }`}
               >
-                <span data-deck-name className="min-w-0 flex-1 truncate">
-                  {deckDisplayName(deck.name)}
+                {/* The overflow-hidden/nowrap/ellipsis clipping all lives on
+                    this one element (not split across it and the inner span)
+                    — an element's scrollWidth only reports the true unclipped
+                    content width when overflow:hidden is on that same
+                    element; a child that clips its own overflow first would
+                    make the parent's scrollWidth == clientWidth always, and
+                    the marquee distance below would come out as 0. The inner
+                    span is purely a transform carrier with no clipping of
+                    its own. */}
+                <span
+                  data-deck-name
+                  className={`block min-w-0 flex-1 overflow-hidden whitespace-nowrap ${
+                    marqueeState?.deckId === deck.id ? "" : "text-ellipsis"
+                  }`}
+                >
+                  {marqueeState?.deckId === deck.id ? (
+                    // The animated carousel — only rendered while actively
+                    // revealing. At rest the text sits directly in the span
+                    // above with no wrapper: text-overflow:ellipsis only
+                    // reliably renders "…" when the overflowing content is
+                    // the element's own direct text, not when it's nested
+                    // inside a child box like this one — Safari just clips
+                    // silently in that case (Chromium happens to still show
+                    // the ellipsis, which is why this wasn't caught earlier).
+                    // Two copies of the name, gap-8 apart, so the loop is
+                    // seamless — see the distance/duration comment above.
+                    <span
+                      className="inline-flex gap-8"
+                      style={
+                        {
+                          "--marquee-distance": `-${marqueeState.distance}px`,
+                          animation: `deck-name-marquee ${marqueeState.duration}ms linear infinite`,
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span>{deckDisplayName(deck.name)}</span>
+                      <span aria-hidden="true">{deckDisplayName(deck.name)}</span>
+                    </span>
+                  ) : (
+                    deckDisplayName(deck.name)
+                  )}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="flex gap-2 text-xs font-medium">
@@ -1284,9 +1303,11 @@ export default function HomePage() {
                         onClick={(e) => {
                           if (
                             foldTriggeredRef.current ||
-                            Date.now() - lastFoldTimestampRef.current < 600
+                            Date.now() - lastFoldTimestampRef.current < 600 ||
+                            marqueeTriggeredRef.current
                           ) {
                             foldTriggeredRef.current = false;
+                            marqueeTriggeredRef.current = false;
                             return;
                           }
                           onClick(e);
@@ -1296,9 +1317,21 @@ export default function HomePage() {
                         // bubbling those events up into the row's gesture,
                         // since mousedown/touchstart aren't covered by
                         // DropdownMenu's own stopClickPropagation (click
-                        // only).
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
+                        // only). Also doubles as the hold target for
+                        // revealing the full (possibly truncated) deck name
+                        // — see startMarqueeHold/endMarqueeHold above.
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          startMarqueeHold(deck, e.currentTarget);
+                        }}
+                        onMouseUp={endMarqueeHold}
+                        onMouseLeave={endMarqueeHold}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          startMarqueeHold(deck, e.currentTarget);
+                        }}
+                        onTouchEnd={endMarqueeHold}
+                        onTouchCancel={endMarqueeHold}
                         onContextMenu={(e) => e.preventDefault()}
                         aria-label="Deck actions"
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
@@ -1429,14 +1462,6 @@ export default function HomePage() {
       </ul>
       </div>
       </ScrollFade>
-
-      {deckNameTooltip && (
-        <ClickTooltip
-          text={deckNameTooltip.text}
-          anchorRect={deckNameTooltip.rect}
-          onDismiss={() => setDeckNameTooltip(null)}
-        />
-      )}
 
       <button
         onClick={() => {
