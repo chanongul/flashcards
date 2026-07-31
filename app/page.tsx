@@ -1184,7 +1184,17 @@ export default function HomePage() {
                 role="link"
                 tabIndex={0}
                 onClick={() => {
-                  if (foldTriggeredRef.current) {
+                  // foldTriggeredRef alone isn't enough: on mobile, releasing
+                  // a hold fires touchend (no-op cancelFoldHold) then a
+                  // synthetic mousedown *before* click, and that mousedown
+                  // calls startFoldHold again, which resets foldTriggeredRef
+                  // to false — so by the time this handler runs the flag has
+                  // already been cleared. The timestamp check (same one the
+                  // ellipsis button already uses below) is immune to that.
+                  if (
+                    foldTriggeredRef.current ||
+                    Date.now() - lastFoldTimestampRef.current < 600
+                  ) {
                     foldTriggeredRef.current = false;
                     return;
                   }
@@ -1205,7 +1215,10 @@ export default function HomePage() {
                   }, DOUBLE_TAP_WINDOW_MS);
                 }}
                 onDoubleClick={(e) => {
-                  if (foldTriggeredRef.current) {
+                  if (
+                    foldTriggeredRef.current ||
+                    Date.now() - lastFoldTimestampRef.current < 600
+                  ) {
                     foldTriggeredRef.current = false;
                     return;
                   }
