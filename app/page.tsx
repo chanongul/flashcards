@@ -63,6 +63,7 @@ import { useUser } from "@/lib/useUser";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { createClient } from "@/utils/supabase/client";
 import { useTitleSync } from "@/lib/useTitleSync";
+import { useHoldGesture } from "@/lib/useHoldGesture";
 import {
   countCardsByState,
   DECK_COUNT_TOOLTIPS,
@@ -294,19 +295,12 @@ export default function HomePage() {
     "updated-asc": ClockArrowUp,
   };
   const DeckSortIcon = DECK_SORT_ICONS[deckSortMode];
-  const foldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Set true the instant the hold timer fires, so the click that follows the
-  // release (mouseup/touchend always synthesizes one) can be swallowed
-  // instead of navigating — same "did a hold already happen" pattern as
-  // press-hold's own reset-button gesture below, just per-deck instead of a
-  // single shared target.
-  const foldTriggeredRef = useRef(false);
-  // Timestamp of the last fold/unfold. Used as a fallback gate in onClick:
-  // on mobile, when unfolding adds new DOM rows the browser fires a synthetic
-  // mousedown before the click, which calls startFoldHold and resets
-  // foldTriggeredRef to false before onClick runs — so foldTriggeredRef alone
-  // can't suppress the menu. The timestamp check is immune to this.
-  const lastFoldTimestampRef = useRef(0);
+  // Press-and-hold on a deck row (see the row's onMouseDown/onTouchStart)
+  // toggles that deck's subdecks; the paired onClick below calls
+  // consumeIfTriggered() to swallow the click a release always synthesizes,
+  // instead of navigating. See lib/useHoldGesture for why a timestamp
+  // fallback is needed on top of the trigger flag.
+  const foldHold = useHoldGesture(FOLD_HOLD_MS);
 
   // Reveals a deck row's full (possibly truncated) name as a seamless,
   // infinitely-looping carousel — triggered by holding the row's "..."
@@ -330,36 +324,24 @@ export default function HomePage() {
   const MARQUEE_HOLD_MS = 400;
   const MARQUEE_SPEED_PX_PER_SEC = 100;
   const MARQUEE_GAP_PX = 32; // matches the gap-8 on the two-copy row below
-  const marqueeHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Set true the instant the hold timer fires, so the click that follows
-  // release (mouseup/touchend always synthesizes one) can be swallowed
-  // instead of opening the actions dropdown — same pattern as
-  // foldTriggeredRef above, just for this button's own hold gesture.
-  const marqueeTriggeredRef = useRef(false);
+  const marqueeHold = useHoldGesture(MARQUEE_HOLD_MS);
 
   function startMarqueeHold(deck: Deck, buttonEl: HTMLElement) {
-    cancelMarqueeHold();
-    marqueeTriggeredRef.current = false;
     const rowEl = buttonEl.closest("li");
-    marqueeHoldTimeout.current = setTimeout(() => {
+    marqueeHold.start(() => {
       const nameEl = rowEl?.querySelector<HTMLElement>("[data-deck-name]");
-      if (!nameEl) return;
+      if (!nameEl) return false;
       const overflow = nameEl.scrollWidth - nameEl.clientWidth;
-      if (overflow <= 0) return; // not truncated — nothing to reveal
-      marqueeTriggeredRef.current = true;
+      if (overflow <= 0) return false; // not truncated — nothing to reveal
       const distance = nameEl.scrollWidth + MARQUEE_GAP_PX;
       const duration = Math.max(300, (distance / MARQUEE_SPEED_PX_PER_SEC) * 1000);
       setMarqueeState({ deckId: deck.id, distance, duration });
-    }, MARQUEE_HOLD_MS);
-  }
-
-  function cancelMarqueeHold() {
-    if (marqueeHoldTimeout.current) clearTimeout(marqueeHoldTimeout.current);
-    marqueeHoldTimeout.current = null;
+      return true;
+    });
   }
 
   function endMarqueeHold() {
-    cancelMarqueeHold();
+    marqueeHold.cancel();
     setMarqueeState(null);
   }
 
@@ -382,40 +364,15 @@ export default function HomePage() {
     } catch {}
   }, [collapsedDeckIds]);
 
-  function startFoldHold(deckId: string) {
-    foldTriggeredRef.current = false;
-    if (foldHoldTimeout.current) clearTimeout(foldHoldTimeout.current);
-    foldHoldTimeout.current = setTimeout(() => {
-      foldTriggeredRef.current = true;
-      lastFoldTimestampRef.current = Date.now();
-      toggleDeckFold(deckId);
-    }, FOLD_HOLD_MS);
-  }
-
-  function cancelFoldHold() {
-    if (foldHoldTimeout.current) clearTimeout(foldHoldTimeout.current);
-    foldHoldTimeout.current = null;
-  }
-
   // Holding the "Decks" heading (a much longer hold than a single deck row's,
   // since this is a broader/harder-to-undo-by-accident action) toggles every
   // foldable deck at once — see toggleAllDeckFold below, defined after
   // `decks` is available; referencing it here works because function
-  // declarations are hoisted for the whole component body.
+  // declarations are hoisted for the whole component body. No paired
+  // onClick to guard here (the heading isn't otherwise clickable), so this
+  // doesn't need consumeIfTriggered.
   const ALL_FOLD_HOLD_MS = 500;
-  const allFoldHoldTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function startAllFoldHold() {
-    if (allFoldHoldTimeout.current) clearTimeout(allFoldHoldTimeout.current);
-    allFoldHoldTimeout.current = setTimeout(() => {
-      toggleAllDeckFold();
-    }, ALL_FOLD_HOLD_MS);
-  }
-
-  function cancelAllFoldHold() {
-    if (allFoldHoldTimeout.current) clearTimeout(allFoldHoldTimeout.current);
-    allFoldHoldTimeout.current = null;
-  }
+  const allFoldHold = useHoldGesture(ALL_FOLD_HOLD_MS);
 
   const [showNoteTypes, setShowNoteTypes] = useState(false);
   const [noteTypePage, setNoteTypePage] = useState<"list" | "create">("list");
@@ -1091,12 +1048,12 @@ export default function HomePage() {
         <div className="flex items-center gap-2">
           <h2
             className="text-xl cursor-pointer font-bold"
-            onMouseDown={startAllFoldHold}
-            onMouseUp={cancelAllFoldHold}
-            onMouseLeave={cancelAllFoldHold}
-            onTouchStart={startAllFoldHold}
-            onTouchEnd={cancelAllFoldHold}
-            onTouchCancel={cancelAllFoldHold}
+            onMouseDown={() => allFoldHold.start(toggleAllDeckFold)}
+            onMouseUp={allFoldHold.cancel}
+            onMouseLeave={allFoldHold.cancel}
+            onTouchStart={() => allFoldHold.start(toggleAllDeckFold)}
+            onTouchEnd={allFoldHold.cancel}
+            onTouchCancel={allFoldHold.cancel}
             onContextMenu={(e) => e.preventDefault()}
           >
             Decks
@@ -1200,28 +1157,15 @@ export default function HomePage() {
                 role="link"
                 tabIndex={0}
                 onClick={() => {
-                  // foldTriggeredRef alone isn't enough: on mobile, releasing
-                  // a hold fires touchend (no-op cancelFoldHold) then a
-                  // synthetic mousedown *before* click, and that mousedown
-                  // calls startFoldHold again, which resets foldTriggeredRef
-                  // to false — so by the time this handler runs the flag has
-                  // already been cleared. The timestamp check (same one the
-                  // ellipsis button already uses below) is immune to that.
-                  if (
-                    foldTriggeredRef.current ||
-                    Date.now() - lastFoldTimestampRef.current < 600
-                  ) {
-                    foldTriggeredRef.current = false;
-                    return;
-                  }
+                  if (foldHold.consumeIfTriggered()) return;
                   router.push(`/review/${deck.id}`);
                 }}
-                onMouseDown={() => hasChildren && startFoldHold(deck.id)}
-                onMouseUp={cancelFoldHold}
-                onMouseLeave={cancelFoldHold}
-                onTouchStart={() => hasChildren && startFoldHold(deck.id)}
-                onTouchEnd={cancelFoldHold}
-                onTouchCancel={cancelFoldHold}
+                onMouseDown={() => hasChildren && foldHold.start(() => toggleDeckFold(deck.id))}
+                onMouseUp={foldHold.cancel}
+                onMouseLeave={foldHold.cancel}
+                onTouchStart={() => hasChildren && foldHold.start(() => toggleDeckFold(deck.id))}
+                onTouchEnd={foldHold.cancel}
+                onTouchCancel={foldHold.cancel}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -1301,15 +1245,7 @@ export default function HomePage() {
                     trigger={({ onClick }) => (
                       <button
                         onClick={(e) => {
-                          if (
-                            foldTriggeredRef.current ||
-                            Date.now() - lastFoldTimestampRef.current < 600 ||
-                            marqueeTriggeredRef.current
-                          ) {
-                            foldTriggeredRef.current = false;
-                            marqueeTriggeredRef.current = false;
-                            return;
-                          }
+                          if (foldHold.consumeIfTriggered() || marqueeHold.consumeIfTriggered()) return;
                           onClick(e);
                         }}
                         // Not a fold-hold target itself (see the row's own
