@@ -37,6 +37,14 @@ export function useHoldGesture(holdMs: number) {
   function cancel() {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = null;
+    // Refresh the fallback timestamp at release time too, not just at the
+    // moment the hold first triggered: some gestures (e.g. the name-reveal
+    // carousel) are meant to be held well past their trigger point, so the
+    // synthetic click that follows release can land long after the
+    // original `withinMs` window from the trigger has already expired.
+    if (triggeredRef.current) {
+      lastTriggeredAtRef.current = Date.now();
+    }
   }
 
   function consumeIfTriggered(withinMs = 600): boolean {
