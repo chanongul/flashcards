@@ -27,6 +27,13 @@ const AAC_MIME_RE = /aac|mp4|m4a/i;
 // Temp files, not stdin/stdout pipes: some containers (notably MP4/M4A, whose
 // moov atom can sit at the end of the file) need the demuxer to seek, which a
 // non-seekable pipe can't support.
+//
+// Deliberately does NOT apply trimStart/trimEnd (an earlier version of this
+// did, via ffmpeg's own -ss/-t) — trim is non-destructive, pure playback
+// metadata now (see TiptapFieldInput's AudioNodeView and RichText.tsx),
+// specifically so the *original*, untrimmed clip is always what's actually
+// kept in R2, on request: cutting it down here would permanently discard
+// whatever was trimmed away, with no way back.
 async function transcodeToAac(input: Buffer): Promise<Buffer> {
   const id = crypto.randomUUID();
   const inPath = path.join(os.tmpdir(), `${id}-in`);

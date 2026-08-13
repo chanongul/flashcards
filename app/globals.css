@@ -1,3 +1,10 @@
+/* KaTeX's own stylesheet (see MathNodeView/RichText.tsx) — required for math
+ * to typeset correctly at all (glyph positioning, fraction bars, etc. are
+ * real CSS rules, not just font glyphs), not just cosmetic. Next's built-in
+ * CSS pipeline resolves this node_modules import the same way it would any
+ * other global CSS `@import`. */
+@import "katex/dist/katex.min.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -132,6 +139,23 @@ body {
   height: auto;
   display: block;
 }
+
+/* Text-caret-vs-clickable cursor cues, scoped to the editable instance only
+ * (.ProseMirror — the class Tiptap itself adds to the contenteditable DOM
+ * node alongside TiptapFieldInput's own `rich-text-content`) rather than
+ * every `.rich-text-content`, which also matches RichText.tsx's read-only
+ * display span where none of this is clickable. `cursor: text` on the root
+ * is only needed so it still reads as text entry over the empty space
+ * around/after an inline image or audio node, where a browser's default
+ * "whatever the nearest positioned ancestor says" behavior would otherwise
+ * leak the pointer set below back out past the media element itself. */
+.rich-text-content.ProseMirror {
+  cursor: text;
+}
+.rich-text-content.ProseMirror img,
+.rich-text-content.ProseMirror audio {
+  cursor: pointer;
+}
 /* :has(), not a plain `.rich-text-content audio`: the wrapping
  * .rich-text-content span is itself `display: inline` with a shrink-to-fit
  * width, and the review page centers it via a flex `items-center` ancestor
@@ -150,6 +174,213 @@ body {
 }
 .rich-text-content audio {
   width: 100%;
+}
+
+/* Block-level content (see lib/tiptapBlockExtensions.ts's own BlockDoc doc
+ * comment for the schema change that made all of this possible) — margins
+ * throughout are deliberately small, matching this app's existing compact-
+ * field aesthetic rather than a full document editor's spacing, and
+ * first/last-child rules keep a field from gaining extra leading/trailing
+ * whitespace just because its content happens to start or end with one of
+ * these instead of plain text. */
+.rich-text-content p {
+  margin: 0.35em 0;
+}
+.rich-text-content p:first-child {
+  margin-top: 0;
+}
+.rich-text-content p:last-child {
+  margin-bottom: 0;
+}
+[data-align="left"] { text-align: left; }
+[data-align="center"] { text-align: center; }
+[data-align="right"] { text-align: right; }
+[data-align="justify"] { text-align: justify; }
+
+.rich-text-content blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid theme('colors.neutral.700');
+  color: theme('colors.neutral.400');
+}
+.rich-text-content blockquote p {
+  margin: 0.2em 0;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0.35em 0;
+  padding-left: 1.4em;
+}
+.rich-text-content ul {
+  list-style-type: disc;
+}
+.rich-text-content ol {
+  list-style-type: decimal;
+}
+.rich-text-content li {
+  margin: 0.15em 0;
+}
+/* Every list item's own content is wrapped in a <p> (see ListItem's content
+ * expression in lib/tiptapBlockExtensions.ts) — without this it'd get the
+ * same 0.35em margin as any other paragraph, doubling up with li's own
+ * margin above for a visibly oversized gap between items. */
+.rich-text-content li > p {
+  margin: 0;
+}
+
+.rich-text-content hr {
+  margin: 0.6em 0;
+  border: none;
+  border-top: 1px solid theme('colors.neutral.700');
+}
+
+/* .tableWrapper — both Tiptap's own live-editor NodeView (which wraps every
+ * table in a div with exactly this class automatically, undocumented in
+ * this codebase since it's the extension's own default, not something
+ * lib/tiptapBlockExtensions.ts opted into) and RichText.tsx's own
+ * read-only-display effect (which wraps each table the same way by hand,
+ * reusing this same class specifically so one rule covers both). Without
+ * it, a table wider than the field — one long unbroken word forcing a
+ * column wider, or just enough columns — breaks out of the field's own
+ * box entirely (confirmed: visible past the card's own rounded border,
+ * into the page background) rather than scrolling within it. Truncating
+ * cell content instead was deliberately ruled out — this app's whole
+ * purpose is showing you your own study material, so hiding part of a
+ * cell's text past an ellipsis means literally losing data you need to
+ * see, not just a cosmetic tradeoff. overscroll-contain here for the same
+ * "don't let a scroll-past-the-edge gesture chain into scrolling the page"
+ * reasoning as TiptapFieldInput's own toolbar. */
+.tableWrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  /* Explicit background (matching .rich-text-content pre's own identical
+   * treatment for code blocks) rather than staying transparent — needed so
+   * the scroll-fade gradients below (which have to bake in a solid color to
+   * fade *to*) always blend seamlessly regardless of what's actually behind
+   * a table in a given context (a review card, a browse-list row, etc. —
+   * contexts this stylesheet can't assume a single consistent color for
+   * otherwise). */
+  background: theme('colors.neutral.900');
+}
+/* Pure-CSS horizontal scroll-shadow/fade — hints "there's more to scroll to"
+ * exactly like ScrollFade.tsx already does for vertical scroll regions
+ * elsewhere in the app, but as a background-gradient trick instead of extra
+ * DOM elements + a ResizeObserver: TiptapFieldInput's own toolbar row is
+ * plain React JSX (a ResizeObserver-based sibling-element approach like
+ * ScrollFade's would've worked fine there), but .tableWrapper in the live
+ * editor is generated by Tiptap's own Table NodeView — inserting an extra
+ * wrapping element around ProseMirror-managed DOM to anchor fade siblings
+ * risks confusing its internal DOM position tracking, so this needed to
+ * work with zero extra elements in every context (editor table, read-only
+ * table, and the toolbar, via .scroll-fade-x below) rather than duplicating
+ * two different mechanisms for what's conceptually the same effect.
+ *
+ * Four background layers, front-to-back: two "cover" gradients glued to the
+ * scrollable *content*'s own left/right edges (background-attachment:
+ * local — unlike every other background-attachment value, `local` scrolls
+ * WITH the content instead of staying fixed to the element's own box), and
+ * two "hint" gradients that stay fixed to the element's own box
+ * (the default attachment). At rest, the left cover sits exactly at the
+ * visible left edge (content hasn't scrolled) and fully hides the hint
+ * gradient beneath it — no fade shown, correctly, since there's nothing
+ * more to scroll to on that side. Once scrolled away from an edge, that
+ * edge's cover gradient scrolls out of view along with the rest of the
+ * content up to that point, uncovering the fixed hint gradient underneath
+ * — the fade appears, exactly when (and only when) there's real content
+ * hidden in that direction. No JS, no ResizeObserver, and (unlike a
+ * sibling-element approach) nothing that could ever end up mispositioned
+ * relative to the scrolling element it's attached to, since it's painted
+ * directly onto that element's own background. */
+/* .tableWrapper gets this directly (rather than also carrying a
+ * .scroll-fade-x class) since it's Tiptap's own auto-generated element in
+ * the live editor — nothing here controls its class list, only its CSS via
+ * the class name Tiptap itself already gives it. */
+.scroll-fade-x,
+.tableWrapper {
+  background-repeat: no-repeat;
+  background-size: 24px 100%, 24px 100%, 24px 100%, 24px 100%;
+  background-position: left, right, left, right;
+  background-attachment: local, local, scroll, scroll;
+  background-image:
+    linear-gradient(to right, theme('colors.neutral.900') 30%, transparent),
+    linear-gradient(to left, theme('colors.neutral.900') 30%, transparent),
+    linear-gradient(to right, theme('colors.neutral.900'), transparent),
+    linear-gradient(to left, theme('colors.neutral.900'), transparent);
+}
+.rich-text-content table {
+  margin: 0.5em 0;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9em;
+}
+.rich-text-content th,
+.rich-text-content td {
+  border: 1px solid theme('colors.neutral.700');
+  padding: 0.3em 0.5em;
+  text-align: left;
+  vertical-align: top;
+  /* Lets a single long unbroken run of characters (no spaces to wrap at
+   * normally — exactly what forced a column wider than the whole field in
+   * practice) break mid-word onto another line instead of forcing the
+   * column, and so the whole table, wider — this alone avoids needing the
+   * scroll fallback above for most real content; the wrapper stays as a
+   * backstop for genuinely many columns where wrapping alone still isn't
+   * enough. */
+  overflow-wrap: break-word;
+}
+.rich-text-content th {
+  background: theme('colors.neutral.800');
+  font-weight: 600;
+}
+/* Same reasoning as li > p above — a table cell's content is also wrapped
+ * in a <p> (TableCell/TableHeader's own default content expression). */
+.rich-text-content th > p,
+.rich-text-content td > p {
+  margin: 0;
+}
+
+.rich-text-content pre {
+  margin: 0.5em 0;
+  padding: 0.6em 0.75em;
+  border-radius: 0.375rem;
+  border: 1px solid theme('colors.neutral.800');
+  background: theme('colors.neutral.900');
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+.rich-text-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+/* highlight.js/lowlight token classes — see lib/tiptapBlockExtensions.ts's
+ * own CodeBlock doc comment for why highlighting is computed live (a
+ * ProseMirror decoration in the editor, RichText.tsx's own re-highlight
+ * effect for the read-only display) rather than ever stored — hand-rolled
+ * rather than importing one of highlight.js's bundled theme stylesheets, to
+ * match this app's own dark palette instead of an arbitrary theme's colors. */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal { color: #c084fc; }
+.hljs-string, .hljs-attr, .hljs-symbol, .hljs-bullet, .hljs-addition { color: #4ade80; }
+.hljs-comment, .hljs-quote { color: theme('colors.neutral.500'); font-style: italic; }
+.hljs-number, .hljs-regexp, .hljs-deletion { color: #fb923c; }
+.hljs-title, .hljs-name, .hljs-section, .hljs-selector-id { color: #60a5fa; }
+.hljs-type, .hljs-class, .hljs-built_in { color: #facc15; }
+.hljs-tag { color: theme('colors.neutral.400'); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+
+/* Math (see lib/tiptapBlockExtensions.ts's MathInline/MathBlock) — the
+ * inline node stays inline in the text flow; the block one gets its own
+ * centered line, mirroring MathNodeView's own Tailwind classes in the live
+ * editor (which render via React, not this stylesheet, so read-only
+ * RichText.tsx's raw sanitized HTML needs the same rules restated here). */
+.rich-text-content span[data-latex] {
+  display: inline-block;
+}
+.rich-text-content div[data-latex] {
+  margin: 0.5em 0;
+  text-align: center;
 }
 
 /* Skeleton placeholder for an <img>/<audio> that's still fetching from R2 —

@@ -44,7 +44,7 @@ import {
   NORMAL_TEXT_FORMAT,
 } from "@/components/MediaFieldInput";
 import { TagsInput } from "@/components/TagsInput";
-import { RichTextInput } from "@/components/RichTextInput";
+import { TemplateFormatInput } from "@/components/TemplateFormatInput";
 import { stripHtml } from "@/lib/sanitize";
 import { useLoading, useLoadingWhen } from "@/components/GlobalLoading";
 import {
@@ -1717,7 +1717,7 @@ export default function HomePage() {
                       )}
                     </div>
                     {field.type === "richtext" || field.type === "choice" ? (
-                      <RichTextInput
+                      <TemplateFormatInput
                         value={buildFormattedText(field.name, field.format)}
                         onChange={(html) =>
                           setNewQuestionFields((fs) =>
@@ -1733,7 +1733,6 @@ export default function HomePage() {
                           )
                         }
                         placeholder="Field name (e.g. Word)"
-                        formatEntireValue
                       />
                     ) : (
                       <input
@@ -1865,7 +1864,7 @@ export default function HomePage() {
                       )}
                     </div>
                     {field.type === "richtext" || field.type === "choice" ? (
-                      <RichTextInput
+                      <TemplateFormatInput
                         value={buildFormattedText(field.name, field.format)}
                         onChange={(html) =>
                           setNewAnswerFields((fs) =>
@@ -1881,7 +1880,6 @@ export default function HomePage() {
                           )
                         }
                         placeholder="Field name (e.g. Meaning)"
-                        formatEntireValue
                       />
                     ) : (
                       <input

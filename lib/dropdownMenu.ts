@@ -21,7 +21,21 @@ export function nearestScrollContainer(el: Element): Element | null {
   let node = el.parentElement;
   while (node && node !== document.body) {
     const overflowY = getComputedStyle(node).overflowY;
-    if (overflowY === 'auto' || overflowY === 'scroll') return node;
+    // scrollHeight > clientHeight (real vertical overflow), not just the
+    // computed style — a CSS quirk means overflow-y computes to 'auto' on
+    // an element that only ever set overflow-x: auto (e.g.
+    // TiptapFieldInput's horizontally-scrolling toolbar): per the overflow
+    // spec, if one axis is non-'visible' and the other is left/set to
+    // 'visible', that 'visible' one computes to 'auto' too, regardless of
+    // which axis or how it was specified. Without this check, a purely
+    // horizontal scroller got treated as this trigger's vertical scroll
+    // container, and — being only as tall as one row of toolbar buttons —
+    // made shouldDropUp below always think there was no room and flip the
+    // menu upward off-screen (confirmed: this broke the toolbar's own
+    // align dropdown specifically once its row gained overflow-x-auto).
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
     node = node.parentElement;
   }
   return null;

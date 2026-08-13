@@ -34,8 +34,9 @@ function cardContainsMarker(card: Card, marker: string): boolean {
 // separately would just be redundant/conflicting event-log writes for the
 // same underlying content (same pattern already used for delete/clone in
 // lib/actions.ts). The rewritten HTML has no `src` for the new filename yet
-// — that's fine, RichText/RichTextInput regenerate it from data-media-id on
-// their next sanitize pass, same as any other stored media reference.
+// — that's fine, sanitizeRichText regenerates it from data-media-id on the
+// next sanitize pass (display or edit, whichever comes first), same as any
+// other stored media reference.
 async function replacePendingReferences(userId: string, pendingId: string, filename: string) {
   const marker = `pending:${pendingId}`;
   const cards = await db.cards.filter((c) => !c.deleted && cardContainsMarker(c, marker)).toArray();

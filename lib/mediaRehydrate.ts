@@ -3,9 +3,13 @@ import { db } from './db';
 // A "pending:{id}" media element (queued locally while offline — see
 // lib/db.ts's PendingMedia and lib/mediaSync.ts) has no real `src` yet.
 // Fills one in from the locally-stored blob so the image/audio is still
-// visible/playable before it's actually uploaded. Shared between RichText
-// (review-time rendering) and RichTextInput (editing) since both need it.
-// Returns a cleanup function that revokes the object URLs it created.
+// visible/playable before it's actually uploaded. Used by RichText
+// (review-time rendering of a card's front/back) and by TiptapFieldInput
+// (reopening a field whose value already contains a pending reference from
+// an earlier, still-offline session — a freshly inserted one sets its own
+// live src immediately instead, see TiptapFieldInput's insertImage/
+// insertAudio). Returns a cleanup function that revokes the object URLs it
+// created.
 export function rehydratePendingMedia(container: HTMLElement): () => void {
   const urls: string[] = [];
   let cancelled = false;

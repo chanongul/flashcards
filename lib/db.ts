@@ -33,7 +33,18 @@ export interface FsrsState {
 // The actual widget/content a single field holds: plain formatted text,
 // exactly one image, exactly one audio clip, or one value picked from a
 // fixed list of options (never mixed in one field).
-export type FieldType = 'richtext' | 'image' | 'audio' | 'choice';
+//
+// 'richtext' is edited via components/TiptapFieldInput.tsx (built on
+// Tiptap/ProseMirror). 'richtext2' is a legacy synonym for the exact same
+// thing — it briefly existed as a separate value while Tiptap was being
+// trialed on just a seeded "Temp" note type, before replacing the old
+// RichTextInput everywhere; kept only so a note type saved back then still
+// resolves. Both render the same widget (see MediaFieldInput's
+// FieldValueInput) and produce the identical stored HTML vocabulary (see
+// lib/sanitize.ts) — 'richtext2' is deliberately not offered in the
+// note-type editor's field-type picker (MediaFieldInput's ALL_FIELD_TYPES)
+// since there's no reason for a new field to ever choose it over 'richtext'.
+export type FieldType = 'richtext' | 'image' | 'audio' | 'choice' | 'richtext2';
 
 // What gets declared per field on a custom NoteType. 'dynamic' means "let
 // each note choose its own FieldType for this field" (same toggle UI and
@@ -45,7 +56,7 @@ export type FieldType = 'richtext' | 'image' | 'audio' | 'choice';
 // this field, no toggle.
 export type FieldTypeConfig = FieldType | 'dynamic' | 'asset';
 
-// The rich text effects RichTextInput's toolbar exposes, captured as flags
+// The rich text effects the toolbar exposes, captured as flags
 // rather than HTML — used wherever an effect applies to a whole string at
 // once (a choice field's picked option, a note type's per-field starter
 // template) rather than to part of a live selection. size===3 means normal

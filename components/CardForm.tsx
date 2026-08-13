@@ -9,9 +9,7 @@ import {
   parseClozeToDraft,
 } from "@/lib/cloze";
 import {
-  FieldTypeToggle,
   FieldValueInput,
-  inferFieldType,
   fieldHasContent,
   fieldNeedsLabel,
   reconcileFieldValues,
@@ -65,8 +63,6 @@ export function CardForm({
   );
   const [front, setFront] = useState(initialFront);
   const [back, setBack] = useState(initialBack);
-  const [frontType, setFrontType] = useState<FieldType>("richtext");
-  const [backType, setBackType] = useState<FieldType>("richtext");
 
   const [clozeText, setClozeText] = useState("");
   const [clozeAnswers, setClozeAnswers] = useState<Record<string, string>>({});
@@ -74,9 +70,6 @@ export function CardForm({
 
   const [fieldValues, setFieldValues] =
     useState<Record<string, string>>(initialFields);
-  const [dynamicFieldTypes, setDynamicFieldTypes] = useState<
-    Record<string, FieldType>
-  >({});
   const [tagsInput, setTagsInput] = useState<string[]>(initialTags);
   const [editReversed, setEditReversed] = useState(initialReversed);
   const [error, setError] = useState("");
@@ -86,11 +79,13 @@ export function CardForm({
     return noteTypes?.find((nt) => nt.id === cardType);
   }, [cardType, noteTypes]);
 
-  function resolvedFieldType(fieldName: string): FieldType {
-    const config = selectedNoteType?.fieldTypes?.[fieldName] ?? "richtext";
-    if (config === "dynamic") return dynamicFieldTypes[fieldName] ?? "richtext";
-    if (config === "asset") return dynamicFieldTypes[fieldName] ?? "image";
-    return config;
+  // Every non-'choice' field config (richtext, and the legacy
+  // image/audio/dynamic/asset/richtext2 — see lib/db.ts's FieldType doc
+  // comment) renders the same unified content editor now, so there's no
+  // per-note "which kind" left to resolve — just richtext or choice.
+  function resolvedFieldType(fieldId: string): FieldType {
+    const config = selectedNoteType?.fieldTypes?.[fieldId] ?? "richtext";
+    return config === "choice" ? "choice" : "richtext";
   }
 
   // Setup form states when editing
@@ -99,8 +94,6 @@ export function CardForm({
       setCardType(initialCardType);
       setFront(initialFront);
       setBack(initialBack);
-      setFrontType(inferFieldType(initialFront));
-      setBackType(inferFieldType(initialBack));
 
       const draft = parseClozeToDraft(initialFront);
       setClozeText(draft.template);
@@ -121,19 +114,7 @@ export function CardForm({
 
   useEffect(() => {
     if (mode === "edit" && selectedNoteType) {
-      const reconciled = reconcileFieldValues(initialFields, selectedNoteType);
-      setFieldValues(reconciled);
-      const dynTypes: Record<string, FieldType> = {};
-      for (const f of selectedNoteType.fields) {
-        const config = selectedNoteType.fieldTypes?.[f] ?? "richtext";
-        if (config === "dynamic") {
-          dynTypes[f] = inferFieldType(reconciled[f] ?? "");
-        } else if (config === "asset") {
-          const inferred = inferFieldType(reconciled[f] ?? "");
-          dynTypes[f] = inferred === "richtext" ? "image" : inferred;
-        }
-      }
-      setDynamicFieldTypes(dynTypes);
+      setFieldValues(reconcileFieldValues(initialFields, selectedNoteType));
     }
   }, [mode, selectedNoteType, initialFields]);
 
@@ -141,14 +122,11 @@ export function CardForm({
     setCardType(type);
     setFront("");
     setBack("");
-    setFrontType("richtext");
-    setBackType("richtext");
     setEditReversed(false);
     setClozeText("");
     setClozeAnswers({});
     setClozeSeparateCards(false);
     setFieldValues({});
-    setDynamicFieldTypes({});
     setTagsInput([]);
     setError("");
   }
@@ -225,17 +203,17 @@ export function CardForm({
         });
       });
     } else {
-      if (fieldNeedsLabel(front, frontType)) {
+      if (fieldNeedsLabel(front, "richtext")) {
         setError("Add a label for the front (used for search).");
         return;
       }
-      if (fieldNeedsLabel(back, backType)) {
+      if (fieldNeedsLabel(back, "richtext")) {
         setError("Add a label for the back (used for search).");
         return;
       }
       if (
-        !fieldHasContent(front, frontType) ||
-        !fieldHasContent(back, backType)
+        !fieldHasContent(front, "richtext") ||
+        !fieldHasContent(back, "richtext")
       ) {
         setError("Fill in both front and back.");
         return;
@@ -295,39 +273,14 @@ export function CardForm({
       {selectedNoteType ? (
         <>
           {selectedNoteType.questionFields.map((fieldId) => {
-            const fieldConfig =
-              selectedNoteType.fieldTypes?.[fieldId] ?? "richtext";
-            const isDynamic = fieldConfig === "dynamic";
-            const isAsset = fieldConfig === "asset";
             const type = resolvedFieldType(fieldId);
             const label = selectedNoteType.fieldNames?.[fieldId] ?? fieldId;
             return (
               <div key={fieldId + "-q"}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-neutral-500">
-                    {label}
-                    <span className="text-neutral-600 font-medium">
-                      {" "}
-                      (question)
-                    </span>
-                  </span>
-                  {(isDynamic || isAsset) && (
-                    <FieldTypeToggle
-                      value={type}
-                      types={isAsset ? ["image", "audio"] : undefined}
-                      onChange={(t) => {
-                        setDynamicFieldTypes((f) => ({
-                          ...f,
-                          [fieldId]: t,
-                        }));
-                        setFieldValues((f) => ({
-                          ...f,
-                          [fieldId]: "",
-                        }));
-                      }}
-                    />
-                  )}
-                </div>
+                <span className="text-xs text-neutral-500">
+                  {label}
+                  <span className="text-neutral-600 font-medium"> (question)</span>
+                </span>
                 <div className="mt-0.5">
                   <FieldValueInput
                     type={type}
@@ -355,39 +308,14 @@ export function CardForm({
             <hr className="border-neutral-800 !my-3" />
           )}
           {selectedNoteType.answerFields.map((fieldId) => {
-            const fieldConfig =
-              selectedNoteType.fieldTypes?.[fieldId] ?? "richtext";
-            const isDynamic = fieldConfig === "dynamic";
-            const isAsset = fieldConfig === "asset";
             const type = resolvedFieldType(fieldId);
             const label = selectedNoteType.fieldNames?.[fieldId] ?? fieldId;
             return (
               <div key={fieldId + "-a"}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-neutral-500">
-                    {label}
-                    <span className="text-neutral-600 font-medium">
-                      {" "}
-                      (answer)
-                    </span>
-                  </span>
-                  {(isDynamic || isAsset) && (
-                    <FieldTypeToggle
-                      value={type}
-                      types={isAsset ? ["image", "audio"] : undefined}
-                      onChange={(t) => {
-                        setDynamicFieldTypes((f) => ({
-                          ...f,
-                          [fieldId]: t,
-                        }));
-                        setFieldValues((f) => ({
-                          ...f,
-                          [fieldId]: "",
-                        }));
-                      }}
-                    />
-                  )}
-                </div>
+                <span className="text-xs text-neutral-500">
+                  {label}
+                  <span className="text-neutral-600 font-medium"> (answer)</span>
+                </span>
                 <div className="mt-0.5">
                   <FieldValueInput
                     type={type}
@@ -436,19 +364,10 @@ export function CardForm({
       ) : (
         <>
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-neutral-500">Front</span>
-              <FieldTypeToggle
-                value={frontType}
-                onChange={(t) => {
-                  setFrontType(t);
-                  setFront("");
-                }}
-              />
-            </div>
+            <span className="text-xs text-neutral-500">Front</span>
             <div className="mt-0.5">
               <FieldValueInput
-                type={frontType}
+                type="richtext"
                 value={front}
                 onChange={(html) => {
                   setFront(html);
@@ -459,19 +378,10 @@ export function CardForm({
             </div>
           </div>
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-neutral-500">Back</span>
-              <FieldTypeToggle
-                value={backType}
-                onChange={(t) => {
-                  setBackType(t);
-                  setBack("");
-                }}
-              />
-            </div>
+            <span className="text-xs text-neutral-500">Back</span>
             <div className="mt-0.5">
               <FieldValueInput
-                type={backType}
+                type="richtext"
                 value={back}
                 onChange={(html) => {
                   setBack(html);
