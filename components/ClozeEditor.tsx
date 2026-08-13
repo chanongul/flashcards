@@ -19,7 +19,7 @@ interface ClozeEditorProps {
 }
 
 const CHIP_CLASS =
-  'inline-block rounded bg-neutral-700 px-1.5 text-xs font-semibold text-neutral-100 align-middle select-none pointer-events-none';
+  'inline-block rounded bg-neutral-700 px-1.5 text-xs font-semibold text-neutral-100 align-middle select-none pointer-events-none before:content-[attr(data-blank)]';
 
 // Builds the contentEditable's seed HTML from a {{A}}-style draft via DOM
 // APIs (not string concatenation), so the browser handles escaping any
@@ -38,7 +38,6 @@ function draftToHtml(template: string): string {
       chip.dataset.blank = m[1];
       chip.setAttribute('contenteditable', 'false');
       chip.className = CHIP_CLASS;
-      chip.textContent = m[1];
       container.appendChild(chip);
       last = m.index + m[0].length;
     }
@@ -164,7 +163,7 @@ export function ClozeEditor({
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    const chip = `<span data-blank="${letter}" contenteditable="false" class="${CHIP_CLASS}">${letter}</span>`;
+    const chip = `<span data-blank="${letter}" contenteditable="false" class="${CHIP_CLASS}"></span>`;
     document.execCommand('insertHTML', false, chip);
     // The caret after insertHTML lands inside the chip's own (non-editable)
     // text node, not after it — any further typing or execCommand there is
