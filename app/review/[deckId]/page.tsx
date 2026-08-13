@@ -34,6 +34,7 @@ import { arrowify } from "@/lib/arrowify";
 import { CardFaces } from "@/components/CardFaces";
 import { useLoading, useLoadingWhen } from "@/components/GlobalLoading";
 import { ScrollFade } from "@/components/ScrollFade";
+import { ClozeRevealPart, CLOZE_COLORS } from "@/components/ClozeRevealPart";
 import { JotPad } from "@/components/JotPad";
 import { CardForm } from "@/components/CardForm";
 import { Modal } from "@/components/base/Modal";
@@ -92,65 +93,12 @@ function ClozeFillIn({
             key={i}
             type="text"
             value={values[index] ?? ""}
+            placeholder={String.fromCharCode(65 + index)}
             onChange={(e) => onChange(index, e.target.value)}
             autoFocus={index === 0}
             aria-label="Fill in the blank"
             className="mx-1 w-32 rounded-none border-0 border-b-2 border-neutral-600 bg-transparent px-1 py-0.5 text-center text-lg text-neutral-100 focus:border-neutral-300 focus:outline-none"
           />
-        );
-      })}
-    </p>
-  );
-}
-
-// One color per blank *occurrence* (not per section) — cycled by index, and
-// looked up with the same index in both the user-filled and answer parts —
-// so a sentence that repeats the same cloze number more than once still
-// lets the user tell which occurrence's typed answer lines up with which
-// occurrence's correct answer, rather than every blank looking identical.
-const CLOZE_COLORS = [
-  "bg-sky-900/60 text-sky-300",
-  "bg-green-900/60 text-green-300",
-  "bg-amber-900/60 text-amber-300",
-  "bg-purple-900/60 text-purple-300",
-  "bg-pink-900/60 text-pink-300",
-  "bg-teal-900/60 text-teal-300",
-  "bg-orange-900/60 text-orange-300",
-  "bg-indigo-900/60 text-indigo-300",
-];
-
-// The "Show answer" pair for a cloze card: the upper part freezes what the
-// user typed into each blank (dash if they left one empty), the lower part
-// shows the correct answer. Same sentence, same non-active-number context
-// text, rendered twice.
-function ClozeRevealPart({
-  text,
-  activeIndex,
-  mode,
-  userValues,
-}: {
-  text: string;
-  activeIndex: number;
-  mode: "user" | "answer";
-  userValues: string[];
-}) {
-  let blankCount = 0;
-  return (
-    <p className="text-lg">
-      {clozeSegments(text).map((seg, i) => {
-        if (seg.type === "text")
-          return <span key={i}>{arrowify(seg.value)}</span>;
-        if (seg.number !== activeIndex)
-          return <span key={i}>{arrowify(seg.answer)}</span>;
-        const index = blankCount;
-        blankCount += 1;
-        const value =
-          mode === "user" ? userValues[index]?.trim() || "—" : seg.answer;
-        const color = CLOZE_COLORS[index % CLOZE_COLORS.length];
-        return (
-          <span key={i} className={`rounded px-1.5 ${color}`}>
-            {arrowify(value)}
-          </span>
         );
       })}
     </p>

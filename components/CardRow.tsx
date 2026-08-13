@@ -26,6 +26,8 @@ import { useLoading, useLoadingWhen } from "./GlobalLoading";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { CardForm } from "./CardForm";
 import { CardFaces } from "./CardFaces";
+import { ClozeRevealPart } from "./ClozeRevealPart";
+import { ScrollFade } from "./ScrollFade";
 import { Modal } from "./base/Modal";
 import { DropdownMenu } from "./base/DropdownMenu";
 import { DeckPickerModal } from "./DeckPickerModal";
@@ -432,11 +434,37 @@ export function CardRow({
         }
       >
         <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-center">
-          <CardFaces
-            front={cardFrontHtml(card)}
-            back={cardBackHtml(card)}
-            showBack
-          />
+          {card.cardType === "cloze" ? (
+            <>
+              <ScrollFade>
+                <div className="flex min-h-full flex-col items-center justify-center py-4">
+                  <ClozeRevealPart
+                    text={card.front}
+                    activeIndex={card.clozeIndex ?? 1}
+                    mode="user"
+                    userValues={[]}
+                  />
+                </div>
+              </ScrollFade>
+              <hr className="shrink-0 border-neutral-800" />
+              <ScrollFade>
+                <div className="flex min-h-full flex-col items-center justify-center py-4">
+                  <ClozeRevealPart
+                    text={card.front}
+                    activeIndex={card.clozeIndex ?? 1}
+                    mode="answer"
+                    userValues={[]}
+                  />
+                </div>
+              </ScrollFade>
+            </>
+          ) : (
+            <CardFaces
+              front={cardFrontHtml(card)}
+              back={cardBackHtml(card)}
+              showBack
+            />
+          )}
         </div>
       </Modal>
 

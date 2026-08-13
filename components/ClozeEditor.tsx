@@ -24,7 +24,7 @@ const CHIP_CLASS =
 // Builds the contentEditable's seed HTML from a {{A}}-style draft via DOM
 // APIs (not string concatenation), so the browser handles escaping any
 // special characters in the surrounding text correctly.
-function draftToHtml(template: string): string {
+function draftToHtml(template: string, answers: Record<string, string>): string {
   const container = document.createElement('div');
   const lines = template.split('\n');
   lines.forEach((line, i) => {
@@ -37,8 +37,9 @@ function draftToHtml(template: string): string {
       const chip = document.createElement('input');
       chip.type = 'button';
       chip.value = m[1];
-      chip.tabIndex = -1;
       chip.dataset.blank = m[1];
+      chip.dataset.answer = answers[m[1]] ?? '';
+      chip.tabIndex = -1;
       chip.setAttribute('contenteditable', 'false');
       chip.className = CHIP_CLASS;
       container.appendChild(chip);
@@ -85,12 +86,15 @@ export function ClozeEditor({
   const textRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState(initialText);
   const [answers, setAnswers] = useState(initialAnswers);
+  const latestAnswers = useRef(initialAnswers);
+  latestAnswers.current = answers;
+
   const [separateCards, setSeparateCards] = useState(initialSeparateCards);
   const [hint, setHint] = useState('');
 
   useLayoutEffect(() => {
     const el = textRef.current;
-    if (el) el.innerHTML = draftToHtml(initialText);
+    if (el) el.innerHTML = draftToHtml(initialText, initialAnswers);
     // Mount-only seed — see the initialText/initialAnswers doc comment above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -98,12 +102,56 @@ export function ClozeEditor({
   function handleInput() {
     const el = textRef.current;
     if (!el) return;
+
+    // First, extract any answers embedded in the DOM (e.g. restored via Undo)
+    const domAnswers: Record<string, string> = {};
+    const chips = el.querySelectorAll<HTMLInputElement>(`input[data-blank]`);
+    chips.forEach((chip) => {
+      const currentLetter = chip.dataset.blank!;
+      if (chip.dataset.answer !== undefined) {
+        if (!domAnswers[currentLetter]) domAnswers[currentLetter] = chip.dataset.answer;
+      }
+    });
+
+    // Normalization: Ensure blanks are always ordered A, B, C... by appearance.
+    // If a blank is inserted out of order (e.g. at the front), re-label it and
+    // shift all subsequent ones, preserving their existing answers.
+    const mapping: Record<string, string> = {};
+    let nextLetterIndex = 0;
+    chips.forEach((chip) => {
+      const currentLetter = chip.dataset.blank!;
+      if (!mapping[currentLetter]) {
+        mapping[currentLetter] = String.fromCharCode(65 + nextLetterIndex);
+        nextLetterIndex++;
+      }
+    });
+
     const serialized = serializeContent(el);
-    // Drop answers for letters no longer in the text (e.g. its chip got
-    // deleted) so a re-added letter doesn't come back pre-filled.
     const letters = clozeBlankLetters(serialized);
+    
+    // Map existing answers to their new letters, prioritizing DOM answers
+    // in case they were restored by an Undo event.
     const next: Record<string, string> = {};
-    for (const letter of letters) next[letter] = answers[letter] ?? '';
+    for (const letter of letters) {
+      const oldLetter = Object.keys(mapping).find((k) => mapping[k] === letter);
+      const domAns = oldLetter ? domAnswers[oldLetter] : undefined;
+      const stateAns = oldLetter ? latestAnswers.current[oldLetter] : undefined;
+      next[letter] = (domAns !== undefined ? domAns : stateAns) ?? '';
+    }
+
+    // Now update DOM chips with new letters and answers so future Undo snapshots
+    // have the correct state.
+    chips.forEach((chip) => {
+      const currentLetter = chip.dataset.blank!;
+      const newLetter = mapping[currentLetter];
+      if (currentLetter !== newLetter) {
+        chip.dataset.blank = newLetter;
+        chip.value = newLetter;
+      }
+      chip.dataset.answer = next[newLetter] ?? '';
+    });
+
+    latestAnswers.current = next; // Immediately update for synchronous double-calls
     setText(serialized);
     setAnswers(next);
     setHint('');
@@ -112,8 +160,17 @@ export function ClozeEditor({
 
   function handleAnswerChange(letter: string, value: string) {
     const next = { ...answers, [letter]: value };
+    latestAnswers.current = next;
     setAnswers(next);
     onChange(text, next, separateCards);
+
+    const el = textRef.current;
+    if (el) {
+      const chips = el.querySelectorAll<HTMLInputElement>(`input[data-blank="${letter}"]`);
+      chips.forEach((chip) => {
+        chip.dataset.answer = value;
+      });
+    }
   }
 
   function handleSeparateCardsChange(value: boolean) {
@@ -166,7 +223,7 @@ export function ClozeEditor({
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    const chip = `<input type="button" data-blank="${letter}" value="${letter}" contenteditable="false" tabindex="-1" class="${CHIP_CLASS}" />`;
+    const chip = `<input type="button" data-blank="${letter}" data-answer="" value="${letter}" contenteditable="false" tabindex="-1" class="${CHIP_CLASS}" />`;
     document.execCommand('insertHTML', false, chip);
     // The caret after insertHTML lands inside the chip's own (non-editable)
     // text node, not after it — any further typing or execCommand there is

@@ -64,9 +64,13 @@ export function CardForm({
   const [front, setFront] = useState(initialFront);
   const [back, setBack] = useState(initialBack);
 
-  const [clozeText, setClozeText] = useState("");
-  const [clozeAnswers, setClozeAnswers] = useState<Record<string, string>>({});
-  const [clozeSeparateCards, setClozeSeparateCards] = useState(false);
+  const initialClozeDraft = mode === "edit" && initialCardType === "cloze"
+    ? parseClozeToDraft(initialFront)
+    : { template: "", answers: {}, separateCards: false };
+
+  const [clozeText, setClozeText] = useState(initialClozeDraft.template);
+  const [clozeAnswers, setClozeAnswers] = useState<Record<string, string>>(initialClozeDraft.answers);
+  const [clozeSeparateCards, setClozeSeparateCards] = useState(initialClozeDraft.separateCards);
 
   const [fieldValues, setFieldValues] =
     useState<Record<string, string>>(initialFields);

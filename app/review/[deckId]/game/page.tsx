@@ -10,6 +10,8 @@ import { useSmartBack } from '@/lib/useSmartBack';
 import { useTitleSync } from '@/lib/useTitleSync';
 import { useLoadingWhen } from '@/components/GlobalLoading';
 import { CardFaces } from '@/components/CardFaces';
+import { ClozeRevealPart } from '@/components/ClozeRevealPart';
+import { ScrollFade } from '@/components/ScrollFade';
 import { cardFrontHtml, cardBackHtml } from '@/lib/cardContent';
 import { deckBreadcrumb, getDeckAndDescendantIds } from '@/lib/decks';
 
@@ -125,7 +127,37 @@ export default function GameModePage() {
       {current ? (
         <div className="flex flex-1 flex-col gap-4">
           <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 px-4 text-center">
-            <CardFaces front={cardFrontHtml(current)} back={cardBackHtml(current)} showBack={revealed} />
+            {current.cardType === 'cloze' ? (
+              <>
+                <ScrollFade>
+                  <div className="flex min-h-full flex-col items-center justify-center py-4">
+                    <ClozeRevealPart
+                      text={current.front}
+                      activeIndex={current.clozeIndex ?? 1}
+                      mode="user"
+                      userValues={[]}
+                    />
+                  </div>
+                </ScrollFade>
+                {revealed && (
+                  <>
+                    <hr className="shrink-0 border-neutral-800" />
+                    <ScrollFade>
+                      <div className="flex min-h-full flex-col items-center justify-center py-4">
+                        <ClozeRevealPart
+                          text={current.front}
+                          activeIndex={current.clozeIndex ?? 1}
+                          mode="answer"
+                          userValues={[]}
+                        />
+                      </div>
+                    </ScrollFade>
+                  </>
+                )}
+              </>
+            ) : (
+              <CardFaces front={cardFrontHtml(current)} back={cardBackHtml(current)} showBack={revealed} />
+            )}
           </div>
 
           <div className="flex shrink-0 gap-2">
