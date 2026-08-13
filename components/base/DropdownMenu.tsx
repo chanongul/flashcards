@@ -45,13 +45,15 @@ export function DropdownMenu({ trigger, children, stopClickPropagation = false }
     const rect = trigger.getBoundingClientRect();
     const right = window.innerWidth - rect.right;
     // The dropdown's position: fixed styling is relative to the layout viewport
-    // (window.innerHeight), not the visual viewport, so we must calculate
-    // the bottom offset using window.innerHeight to keep it correctly anchored
-    // to the trigger, even when the keyboard is up.
+    // (window.innerHeight). getBoundingClientRect() is relative to the visual
+    // viewport. On iOS with the keyboard up, the visual viewport is offset
+    // inside the layout viewport, so we must add offsetTop to map the visual
+    // rect coordinates into layout viewport coordinates.
+    const offsetTop = window.visualViewport?.offsetTop ?? 0;
     setCoords(
       shouldDropUp(trigger)
-        ? { right, bottom: window.innerHeight - rect.top + 4 }
-        : { right, top: rect.bottom + 4 }
+        ? { right, bottom: window.innerHeight - (rect.top + offsetTop) + 4 }
+        : { right, top: rect.bottom + offsetTop + 4 }
     );
   }
 

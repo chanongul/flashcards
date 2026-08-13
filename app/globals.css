@@ -459,6 +459,7 @@ body {
 
 input, textarea, select, [contenteditable] {
   line-height: 1.5 !important;
+  caret-color: theme('colors.orange.400') !important;
 }
 
 /* iOS Safari's blue focus glow is part of the *native* form-control chrome
