@@ -297,6 +297,10 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
     if (!wasSelectedOnPointerDownRef.current) return;
     e.preventDefault();
     e.stopPropagation();
+    // Blur the editor so iOS doesn't show the keyboard when the tap
+    // re-focuses the contenteditable div as a side-effect of the click.
+    editor.commands.blur();
+    (document.activeElement as HTMLElement | null)?.blur();
     const mediaId = node.attrs['data-media-id'] as string | null;
     if (!mediaId) return;
     const crop = hasCrop ? { x: cropX!, y: cropY!, w: cropWidth!, h: cropHeight! } : null;
