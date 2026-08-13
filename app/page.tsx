@@ -1004,7 +1004,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto flex h-dvh max-w-md flex-col px-6 pb-6 pt-0 md:mb-0">
+    <main className="mx-auto flex h-[calc(100dvh-1rem)] max-w-md flex-col px-6 pb-6 pt-0 md:mb-0">
       <div className="shrink-0 pt-2 md:pt-6">
         <div className="mb-6 flex items-center justify-between">
           <h1
