@@ -334,7 +334,10 @@ export default function HomePage() {
       const overflow = nameEl.scrollWidth - nameEl.clientWidth;
       if (overflow <= 0) return false; // not truncated — nothing to reveal
       const distance = nameEl.scrollWidth + MARQUEE_GAP_PX;
-      const duration = Math.max(300, (distance / MARQUEE_SPEED_PX_PER_SEC) * 1000);
+      const duration = Math.max(
+        300,
+        (distance / MARQUEE_SPEED_PX_PER_SEC) * 1000,
+      );
       setMarqueeState({ deckId: deck.id, distance, duration });
       return true;
     });
@@ -1003,181 +1006,180 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex h-dvh max-w-md flex-col px-6 pb-6 pt-0 md:mb-0">
       <div className="shrink-0 pt-2 md:pt-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1
-          className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-50"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
-          onMouseEnter={handleTitleHoverStart}
-          onMouseLeave={handleTitleHoverEnd}
-          onMouseDown={startPressHoldTimers}
-          onMouseUp={endPressHoldTimers}
-          onTouchStart={handleTitleTouchStart}
-          onTouchEnd={handleTitleTouchEnd}
-          onTouchCancel={handleTitleTouchEnd}
-          onClick={handleTitleClick}
-          role="button"
-          aria-label={isOnline ? "Sync now" : "Offline — sync unavailable"}
-          title={isOnline ? "Sync now" : "Offline — sync unavailable"}
-        >
-          Flashcards
-          <span
-            className={`absolute bottom-0 left-0 h-0.5 bg-current transition-[width] duration-700 ease-[cubic-bezier(0.1,1.1,0.025,1)] ${titleSkewed ? "w-full" : "w-0"}`}
-          />
-        </h1>
-        <button
-          onClick={handleSignOut}
-          aria-label="Sign out"
-          className="rounded-md text-neutral-400 hover:text-neutral-200"
-        >
-          <LogOut size={16} />
-        </button>
-      </div>
-
-      {syncError && (
-        <p className="mb-4 -mt-4 text-xs text-red-400">{syncError}</p>
-      )}
-
-      <div className="mb-6">
-        <TodayStatusSummary />
-      </div>
-
-      <div className="mb-6">
-        <ReviewHeatmap />
-      </div>
-
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2
-            className="text-xl cursor-pointer font-bold"
-            onMouseDown={() => allFoldHold.start(toggleAllDeckFold)}
-            onMouseUp={allFoldHold.cancel}
-            onMouseLeave={allFoldHold.cancel}
-            onTouchStart={() => allFoldHold.start(toggleAllDeckFold)}
-            onTouchEnd={allFoldHold.cancel}
-            onTouchCancel={allFoldHold.cancel}
-            onContextMenu={(e) => e.preventDefault()}
+        <div className="mb-6 flex items-center justify-between">
+          <h1
+            className={`relative inline-block text-3xl font-black transition-all duration-200 ${isOnline ? "cursor-pointer" : "cursor-not-allowed opacity-50"} ${titleSkewed ? "translate-x-[12%] scale-[115%] -skew-x-[15deg]" : ""} ${showResetButton ? "text-orange-600" : ""}`}
+            onMouseEnter={handleTitleHoverStart}
+            onMouseLeave={handleTitleHoverEnd}
+            onMouseDown={startPressHoldTimers}
+            onMouseUp={endPressHoldTimers}
+            onTouchStart={handleTitleTouchStart}
+            onTouchEnd={handleTitleTouchEnd}
+            onTouchCancel={handleTitleTouchEnd}
+            onClick={handleTitleClick}
+            role="button"
+            aria-label={isOnline ? "Sync now" : "Offline — sync unavailable"}
+            title={isOnline ? "Sync now" : "Offline — sync unavailable"}
           >
-            Decks
-          </h2>
+            Flashcards
+            <span
+              className={`absolute bottom-0 left-0 h-0.5 bg-current transition-[width] duration-700 ease-[cubic-bezier(0.1,1.1,0.025,1)] ${titleSkewed ? "w-full" : "w-0"}`}
+            />
+          </h1>
           <button
-            onClick={() => setDeckSortMode((mode) => nextDeckSortMode(mode))}
-            aria-label={DECK_SORT_LABELS[deckSortMode]}
-            title={DECK_SORT_LABELS[deckSortMode]}
-            className="flex h-8 w-8 items-center justify-center hover:text-neutral-400"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            className="rounded-md text-neutral-400 hover:text-neutral-200"
           >
-            <DeckSortIcon size={18} strokeWidth={3} />
+            <LogOut size={16} />
           </button>
         </div>
-        <div className="flex items-center gap-4 text-neutral-400">
-          <Link
-            href="/browse"
-            aria-label="Browse cards"
-            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
-          >
-            <Search size={16} />
-          </Link>
-          <button
-            onClick={() => setShowNoteTypes(true)}
-            aria-label="Manage custom card types"
-            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
-          >
-            <LayoutTemplate size={16} />
-          </button>
-          <button
-            onClick={handleExportAll}
-            aria-label="Export all decks"
-            title="Export all decks"
-            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
-          >
-            <Download size={16} />
-          </button>
-          <button
-            onClick={() => setShowImport(true)}
-            aria-label="Import"
-            title="Import"
-            className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
-          >
-            <Upload size={16} />
-          </button>
+
+        {syncError && (
+          <p className="mb-4 -mt-4 text-xs text-red-400">{syncError}</p>
+        )}
+
+        <div className="mb-6">
+          <TodayStatusSummary />
         </div>
-      </div>
+
+        <div className="mb-6">
+          <ReviewHeatmap />
+        </div>
+
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2
+              className="text-xl cursor-pointer font-bold"
+              onMouseDown={() => allFoldHold.start(toggleAllDeckFold)}
+              onMouseUp={allFoldHold.cancel}
+              onMouseLeave={allFoldHold.cancel}
+              onTouchStart={() => allFoldHold.start(toggleAllDeckFold)}
+              onTouchEnd={allFoldHold.cancel}
+              onTouchCancel={allFoldHold.cancel}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              Decks
+            </h2>
+            <button
+              onClick={() => setDeckSortMode((mode) => nextDeckSortMode(mode))}
+              aria-label={DECK_SORT_LABELS[deckSortMode]}
+              title={DECK_SORT_LABELS[deckSortMode]}
+              className="flex h-8 w-8 items-center justify-center hover:text-neutral-400"
+            >
+              <DeckSortIcon size={18} strokeWidth={3} />
+            </button>
+          </div>
+          <div className="flex items-center gap-4 text-neutral-400">
+            <Link
+              href="/browse"
+              aria-label="Browse cards"
+              className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
+            >
+              <Search size={16} />
+            </Link>
+            <button
+              onClick={handleExportAll}
+              aria-label="Export all decks"
+              title="Export all decks"
+              className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
+            >
+              <Download size={16} />
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              aria-label="Import"
+              title="Import"
+              className="flex h-8 items-center justify-center rounded-md hover:text-neutral-200"
+            >
+              <Upload size={16} />
+            </button>
+          </div>
+        </div>
       </div>
 
       <ScrollFade fadeFrom="from-neutral-950" bleed={false} className="-mr-6">
-      <div className="pr-6">
-      <ul className="space-y-2">
-        {visibleDeckRows.map(({ deck, depth }) => {
-          const hasChildren = deckNamesWithChildren.has(deck.name);
-          const isFolded = hasChildren && collapsedDeckIds.has(deck.id);
-          return editingDeckId === deck.id ? (
-            <li key={deck.id} style={{ marginLeft: depth * 16 }}>
-              <form onSubmit={handleSaveDeckName} className="flex gap-2">
-                <div className="flex-1">
-                  <input
-                    value={editDeckName}
-                    onChange={(e) => {
-                      setEditDeckName(e.target.value);
-                      setRenameDeckError("");
+        <div className="pr-6">
+          <ul className="space-y-2">
+            {visibleDeckRows.map(({ deck, depth }) => {
+              const hasChildren = deckNamesWithChildren.has(deck.name);
+              const isFolded = hasChildren && collapsedDeckIds.has(deck.id);
+              return editingDeckId === deck.id ? (
+                <li key={deck.id} style={{ marginLeft: depth * 16 }}>
+                  <form onSubmit={handleSaveDeckName} className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        value={editDeckName}
+                        onChange={(e) => {
+                          setEditDeckName(e.target.value);
+                          setRenameDeckError("");
+                        }}
+                        autoFocus
+                        className="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 px-4"
+                      />
+                      {renameDeckError && (
+                        <p className="mt-1 text-sm text-red-400">
+                          {renameDeckError}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      aria-label="Save"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-300 hover:text-neutral-100"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingDeckId(null);
+                        setRenameDeckError("");
+                      }}
+                      aria-label="Cancel"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
+                    >
+                      <X size={16} />
+                    </button>
+                  </form>
+                </li>
+              ) : (
+                <li
+                  key={deck.id}
+                  className="relative flex h-10 items-center gap-2"
+                  style={{ marginLeft: depth * 16 }}
+                >
+                  <div
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (foldHold.consumeIfTriggered()) return;
+                      router.push(`/review/${deck.id}`);
                     }}
-                    autoFocus
-                    className="h-10 w-full rounded-md border border-neutral-800 bg-neutral-900 px-4"
-                  />
-                  {renameDeckError && (
-                    <p className="mt-1 text-sm text-red-400">
-                      {renameDeckError}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  aria-label="Save"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-300 hover:text-neutral-100"
-                >
-                  <Check size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingDeckId(null);
-                    setRenameDeckError("");
-                  }}
-                  aria-label="Cancel"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                >
-                  <X size={16} />
-                </button>
-              </form>
-            </li>
-          ) : (
-            <li
-              key={deck.id}
-              className="relative flex h-10 items-center gap-2"
-              style={{ marginLeft: depth * 16 }}
-            >
-              <div
-                role="link"
-                tabIndex={0}
-                onClick={() => {
-                  if (foldHold.consumeIfTriggered()) return;
-                  router.push(`/review/${deck.id}`);
-                }}
-                onMouseDown={() => hasChildren && foldHold.start(() => toggleDeckFold(deck.id))}
-                onMouseUp={foldHold.cancel}
-                onMouseLeave={foldHold.cancel}
-                onTouchStart={() => hasChildren && foldHold.start(() => toggleDeckFold(deck.id))}
-                onTouchEnd={foldHold.cancel}
-                onTouchCancel={foldHold.cancel}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    router.push(`/review/${deck.id}`);
-                  }
-                }}
-                onContextMenu={(e) => e.preventDefault()}
-                className={`flex h-10 min-w-0 flex-1 gap-4 cursor-pointer items-center justify-between rounded-md border border-neutral-800 pl-4 hover:bg-neutral-900 ${
-                  isFolded ? "bg-white/[0.025]" : ""
-                }`}
-              >
-                {/* The overflow-hidden/nowrap/ellipsis clipping all lives on
+                    onMouseDown={() =>
+                      hasChildren &&
+                      foldHold.start(() => toggleDeckFold(deck.id))
+                    }
+                    onMouseUp={foldHold.cancel}
+                    onMouseLeave={foldHold.cancel}
+                    onTouchStart={() =>
+                      hasChildren &&
+                      foldHold.start(() => toggleDeckFold(deck.id))
+                    }
+                    onTouchEnd={foldHold.cancel}
+                    onTouchCancel={foldHold.cancel}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/review/${deck.id}`);
+                      }
+                    }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className={`flex h-10 min-w-0 flex-1 gap-4 cursor-pointer items-center justify-between rounded-md border border-neutral-800 pl-4 hover:bg-neutral-900 ${
+                      isFolded ? "bg-white/[0.025]" : ""
+                    }`}
+                  >
+                    {/* The overflow-hidden/nowrap/ellipsis clipping all lives on
                     this one element (not split across it and the inner span)
                     — an element's scrollWidth only reports the true unclipped
                     content width when overflow:hidden is on that same
@@ -1186,217 +1188,223 @@ export default function HomePage() {
                     the marquee distance below would come out as 0. The inner
                     span is purely a transform carrier with no clipping of
                     its own. */}
-                <span
-                  data-deck-name
-                  className={`block min-w-0 flex-1 overflow-hidden whitespace-nowrap ${
-                    marqueeState?.deckId === deck.id ? "" : "text-ellipsis"
-                  }`}
-                >
-                  {marqueeState?.deckId === deck.id ? (
-                    // The animated carousel — only rendered while actively
-                    // revealing. At rest the text sits directly in the span
-                    // above with no wrapper: text-overflow:ellipsis only
-                    // reliably renders "…" when the overflowing content is
-                    // the element's own direct text, not when it's nested
-                    // inside a child box like this one — Safari just clips
-                    // silently in that case (Chromium happens to still show
-                    // the ellipsis, which is why this wasn't caught earlier).
-                    // Two copies of the name, gap-8 apart, so the loop is
-                    // seamless — see the distance/duration comment above.
                     <span
-                      className="inline-flex gap-8"
-                      style={
-                        {
-                          "--marquee-distance": `-${marqueeState.distance}px`,
-                          animation: `deck-name-marquee ${marqueeState.duration}ms linear infinite`,
-                        } as React.CSSProperties
-                      }
+                      data-deck-name
+                      className={`block min-w-0 flex-1 overflow-hidden whitespace-nowrap ${
+                        marqueeState?.deckId === deck.id ? "" : "text-ellipsis"
+                      }`}
                     >
-                      <span>{deckDisplayName(deck.name)}</span>
-                      <span aria-hidden="true">{deckDisplayName(deck.name)}</span>
+                      {marqueeState?.deckId === deck.id ? (
+                        // The animated carousel — only rendered while actively
+                        // revealing. At rest the text sits directly in the span
+                        // above with no wrapper: text-overflow:ellipsis only
+                        // reliably renders "…" when the overflowing content is
+                        // the element's own direct text, not when it's nested
+                        // inside a child box like this one — Safari just clips
+                        // silently in that case (Chromium happens to still show
+                        // the ellipsis, which is why this wasn't caught earlier).
+                        // Two copies of the name, gap-8 apart, so the loop is
+                        // seamless — see the distance/duration comment above.
+                        <span
+                          className="inline-flex gap-8"
+                          style={
+                            {
+                              "--marquee-distance": `-${marqueeState.distance}px`,
+                              animation: `deck-name-marquee ${marqueeState.duration}ms linear infinite`,
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span>{deckDisplayName(deck.name)}</span>
+                          <span aria-hidden="true">
+                            {deckDisplayName(deck.name)}
+                          </span>
+                        </span>
+                      ) : (
+                        deckDisplayName(deck.name)
+                      )}
                     </span>
-                  ) : (
-                    deckDisplayName(deck.name)
-                  )}
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="flex gap-2 text-xs font-medium">
-                    <span
-                      className="text-sky-400"
-                      title={DECK_COUNT_TOOLTIPS.new}
-                    >
-                      {deckCounts?.get(deck.id)?.newCount ?? 0}
-                    </span>
-                    <span
-                      className="text-orange-600"
-                      title={DECK_COUNT_TOOLTIPS.learning}
-                    >
-                      {deckCounts?.get(deck.id)?.learningCount ?? 0}
-                    </span>
-                    <span
-                      className="text-olive-300"
-                      title={DECK_COUNT_TOOLTIPS.due}
-                    >
-                      {deckCounts?.get(deck.id)?.dueCount ?? 0}
-                    </span>
-                  </span>
-                  <DropdownMenu
-                    stopClickPropagation
-                    trigger={({ onClick }) => (
-                      <button
-                        onClick={(e) => {
-                          if (foldHold.consumeIfTriggered() || marqueeHold.consumeIfTriggered()) return;
-                          onClick(e);
-                        }}
-                        // Not a fold-hold target itself (see the row's own
-                        // onMouseDown/onTouchStart) — just kept from
-                        // bubbling those events up into the row's gesture,
-                        // since mousedown/touchstart aren't covered by
-                        // DropdownMenu's own stopClickPropagation (click
-                        // only). Also doubles as the hold target for
-                        // revealing the full (possibly truncated) deck name
-                        // — see startMarqueeHold/endMarqueeHold above.
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          startMarqueeHold(deck, e.currentTarget);
-                        }}
-                        onMouseUp={endMarqueeHold}
-                        onMouseLeave={endMarqueeHold}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
-                          startMarqueeHold(deck, e.currentTarget);
-                        }}
-                        onTouchEnd={endMarqueeHold}
-                        onTouchCancel={endMarqueeHold}
-                        onContextMenu={(e) => e.preventDefault()}
-                        aria-label="Deck actions"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="flex gap-2 text-xs font-medium">
+                        <span
+                          className="text-sky-400"
+                          title={DECK_COUNT_TOOLTIPS.new}
+                        >
+                          {deckCounts?.get(deck.id)?.newCount ?? 0}
+                        </span>
+                        <span
+                          className="text-orange-600"
+                          title={DECK_COUNT_TOOLTIPS.learning}
+                        >
+                          {deckCounts?.get(deck.id)?.learningCount ?? 0}
+                        </span>
+                        <span
+                          className="text-olive-300"
+                          title={DECK_COUNT_TOOLTIPS.due}
+                        >
+                          {deckCounts?.get(deck.id)?.dueCount ?? 0}
+                        </span>
+                      </span>
+                      <DropdownMenu
+                        stopClickPropagation
+                        trigger={({ onClick }) => (
+                          <button
+                            onClick={(e) => {
+                              if (
+                                foldHold.consumeIfTriggered() ||
+                                marqueeHold.consumeIfTriggered()
+                              )
+                                return;
+                              onClick(e);
+                            }}
+                            // Not a fold-hold target itself (see the row's own
+                            // onMouseDown/onTouchStart) — just kept from
+                            // bubbling those events up into the row's gesture,
+                            // since mousedown/touchstart aren't covered by
+                            // DropdownMenu's own stopClickPropagation (click
+                            // only). Also doubles as the hold target for
+                            // revealing the full (possibly truncated) deck name
+                            // — see startMarqueeHold/endMarqueeHold above.
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              startMarqueeHold(deck, e.currentTarget);
+                            }}
+                            onMouseUp={endMarqueeHold}
+                            onMouseLeave={endMarqueeHold}
+                            onTouchStart={(e) => {
+                              e.stopPropagation();
+                              startMarqueeHold(deck, e.currentTarget);
+                            }}
+                            onTouchEnd={endMarqueeHold}
+                            onTouchCancel={endMarqueeHold}
+                            onContextMenu={(e) => e.preventDefault()}
+                            aria-label="Deck actions"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                        )}
                       >
-                        <MoreVertical size={14} />
-                      </button>
-                    )}
-                  >
-                    {(close) => (
-                      <>
-                        <button
-                          onClick={() => {
-                            handleExportDeck(deck);
-                            close();
-                          }}
-                          aria-label="Export deck"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <Download size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            close();
-                            router.push(`/review/${deck.id}/game`);
-                          }}
-                          aria-label="Game mode"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <Gamepad2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActionsAddCardDeck(deck);
-                            close();
-                          }}
-                          aria-label="Add card"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <FilePlus size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            close();
-                            router.push(`/review/${deck.id}/all`);
-                          }}
-                          aria-label="View all cards"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <List size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            close();
-                            router.push(`/review/${deck.id}/browse`);
-                          }}
-                          aria-label="Browse this deck"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <FolderSearch size={14} />
-                        </button>
-                        {deckDepth(deck.name) < MAX_DECK_DEPTH && (
-                          <button
-                            onClick={() => {
-                              handleAddSubdeck(deck);
-                              close();
-                            }}
-                            aria-label="Add subdeck"
-                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                          >
-                            <FolderPlus size={14} />
-                          </button>
+                        {(close) => (
+                          <>
+                            <button
+                              onClick={() => {
+                                handleExportDeck(deck);
+                                close();
+                              }}
+                              aria-label="Export deck"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <Download size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                close();
+                                router.push(`/review/${deck.id}/game`);
+                              }}
+                              aria-label="Game mode"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <Gamepad2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setActionsAddCardDeck(deck);
+                                close();
+                              }}
+                              aria-label="Add card"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <FilePlus size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                close();
+                                router.push(`/review/${deck.id}/all`);
+                              }}
+                              aria-label="View all cards"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <List size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                close();
+                                router.push(`/review/${deck.id}/browse`);
+                              }}
+                              aria-label="Browse this deck"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <FolderSearch size={14} />
+                            </button>
+                            {deckDepth(deck.name) < MAX_DECK_DEPTH && (
+                              <button
+                                onClick={() => {
+                                  handleAddSubdeck(deck);
+                                  close();
+                                }}
+                                aria-label="Add subdeck"
+                                className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                              >
+                                <FolderPlus size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                handleMoveDeck(deck);
+                                close();
+                              }}
+                              aria-label="Move deck"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <FolderInput size={14} />
+                            </button>
+                            {depth === 0 && (
+                              <button
+                                onClick={() => {
+                                  handleCloneDeck(deck.id);
+                                  close();
+                                }}
+                                aria-label="Duplicate deck"
+                                className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                startEditDeck(deck);
+                                close();
+                              }}
+                              aria-label="Rename deck"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDeleteDeck(deck);
+                                close();
+                              }}
+                              aria-label="Delete deck"
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
                         )}
-                        <button
-                          onClick={() => {
-                            handleMoveDeck(deck);
-                            close();
-                          }}
-                          aria-label="Move deck"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <FolderInput size={14} />
-                        </button>
-                        {depth === 0 && (
-                          <button
-                            onClick={() => {
-                              handleCloneDeck(deck.id);
-                              close();
-                            }}
-                            aria-label="Duplicate deck"
-                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                          >
-                            <Copy size={14} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            startEditDeck(deck);
-                            close();
-                          }}
-                          aria-label="Rename deck"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleDeleteDeck(deck);
-                            close();
-                          }}
-                          aria-label="Delete deck"
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
-                  </DropdownMenu>
-                </span>
-              </div>
-            </li>
-          );
-        })}
-        {decks?.length === 0 && (
-          <p className="text-sm text-neutral-500">
-            No decks yet — add one below.
-          </p>
-        )}
-      </ul>
-      </div>
+                      </DropdownMenu>
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+            {decks?.length === 0 && (
+              <p className="text-sm text-neutral-500">
+                No decks yet — add one below.
+              </p>
+            )}
+          </ul>
+        </div>
       </ScrollFade>
 
       <button
@@ -1522,436 +1530,6 @@ export default function HomePage() {
               </button>
             </div>
           </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={showNoteTypes}
-        onClose={closeNoteTypesModal}
-        title={
-          noteTypePage === "list"
-            ? "Custom card types"
-            : editingNoteTypeId
-              ? "Edit card type"
-              : "New card type"
-        }
-        leading={
-          noteTypePage === "create" && (
-            <button
-              onClick={() => {
-                setNoteTypeError("");
-                setNoteTypePage("list");
-              }}
-              aria-label="Back"
-              className="text-neutral-400 hover:text-neutral-200"
-            >
-              <ArrowLeft size={16} />
-            </button>
-          )
-        }
-      >
-        {noteTypePage === "list" ? (
-          <>
-            <ul className="space-y-2">
-              {noteTypes?.map((nt) => (
-                <li
-                  key={nt.id}
-                  className="relative flex h-10 items-center gap-2"
-                >
-                  <div className="flex h-10 flex-1 items-center justify-between rounded-md border border-neutral-800 pl-4 text-sm">
-                    <span className="truncate">{nt.name}</span>
-                    <DropdownMenu
-                      trigger={({ onClick }) => (
-                        <button
-                          onClick={onClick}
-                          aria-label="Custom card type actions"
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-200"
-                        >
-                          <MoreVertical size={14} />
-                        </button>
-                      )}
-                    >
-                      {(close) => (
-                        <>
-                          <button
-                            onClick={() => {
-                              openEditNoteType(nt);
-                              close();
-                            }}
-                            aria-label="Edit custom card type"
-                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleCloneNoteType(nt.id);
-                              close();
-                            }}
-                            aria-label="Duplicate custom card type"
-                            className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-300 hover:bg-neutral-900"
-                          >
-                            <Copy size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleDeleteNoteType(nt.id);
-                              close();
-                            }}
-                            aria-label="Delete custom card type"
-                            className="flex h-8 w-8 items-center justify-center rounded-md text-red-400 hover:bg-neutral-900"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
-                      )}
-                    </DropdownMenu>
-                  </div>
-                </li>
-              ))}
-              {(!noteTypes || noteTypes.length === 0) && (
-                <p className="text-sm text-neutral-500">
-                  No custom card types yet.
-                </p>
-              )}
-            </ul>
-
-            <button
-              onClick={openCreateNoteType}
-              aria-label="New custom card type"
-              className="mt-2 flex h-10 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-            >
-              <Plus size={16} />
-            </button>
-          </>
-        ) : (
-          <>
-            <form onSubmit={handleSubmitNoteType} className="space-y-2">
-              <input
-                value={newTypeName}
-                onChange={(e) => {
-                  setNewTypeName(e.target.value);
-                  setNoteTypeError("");
-                }}
-                placeholder="Name (e.g. Vocabulary)"
-                autoFocus
-                className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-              />
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-neutral-400">
-                  Question fields
-                </p>
-                {newQuestionFields.map((field, i) => (
-                  <div
-                    key={i}
-                    draggable={newQuestionFields.length > 1}
-                    onDragStart={(e) => {
-                      if (!dragHandleActivatedQRef.current) {
-                        e.preventDefault();
-                        return;
-                      }
-                      dragHandleActivatedQRef.current = false;
-                      dragIndexQRef.current = i;
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverIndexQ(i);
-                    }}
-                    onDrop={() => {
-                      const from = dragIndexQRef.current;
-                      if (from !== null && dragOverIndexQ !== null)
-                        setNewQuestionFields((fs) =>
-                          swapItems(fs, from, dragOverIndexQ),
-                        );
-                      dragIndexQRef.current = null;
-                      setDragOverIndexQ(null);
-                    }}
-                    onDragEnd={() => {
-                      dragHandleActivatedQRef.current = false;
-                      dragIndexQRef.current = null;
-                      setDragOverIndexQ(null);
-                    }}
-                    className={`space-y-1 rounded-md border p-2 transition-colors ${
-                      dragOverIndexQ === i && dragIndexQRef.current !== i
-                        ? "border-neutral-400 bg-neutral-800/60"
-                        : "border-neutral-800"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {newQuestionFields.length > 1 && (
-                          <span
-                            onPointerDown={() => {
-                              dragHandleActivatedQRef.current = true;
-                            }}
-                            className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
-                            title="Drag to reorder"
-                          >
-                            <GripVertical size={14} />
-                          </span>
-                        )}
-                        <FieldTypeConfigToggle
-                          value={field.type}
-                          onChange={(type) =>
-                            setNewQuestionFields((fs) =>
-                              fs.map((f, fi) =>
-                                fi === i ? { ...f, type, choices: [] } : f,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                      {newQuestionFields.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNewQuestionFields((fs) =>
-                              fs.filter((_, fi) => fi !== i),
-                            )
-                          }
-                          aria-label="Remove field"
-                          className="shrink-0 text-neutral-500 hover:text-neutral-300"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                    {field.type === "richtext" || field.type === "choice" ? (
-                      <TemplateFormatInput
-                        value={buildFormattedText(field.name, field.format)}
-                        onChange={(html) =>
-                          setNewQuestionFields((fs) =>
-                            fs.map((f, fi) =>
-                              fi === i
-                                ? {
-                                    ...f,
-                                    name: stripHtml(html).trim(),
-                                    format: readTextFormat(html),
-                                  }
-                                : f,
-                            ),
-                          )
-                        }
-                        placeholder="Field name (e.g. Word)"
-                      />
-                    ) : (
-                      <input
-                        value={field.name}
-                        onChange={(e) =>
-                          setNewQuestionFields((fs) =>
-                            fs.map((f, fi) =>
-                              fi === i ? { ...f, name: e.target.value } : f,
-                            ),
-                          )
-                        }
-                        placeholder="Field name (e.g. Word)"
-                        className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                      />
-                    )}
-                    {field.type === "choice" && (
-                      <TagsInput
-                        value={field.choices}
-                        onChange={(choices) =>
-                          setNewQuestionFields((fs) =>
-                            fs.map((f, fi) =>
-                              fi === i ? { ...f, choices } : f,
-                            ),
-                          )
-                        }
-                        placeholder="Type an option, press Enter…"
-                      />
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setNewQuestionFields((fs) => [
-                      ...fs,
-                      {
-                        id: crypto.randomUUID(),
-                        name: "",
-                        type: "richtext",
-                        choices: [],
-                        format: NORMAL_TEXT_FORMAT,
-                      },
-                    ])
-                  }
-                  aria-label="Add question field"
-                  className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-neutral-400">
-                  Answer fields
-                </p>
-                {newAnswerFields.map((field, i) => (
-                  <div
-                    key={i}
-                    draggable={newAnswerFields.length > 1}
-                    onDragStart={(e) => {
-                      if (!dragHandleActivatedARef.current) {
-                        e.preventDefault();
-                        return;
-                      }
-                      dragHandleActivatedARef.current = false;
-                      dragIndexARef.current = i;
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOverIndexA(i);
-                    }}
-                    onDrop={() => {
-                      const from = dragIndexARef.current;
-                      if (from !== null && dragOverIndexA !== null)
-                        setNewAnswerFields((fs) =>
-                          swapItems(fs, from, dragOverIndexA),
-                        );
-                      dragIndexARef.current = null;
-                      setDragOverIndexA(null);
-                    }}
-                    onDragEnd={() => {
-                      dragHandleActivatedARef.current = false;
-                      dragIndexARef.current = null;
-                      setDragOverIndexA(null);
-                    }}
-                    className={`space-y-1 rounded-md border p-2 transition-colors ${
-                      dragOverIndexA === i && dragIndexARef.current !== i
-                        ? "border-neutral-400 bg-neutral-800/60"
-                        : "border-neutral-800"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {newAnswerFields.length > 1 && (
-                          <span
-                            onPointerDown={() => {
-                              dragHandleActivatedARef.current = true;
-                            }}
-                            className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
-                            title="Drag to reorder"
-                          >
-                            <GripVertical size={14} />
-                          </span>
-                        )}
-                        <FieldTypeConfigToggle
-                          value={field.type}
-                          onChange={(type) =>
-                            setNewAnswerFields((fs) =>
-                              fs.map((f, fi) =>
-                                fi === i ? { ...f, type, choices: [] } : f,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                      {newAnswerFields.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNewAnswerFields((fs) =>
-                              fs.filter((_, fi) => fi !== i),
-                            )
-                          }
-                          aria-label="Remove field"
-                          className="shrink-0 text-neutral-500 hover:text-neutral-300"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                    {field.type === "richtext" || field.type === "choice" ? (
-                      <TemplateFormatInput
-                        value={buildFormattedText(field.name, field.format)}
-                        onChange={(html) =>
-                          setNewAnswerFields((fs) =>
-                            fs.map((f, fi) =>
-                              fi === i
-                                ? {
-                                    ...f,
-                                    name: stripHtml(html).trim(),
-                                    format: readTextFormat(html),
-                                  }
-                                : f,
-                            ),
-                          )
-                        }
-                        placeholder="Field name (e.g. Meaning)"
-                      />
-                    ) : (
-                      <input
-                        value={field.name}
-                        onChange={(e) =>
-                          setNewAnswerFields((fs) =>
-                            fs.map((f, fi) =>
-                              fi === i ? { ...f, name: e.target.value } : f,
-                            ),
-                          )
-                        }
-                        placeholder="Field name (e.g. Meaning)"
-                        className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-                      />
-                    )}
-                    {field.type === "choice" && (
-                      <TagsInput
-                        value={field.choices}
-                        onChange={(choices) =>
-                          setNewAnswerFields((fs) =>
-                            fs.map((f, fi) =>
-                              fi === i ? { ...f, choices } : f,
-                            ),
-                          )
-                        }
-                        placeholder="Type an option, press Enter…"
-                      />
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setNewAnswerFields((fs) => [
-                      ...fs,
-                      {
-                        id: crypto.randomUUID(),
-                        name: "",
-                        type: "richtext",
-                        choices: [],
-                        format: NORMAL_TEXT_FORMAT,
-                      },
-                    ])
-                  }
-                  aria-label="Add answer field"
-                  className="flex h-8 w-full items-center justify-center rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-200"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-
-              <label className="flex w-fit items-center gap-2 text-xs text-neutral-400">
-                <Checkbox
-                  checked={newTypeReversed}
-                  onChange={setNewTypeReversed}
-                />
-                Allow reversed cards (lets you opt in per note when creating a
-                card)
-              </label>
-
-              {noteTypeError && (
-                <p className="text-sm text-red-400">{noteTypeError}</p>
-              )}
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900"
-              >
-                {editingNoteTypeId ? "Save" : "Create"}
-              </button>
-            </form>
-          </>
         )}
       </Modal>
 

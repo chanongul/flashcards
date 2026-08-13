@@ -166,6 +166,13 @@ function contentBoxWidth(el: HTMLElement): number {
 function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: ReactNodeViewProps) {
   const dragRef = useRef<{ startX: number; startWidthPx: number; containerWidth: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  // Snapshot of `selected` captured at pointerdown — before ProseMirror
+  // sets the NodeSelection (and re-renders this component with selected=true)
+  // synchronously on the same event. Without this, every first tap on an
+  // unselected image would immediately open the preview, because by the time
+  // the click handler runs `selected` is already true regardless of whether
+  // the image was already selected before the tap.
+  const wasSelectedOnPointerDownRef = useRef(false);
 
   const cropX = node.attrs.cropX as number | null;
   const cropY = node.attrs.cropY as number | null;
@@ -275,21 +282,19 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
     editor.storage.image.openEditor?.(mediaId, (node.attrs.alt as string | null) ?? '', crop);
   }
 
-  // A tap on the image body used to do nothing once selected (the actual
-  // actions live on the corner buttons) — this gives it something useful to
-  // do instead: a full-screen preview, gated on `selected`. In practice
-  // this fires on the very first tap even for a previously-*un*selected
-  // image, not just a deliberate second one — confirmed empirically:
-  // ProseMirror resolves the NodeSelection synchronously on mousedown
-  // (re-rendering this NodeView with `selected: true`) before the browser's
-  // own click event reaches this handler, so `selected` already reads true
-  // by the time it's checked here regardless of which click caused it.
-  // That's still exactly "selected, so a click previews" — it just
-  // resolves within one click rather than requiring a separate one — and
-  // it's harmless either way: the crop/delete/resize corner buttons are
-  // unaffected (separate elements, not gated behind this), so closing the
-  // preview leaves the image selected and those still reachable.
+  // A tap on the image body opens a full-screen preview, but only when the
+  // image was *already* selected before this tap — not on the first tap that
+  // selects it. ProseMirror resolves the NodeSelection synchronously on
+  // mousedown/pointerdown (re-rendering with selected=true) before the click
+  // event fires, so gating on `selected` alone would open the preview on
+  // the very first tap. Instead, wasSelectedOnPointerDownRef captures the
+  // pre-tap selected state, and openPreview checks that.
+  function handleImgPointerDown() {
+    wasSelectedOnPointerDownRef.current = selected;
+  }
+
   function openPreview(e: React.MouseEvent) {
+    if (!wasSelectedOnPointerDownRef.current) return;
     e.preventDefault();
     e.stopPropagation();
     const mediaId = node.attrs['data-media-id'] as string | null;
@@ -350,7 +355,8 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
             alt={(node.attrs.alt as string | null) ?? ''}
             data-media-id={node.attrs['data-media-id']}
             onLoad={handleImgLoad}
-            onClick={selected ? openPreview : undefined}
+            onPointerDown={handleImgPointerDown}
+            onClick={openPreview}
             style={{
               position: 'absolute',
               width: `${100 / cropWidth!}%`,
@@ -379,7 +385,8 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
           alt={(node.attrs.alt as string | null) ?? ''}
           data-media-id={node.attrs['data-media-id']}
           onLoad={handleImgLoad}
-          onClick={selected ? openPreview : undefined}
+          onPointerDown={handleImgPointerDown}
+          onClick={openPreview}
           // globals.css sets `.rich-text-content img { cursor: pointer }` —
           // accurate for an unselected image (a tap selects it); once
           // selected a tap now opens a full-screen preview (openPreview
@@ -424,6 +431,7 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
             onPointerDown={startResize}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            style={{ touchAction: "none" }}
             className="absolute -bottom-3 -right-3 size-6 cursor-nwse-resize rounded-full border-2 border-orange-400 bg-neutral-950"
           />
         </>
