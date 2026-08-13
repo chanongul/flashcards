@@ -270,6 +270,8 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
   function openCrop(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    editor.commands.blur();
+    (document.activeElement as HTMLElement | null)?.blur();
     const mediaId = node.attrs['data-media-id'] as string | null;
     if (!mediaId) return;
     const cropX = node.attrs.cropX as number | null;
@@ -315,6 +317,8 @@ function ImageNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
   function deleteImage(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    editor.commands.blur();
+    (document.activeElement as HTMLElement | null)?.blur();
     editor.chain().focus().deleteSelection().run();
   }
 
@@ -563,6 +567,8 @@ function AudioNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
   function openTrim(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    editor.commands.blur();
+    (document.activeElement as HTMLElement | null)?.blur();
     const mediaId = node.attrs['data-media-id'] as string | null;
     if (mediaId)
       editor.storage.audio.openEditor?.(
@@ -580,6 +586,8 @@ function AudioNodeView({ node, selected, editor, getPos, updateAttributes }: Rea
   function deleteAudio(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    editor.commands.blur();
+    (document.activeElement as HTMLElement | null)?.blur();
     editor.chain().focus().deleteSelection().run();
   }
 
