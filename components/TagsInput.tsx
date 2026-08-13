@@ -43,7 +43,7 @@ export function TagsInput({ value, onChange, placeholder }: TagsInputProps) {
   );
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs">
+    <div className="flex w-full flex-wrap items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs !mt-4">
       {sortedValue.map((tag) => (
         <span
           key={tag}

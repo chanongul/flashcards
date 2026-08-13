@@ -343,7 +343,7 @@ export function CardForm({
             <hr className="border-neutral-800 !my-3" />
           )}
           {selectedNoteType.reversed && (
-            <label className="flex w-fit items-center gap-2 text-xs text-neutral-400 cursor-pointer !my-4">
+            <label className="flex w-fit items-center gap-2 text-xs text-neutral-400 cursor-pointer !mt-4">
               <Checkbox checked={editReversed} onChange={setEditReversed} />
               Also add the reverse card
             </label>
@@ -392,7 +392,7 @@ export function CardForm({
             </div>
           </div>
           {cardType === "basic" && (
-            <label className="flex w-fit items-center gap-2 text-xs text-neutral-400 cursor-pointer !my-4">
+            <label className="flex w-fit items-center gap-2 text-xs text-neutral-400 cursor-pointer !mt-4">
               <Checkbox checked={editReversed} onChange={setEditReversed} />
               Also add the reverse card
             </label>

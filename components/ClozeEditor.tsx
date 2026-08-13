@@ -34,13 +34,13 @@ function draftToHtml(template: string): string {
     let m: RegExpExecArray | null;
     while ((m = re.exec(line))) {
       if (m.index > last) container.appendChild(document.createTextNode(line.slice(last, m.index)));
-      const chip = document.createElement('button');
+      const chip = document.createElement('input');
       chip.type = 'button';
+      chip.value = m[1];
       chip.tabIndex = -1;
       chip.dataset.blank = m[1];
       chip.setAttribute('contenteditable', 'false');
       chip.className = CHIP_CLASS;
-      chip.textContent = m[1];
       container.appendChild(chip);
       last = m.index + m[0].length;
     }
@@ -166,7 +166,7 @@ export function ClozeEditor({
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    const chip = `<button type="button" data-blank="${letter}" contenteditable="false" tabindex="-1" class="${CHIP_CLASS}">${letter}</button>`;
+    const chip = `<input type="button" data-blank="${letter}" value="${letter}" contenteditable="false" tabindex="-1" class="${CHIP_CLASS}" />`;
     document.execCommand('insertHTML', false, chip);
     // The caret after insertHTML lands inside the chip's own (non-editable)
     // text node, not after it — any further typing or execCommand there is
