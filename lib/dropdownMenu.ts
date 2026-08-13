@@ -44,6 +44,12 @@ export function nearestScrollContainer(el: Element): Element | null {
 export function shouldDropUp(triggerEl: Element): boolean {
   const rect = triggerEl.getBoundingClientRect();
   const container = nearestScrollContainer(triggerEl);
-  const bottomBound = container ? container.getBoundingClientRect().bottom : window.innerHeight;
+  // Use visualViewport.height instead of window.innerHeight — on iOS,
+  // window.innerHeight is the FULL page height and does not shrink when the
+  // keyboard is open. visualViewport.height is the actual visible area, so
+  // the dropdown correctly flips upward (or positions itself) to stay above
+  // the keyboard rather than rendering behind it.
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const bottomBound = container ? container.getBoundingClientRect().bottom : viewportHeight;
   return bottomBound - rect.bottom < DROPDOWN_MENU_HEIGHT;
 }

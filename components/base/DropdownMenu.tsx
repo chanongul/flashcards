@@ -44,6 +44,10 @@ export function DropdownMenu({ trigger, children, stopClickPropagation = false }
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
     const right = window.innerWidth - rect.right;
+    // The dropdown's position: fixed styling is relative to the layout viewport
+    // (window.innerHeight), not the visual viewport, so we must calculate
+    // the bottom offset using window.innerHeight to keep it correctly anchored
+    // to the trigger, even when the keyboard is up.
     setCoords(
       shouldDropUp(trigger)
         ? { right, bottom: window.innerHeight - rect.top + 4 }
