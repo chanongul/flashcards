@@ -48,6 +48,11 @@ Supabase (auth + a single `events` table) and Cloudflare R2 (media storage).
   oldest-added-first, then everything else soonest-due-first (not IndexedDB's
   incidental key order, which looks shuffled).
 
+**Import & export**
+- Export any deck (or everything) to JSON — doubles as a full backup.
+- Import that same JSON shape, or a simple front/back/tags CSV. See
+  [Import format](#import-format) for the schema and a ready-to-paste AI prompt.
+
 **Home**
 - Today's New/Learning/Due totals across every deck, as a small comparative bar chart.
 - A GitHub-style review heatmap for the current year.
@@ -79,80 +84,78 @@ Supabase (auth + a single `events` table) and Cloudflare R2 (media storage).
   including Safari, which has no Opus support at all).
 - **ts-fsrs** for spaced-repetition scheduling.
 
-## Setup
+## Import format
 
-### 1. Install dependencies
+The Import button (⬆, top of the home screen) accepts a JSON file shaped like this:
 
-```bash
-npm install
+```json
+{
+  "notes": [
+    {
+      "deckName": "Spanish::Verbs",
+      "noteType": "basic",
+      "front": "to eat",
+      "back": "comer",
+      "tags": ["food"]
+    },
+    {
+      "deckName": "Spanish::Verbs",
+      "noteType": "cloze",
+      "front": "Yo {{c1::como}}, tú {{c2::comes}}.",
+      "back": "present tense of comer"
+    }
+  ]
+}
 ```
 
-### 2. Create a Supabase project
+- `deckName` nests with `::` (`"Parent::Child"`) and is auto-created (max depth 5) — no
+  need to declare it separately unless you want to set `newCardsPerDay`/`reviewsPerDay`,
+  in which case add a top-level `"decks": [{ "name": "...", "newCardsPerDay": 20 }]`.
+- `noteType` is `"basic"` or `"cloze"` (custom note types are also supported via a
+  top-level `noteTypes[]` matching `NoteType` in `lib/db.ts`, but that's overkill for a
+  quick import).
+- Cloze: mark blanks in `front` with `{{c1::answer}}`, `{{c2::answer}}`, etc. — reuse a
+  number to keep blanks together on one card, use different numbers to make them
+  independently-scheduled cards. `back` is optional extra context, not a second cloze.
+- `tags` (string array) and `reversed` (bool, adds a back→front sibling card) are
+  optional on either type.
+- Front/back accept plain text or only `<b>`, `<i>`, `<u>`, `<br>` — everything else gets
+  stripped by the sanitizer. Never fabricate an `<img>`/`<audio data-media-id="...">`:
+  those ids only exist for files actually uploaded through the app.
+- Never include `id` on a deck or note unless you're intentionally re-importing your own
+  earlier export to update it — an `id` means "match my existing entity," and notably
+  can't rename a matched deck or move a matched note to a different deck. For anything
+  new, omit `id` entirely.
 
-Go to [supabase.com](https://supabase.com), create a free project, then run this SQL in
-your project's SQL editor (Supabase dashboard → SQL Editor → paste → run):
+### Writing new cards with AI
 
-```sql
-create table events (
-  id uuid primary key,
-  user_id uuid not null references auth.users(id),
-  entity_id uuid not null,
-  type text not null,
-  payload jsonb not null,
-  client_id text not null,
-  timestamp bigint not null,
-  created_at timestamptz default now()
-);
+Paste everything in the box below into an AI chat (this alone is enough — the AI doesn't
+need anything else from this repo), followed by whatever notes/material you want turned
+into cards, and ask it to generate the JSON file.
 
-create index events_user_id_idx on events (user_id);
-create index events_timestamp_idx on events (timestamp);
+```
+I need a JSON file to import into my flashcards app. Schema:
 
-alter table events enable row level security;
+{ "notes": [{ "deckName": "Deck::Subdeck", "noteType": "basic", "front": "...", "back": "...", "tags": ["..."] }] }
 
-create policy "Users can read their own events"
-  on events for select
-  using (auth.uid() = user_id);
+Rules:
+- noteType is "basic" or "cloze". Basic: plain "front"/"back" strings.
+- Cloze: blanks go directly in "front" as {{c1::answer}}, {{c2::answer}}, etc. — reuse a
+  number for blanks that should be hidden/revealed together, different numbers for blanks
+  that should become separate cards. "back" is optional extra context, not a second cloze.
+- deckName nests with "::", e.g. "Spanish::Verbs::Irregular" — it's auto-created.
+- No "id" field anywhere — that means "overwrite an existing card," not "create new."
+- Front/back: plain text, or only <b>/<i>/<u>/<br> — no other HTML, no images, no audio.
+- One note per fact/question, not multiple crammed into one front/back.
+- Output ONLY the raw JSON, no code fences or commentary, so I can save it straight to a
+  .json file.
 
-create policy "Users can insert their own events"
-  on events for insert
-  with check (auth.uid() = user_id);
+Cards for:
 
-create policy "Users can delete their own events"
-  on events for delete
-  using (auth.uid() = user_id);
+<PASTE YOUR NOTES / TEXTBOOK SECTION / TOPIC HERE>
 ```
 
-Create your account from the dashboard (Authentication → Users → Add user) with an
-email + password — sign-up is intentionally not exposed in the app itself.
-
-### 3. Create a Cloudflare R2 bucket
-
-In the Cloudflare dashboard: R2 → create a bucket, then create an R2 API token
-(Account → R2 → Manage API Tokens) scoped to that bucket. You'll need the account ID,
-access key ID, secret access key, and bucket name.
-
-### 4. Configure environment variables
-
-```bash
-cp .env.example .env.local
-```
-
-Fill in:
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Supabase
-  project settings → API)
-- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` (from
-  step 3)
-
-The same four R2 variables need to be added to your production host's environment
-config too, not just `.env.local`.
-
-### 5. Run it
-
-```bash
-npm run dev
-```
-
-Open http://localhost:3000 and sign in with the account you created in step 2.
+Save the AI's output as a `.json` file and import it via the ⬆ button.
 
 ## Architecture notes
 
